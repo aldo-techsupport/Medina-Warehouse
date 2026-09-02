@@ -1,7 +1,15 @@
 <?php
 
-test('the application returns a successful response', function () {
-    $this->get('/')->assertRedirect('/dashboard');
-    $response = $this->get('/dashboard');
-    $response->assertStatus(200);
+use App\Models\User;
+
+test('unauthenticated users are redirected to login', function () {
+    $this->get('/')->assertRedirect('/login');
+    $this->get('/dashboard')->assertRedirect('/login');
+});
+
+test('authenticated user can view dashboard', function () {
+    $user = User::where('email', 'admin@medina.com')->first();
+    $this->actingAs($user)
+        ->get('/dashboard')
+        ->assertStatus(200);
 });

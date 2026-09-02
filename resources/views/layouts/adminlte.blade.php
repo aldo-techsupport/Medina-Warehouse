@@ -106,6 +106,42 @@
             -webkit-overflow-scrolling: touch;
         }
 
+        /* Navbar & Header Responsive Tweaks */
+        .main-header.navbar {
+            height: 56px;
+            display: flex;
+            align-items: center;
+            flex-wrap: nowrap !important;
+            padding: 0 0.75rem;
+            background-color: #ffffff !important;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        .main-header .navbar-nav {
+            display: flex;
+            flex-direction: row;
+            align-items: center;
+            flex-wrap: nowrap !important;
+        }
+
+        /* Modal Modern Styling */
+        .modal-content {
+            border-radius: 14px;
+            overflow: hidden;
+            border: none;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.18);
+        }
+        .modal-header {
+            border-bottom: 1px solid rgba(0,0,0,0.06);
+            padding: 1rem 1.25rem;
+        }
+        .modal-body {
+            padding: 1.25rem;
+        }
+        .modal-footer {
+            padding: 0.85rem 1.25rem;
+            border-top: 1px solid rgba(0,0,0,0.06);
+        }
+
         /* Mobile Bottom Nav Bar with iPhone Safe Area Support */
         .mobile-bottom-nav {
             display: none;
@@ -118,7 +154,6 @@
             background: #ffffff;
             box-shadow: 0 -2px 12px rgba(0,0,0,0.08);
             z-index: 1045;
-            display: flex;
             justify-content: space-around;
             align-items: center;
             border-top: 1px solid #e5e7eb;
@@ -165,22 +200,15 @@
         }
 
         /* Responsive Mobile tweaks */
-        @media (max-width: 768px) {
+        @media (max-width: 767.98px) {
             .mobile-bottom-nav {
-                display: flex;
+                display: flex !important;
             }
             .content-wrapper {
                 padding-bottom: calc(75px + env(safe-area-inset-bottom, 10px)) !important;
             }
             .content-header h1 {
-                font-size: 1.25rem !important;
-            }
-            .main-header {
-                position: sticky;
-                top: 0;
-                z-index: 1030;
-                padding-left: 0.5rem;
-                padding-right: 0.5rem;
+                font-size: 1.2rem !important;
             }
             .modal-dialog {
                 margin: 0.5rem;
@@ -194,9 +222,12 @@
                 font-size: 11px;
             }
         }
-        @media (min-width: 769px) {
+        @media (min-width: 768px) {
             .mobile-bottom-nav {
                 display: none !important;
+            }
+            .content-wrapper {
+                padding-bottom: 2rem !important;
             }
         }
     </style>
@@ -210,77 +241,142 @@
         <!-- Left navbar links -->
         <ul class="navbar-nav align-items-center">
             <li class="nav-item">
-                <a class="nav-link" data-widget="pushmenu" href="#" role="button"><i class="fas fa-bars"></i></a>
+                <a class="nav-link px-2" data-widget="pushmenu" href="#" role="button"><i class="fas fa-bars"></i></a>
             </li>
-            <li class="nav-item d-none d-md-inline-block">
-                <a href="{{ route('dashboard') }}" class="nav-link font-weight-bold text-dark">
-                    <i class="fas fa-warehouse text-primary mr-1"></i> Gudang Utama
-                </a>
-            </li>
-            <li class="nav-item d-none d-md-inline-block">
-                <a href="{{ route('packing.index') }}" class="nav-link font-weight-bold text-dark">
-                    <i class="fas fa-video text-danger mr-1"></i> Packing Video
-                </a>
-            </li>
-            <li class="nav-item d-none d-md-inline-block">
-                <a href="{{ route('shopee.dashboard') }}" class="nav-link font-weight-bold" style="color: var(--shopee-orange)">
-                    <i class="fas fa-shopping-bag mr-1"></i> Shopee Sync
-                </a>
-            </li>
+            @if(auth()->check() && auth()->user()->hasPermission('dashboard'))
+                <li class="nav-item d-none d-lg-inline-block">
+                    <a href="{{ route('dashboard') }}" class="nav-link font-weight-bold text-dark px-2">
+                        <i class="fas fa-warehouse text-primary mr-1"></i> Gudang Utama
+                    </a>
+                </li>
+            @endif
+            @if(auth()->check() && auth()->user()->hasPermission('packing_station'))
+                <li class="nav-item d-none d-lg-inline-block">
+                    <a href="{{ route('packing.index') }}" class="nav-link font-weight-bold text-dark px-2">
+                        <i class="fas fa-video text-danger mr-1"></i> Packing Video
+                    </a>
+                </li>
+            @endif
+            @if(auth()->check() && auth()->user()->hasPermission('shopee_dashboard'))
+                <li class="nav-item d-none d-lg-inline-block">
+                    <a href="{{ route('shopee.dashboard') }}" class="nav-link font-weight-bold px-2" style="color: var(--shopee-orange)">
+                        <i class="fas fa-shopping-bag mr-1"></i> Shopee Sync
+                    </a>
+                </li>
+            @endif
             <!-- Mobile Brand Title in Header -->
-            <li class="nav-item d-inline-block d-md-none">
-                <span class="font-weight-bold text-dark" style="font-size: 14px;">
-                    <i class="fas fa-boxes-stacked text-primary mr-1"></i> Medina Warehouse
+            <li class="nav-item d-inline-block d-lg-none ml-1">
+                <span class="font-weight-bold text-dark" style="font-size: 13.5px;">
+                    <i class="fas fa-boxes-stacked text-primary mr-1"></i> Medina
                 </span>
             </li>
         </ul>
 
         <!-- Right navbar links -->
         <ul class="navbar-nav ml-auto align-items-center">
-            <!-- Desktop Quick Actions -->
-            <li class="nav-item mr-2 d-none d-sm-inline-block">
-                <a href="{{ route('packing.index') }}" class="btn btn-sm btn-danger shadow-sm font-weight-bold">
-                    <i class="fas fa-barcode mr-1"></i> <span>Scan Packing</span>
-                </a>
-            </li>
+            <!-- Full Desktop Quick Actions (>= 1200px) -->
+            @if(auth()->check() && auth()->user()->hasPermission('packing_station'))
+                <li class="nav-item mr-2 d-none d-xl-inline-block">
+                    <a href="{{ route('packing.index') }}" class="btn btn-sm btn-danger shadow-sm font-weight-bold">
+                        <i class="fas fa-barcode mr-1"></i> <span>Scan Packing</span>
+                    </a>
+                </li>
+            @endif
 
-            <li class="nav-item mr-2 d-none d-sm-inline-block">
-                <button type="button" class="btn btn-sm btn-primary shadow-sm" data-toggle="modal" data-target="#quickMutationModal">
-                    <i class="fas fa-exchange-alt mr-1"></i> <span>Mutasi Cepat</span>
+            @if(auth()->check() && auth()->user()->hasPermission('warehouse_mutations'))
+                <li class="nav-item mr-2 d-none d-xl-inline-block">
+                    <button type="button" class="btn btn-sm btn-primary shadow-sm" data-toggle="modal" data-target="#quickMutationModal">
+                        <i class="fas fa-exchange-alt mr-1"></i> <span>Mutasi Cepat</span>
+                    </button>
+                </li>
+            @endif
+
+            @if(auth()->check() && auth()->user()->hasPermission('shopee_orders'))
+                <li class="nav-item mr-2 d-none d-xl-inline-block">
+                    <button type="button" class="btn btn-sm btn-shopee shadow-sm" data-toggle="modal" data-target="#simulatorModal">
+                        <i class="fas fa-bolt mr-1"></i> <span>Simulasi Order</span>
+                    </button>
+                </li>
+            @endif
+
+            <!-- Collapsed Quick Action Dropdown (< 1200px) -->
+            <li class="nav-item dropdown d-inline-block d-xl-none mr-2">
+                <button type="button" class="btn btn-sm btn-outline-primary shadow-xs dropdown-toggle font-weight-bold px-2" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                    <i class="fas fa-bolt text-warning mr-1"></i> <span class="d-none d-sm-inline">Aksi Cepat</span>
                 </button>
-            </li>
-
-            <li class="nav-item mr-2 d-none d-sm-inline-block">
-                <button type="button" class="btn btn-sm btn-shopee shadow-sm" data-toggle="modal" data-target="#simulatorModal">
-                    <i class="fas fa-bolt mr-1"></i> <span>Simulasi Order</span>
-                </button>
-            </li>
-
-            <!-- Mobile Quick Action Dropdown -->
-            <li class="nav-item dropdown d-inline-block d-sm-none">
-                <a class="nav-link text-primary font-weight-bold" data-toggle="dropdown" href="#">
-                    <i class="fas fa-ellipsis-vertical fa-lg"></i>
-                </a>
-                <div class="dropdown-menu dropdown-menu-right shadow-lg border-0 p-2" style="min-width: 200px;">
-                    <a href="{{ route('packing.index') }}" class="dropdown-item py-2 text-danger font-weight-bold">
-                        <i class="fas fa-video mr-2"></i> Stasiun Packing
-                    </a>
-                    <a href="#" class="dropdown-item py-2" data-toggle="modal" data-target="#quickMutationModal">
-                        <i class="fas fa-exchange-alt text-primary mr-2"></i> Catat Mutasi
-                    </a>
-                    <a href="#" class="dropdown-item py-2" data-toggle="modal" data-target="#simulatorModal">
-                        <i class="fas fa-bolt text-warning mr-2"></i> Simulasi Order Shopee
-                    </a>
-                    <div class="dropdown-divider"></div>
-                    <a href="{{ route('shopee.settings') }}" class="dropdown-item py-2 text-muted">
-                        <i class="fas fa-cog mr-2"></i> Pengaturan API
-                    </a>
+                <div class="dropdown-menu dropdown-menu-right shadow-lg border-0 p-2" style="min-width: 220px; border-radius: 12px;">
+                    <h6 class="dropdown-header font-weight-bold text-dark px-2 py-1">Pintasan Aksi</h6>
+                    @if(auth()->check() && auth()->user()->hasPermission('packing_station'))
+                        <a href="{{ route('packing.index') }}" class="dropdown-item py-2 text-danger font-weight-bold">
+                            <i class="fas fa-video mr-2"></i> Stasiun Packing Video
+                        </a>
+                    @endif
+                    @if(auth()->check() && auth()->user()->hasPermission('warehouse_mutations'))
+                        <a href="#" class="dropdown-item py-2 text-primary font-weight-bold" data-toggle="modal" data-target="#quickMutationModal">
+                            <i class="fas fa-exchange-alt mr-2"></i> Catat Mutasi Stok
+                        </a>
+                    @endif
+                    @if(auth()->check() && auth()->user()->hasPermission('shopee_orders'))
+                        <a href="#" class="dropdown-item py-2 font-weight-bold" style="color: var(--shopee-orange)" data-toggle="modal" data-target="#simulatorModal">
+                            <i class="fas fa-bolt mr-2"></i> Simulasi Order Shopee
+                        </a>
+                    @endif
                 </div>
             </li>
 
+            <!-- User Profile Dropdown -->
+            @auth
+                <li class="nav-item dropdown">
+                    <a class="nav-link d-flex align-items-center py-0 px-2" data-toggle="dropdown" href="#" aria-expanded="false">
+                        <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center font-weight-bold mr-1 mr-md-2 shadow-xs" style="width: 32px; height: 32px; font-size: 13px;">
+                            {{ strtoupper(substr(auth()->user()->name, 0, 1)) }}
+                        </div>
+                        <div class="d-none d-md-block text-left mr-1">
+                            <span class="d-block font-weight-bold text-dark text-truncate" style="max-width: 140px; font-size: 12.5px; line-height: 1.2;">{{ auth()->user()->name }}</span>
+                            <span class="badge {{ auth()->user()->isSuperAdmin() ? 'badge-dark' : 'badge-primary' }}" style="font-size: 9.5px; font-weight: 600;">
+                                {{ auth()->user()->role->name ?? 'Pengguna' }}
+                            </span>
+                        </div>
+                        <i class="fas fa-chevron-down text-muted ml-1" style="font-size: 9px;"></i>
+                    </a>
+                    <div class="dropdown-menu dropdown-menu-right shadow-lg border-0 p-2" style="min-width: 230px; border-radius: 12px;">
+                        <div class="px-3 py-2 border-bottom mb-2 bg-light rounded">
+                            <div class="font-weight-bold text-dark">{{ auth()->user()->name }}</div>
+                            <div class="text-muted text-truncate" style="font-size: 11.5px;">{{ auth()->user()->email }}</div>
+                            <div class="mt-1">
+                                <span class="badge badge-success" style="font-size: 10px;">
+                                    <i class="fas fa-shield-alt mr-1"></i> Role: {{ auth()->user()->role->name ?? 'User' }}
+                                </span>
+                            </div>
+                        </div>
+
+                        @if(auth()->user()->hasPermission('role_management'))
+                            <a href="{{ route('roles.index') }}" class="dropdown-item py-2">
+                                <i class="fas fa-user-shield text-primary mr-2"></i> Manajemen Role & Akses
+                            </a>
+                        @endif
+
+                        @if(auth()->user()->hasPermission('user_management'))
+                            <a href="{{ route('users.index') }}" class="dropdown-item py-2">
+                                <i class="fas fa-users-cog text-info mr-2"></i> Manajemen Pengguna
+                            </a>
+                        @endif
+
+                        <div class="dropdown-divider"></div>
+
+                        <form action="{{ route('logout') }}" method="POST">
+                            @csrf
+                            <button type="submit" class="dropdown-item py-2 text-danger font-weight-bold">
+                                <i class="fas fa-sign-out-alt mr-2"></i> Keluar (Logout)
+                            </button>
+                        </form>
+                    </div>
+                </li>
+            @endauth
+
             <!-- Fullscreen (Desktop Only) -->
-            <li class="nav-item d-none d-md-inline-block">
-                <a class="nav-link" data-widget="fullscreen" href="#" role="button">
+            <li class="nav-item d-none d-lg-inline-block">
+                <a class="nav-link px-2" href="#" id="fullscreenToggleBtn" role="button" onclick="event.preventDefault(); toggleFullscreen();" title="Layar Penuh (Fullscreen)">
                     <i class="fas fa-expand-arrows-alt"></i>
                 </a>
             </li>
@@ -300,79 +396,163 @@
 
         <!-- Sidebar -->
         <div class="sidebar">
+            <!-- Sidebar User Panel -->
+            @auth
+                <div class="user-panel mt-3 pb-3 mb-2 d-flex align-items-center border-bottom" style="border-color: rgba(255,255,255,0.1) !important;">
+                    <div class="image">
+                        <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center font-weight-bold shadow-xs" style="width: 34px; height: 34px; font-size: 14px;">
+                            {{ strtoupper(substr(auth()->user()->name, 0, 1)) }}
+                        </div>
+                    </div>
+                    <div class="info ml-2">
+                        <span class="d-block text-white font-weight-bold" style="font-size: 13px; line-height: 1.2;">{{ auth()->user()->name }}</span>
+                        <span class="badge {{ auth()->user()->isSuperAdmin() ? 'badge-warning text-dark' : 'badge-info' }} mt-1" style="font-size: 10px;">
+                            {{ auth()->user()->role->name ?? 'Pengguna' }}
+                        </span>
+                    </div>
+                </div>
+            @endauth
+
             <!-- Sidebar Menu -->
-            <nav class="mt-3">
+            <nav class="mt-2">
                 <ul class="nav nav-pills nav-sidebar flex-column nav-child-indent" data-widget="treeview" role="menu" data-accordion="false">
                     
-                    <li class="nav-header text-uppercase font-weight-bold text-muted" style="font-size: 10px;">Gudang Utama</li>
-                    
-                    <li class="nav-item">
-                        <a href="{{ route('dashboard') }}" class="nav-link {{ request()->routeIs('dashboard') ? 'active' : '' }}">
-                            <i class="nav-icon fas fa-chart-pie"></i>
-                            <p>Dashboard Gudang</p>
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a href="{{ route('warehouse.products') }}" class="nav-link {{ request()->routeIs('warehouse.products*') ? 'active' : '' }}">
-                            <i class="nav-icon fas fa-boxes"></i>
-                            <p>Katalog & Stok SKU</p>
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a href="{{ route('warehouse.mutations') }}" class="nav-link {{ request()->routeIs('warehouse.mutations*') ? 'active' : '' }}">
-                            <i class="nav-icon fas fa-history"></i>
-                            <p>Riwayat Mutasi Stok</p>
-                        </a>
-                    </li>
+                    @if(auth()->user()->hasPermission('dashboard') || auth()->user()->hasPermission('warehouse_products') || auth()->user()->hasPermission('warehouse_mutations'))
+                        <li class="nav-header text-uppercase font-weight-bold text-muted" style="font-size: 10px;">Gudang Utama</li>
+                        
+                        @if(auth()->user()->hasPermission('dashboard'))
+                            <li class="nav-item">
+                                <a href="{{ route('dashboard') }}" class="nav-link {{ request()->routeIs('dashboard') ? 'active' : '' }}">
+                                    <i class="nav-icon fas fa-chart-pie"></i>
+                                    <p>Dashboard Gudang</p>
+                                </a>
+                            </li>
+                        @endif
 
-                    <li class="nav-header text-uppercase font-weight-bold text-muted mt-2" style="font-size: 10px;">Packing & Pengiriman</li>
+                        @if(auth()->user()->hasPermission('warehouse_products'))
+                            <li class="nav-item">
+                                <a href="{{ route('warehouse.products') }}" class="nav-link {{ request()->routeIs('warehouse.products*') ? 'active' : '' }}">
+                                    <i class="nav-icon fas fa-boxes"></i>
+                                    <p>Katalog & Stok SKU</p>
+                                </a>
+                            </li>
+                        @endif
 
-                    <li class="nav-item">
-                        <a href="{{ route('packing.index') }}" class="nav-link {{ request()->routeIs('packing.index') ? 'active bg-danger' : '' }}">
-                            <i class="nav-icon fas fa-video text-danger"></i>
-                            <p class="font-weight-bold">Stasiun Packing Video</p>
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a href="{{ route('packing.history') }}" class="nav-link {{ request()->routeIs('packing.history') ? 'active bg-danger' : '' }}">
-                            <i class="nav-icon fas fa-photo-film text-danger"></i>
-                            <p>Galeri Video Packing</p>
-                        </a>
-                    </li>
+                        @if(auth()->user()->hasPermission('warehouse_mutations'))
+                            <li class="nav-item">
+                                <a href="{{ route('warehouse.mutations') }}" class="nav-link {{ request()->routeIs('warehouse.mutations*') ? 'active' : '' }}">
+                                    <i class="nav-icon fas fa-history"></i>
+                                    <p>Riwayat Mutasi Stok</p>
+                                </a>
+                            </li>
+                        @endif
+                    @endif
 
-                    <li class="nav-header text-uppercase font-weight-bold text-muted mt-2" style="font-size: 10px;">Integrasi Shopee</li>
+                    @if(auth()->user()->hasPermission('packing_station') || auth()->user()->hasPermission('packing_history'))
+                        <li class="nav-header text-uppercase font-weight-bold text-muted mt-2" style="font-size: 10px;">Packing & Pengiriman</li>
 
-                    <li class="nav-item">
-                        <a href="{{ route('shopee.dashboard') }}" class="nav-link {{ request()->routeIs('shopee.dashboard') ? 'active bg-orange' : '' }}">
-                            <i class="nav-icon fas fa-store" style="color: {{ request()->routeIs('shopee.dashboard') ? '#fff' : 'var(--shopee-orange)' }}"></i>
-                            <p>Dashboard Shopee</p>
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a href="{{ route('shopee.orders') }}" class="nav-link {{ request()->routeIs('shopee.orders*') ? 'active bg-orange' : '' }}">
-                            <i class="nav-icon fas fa-shopping-cart" style="color: {{ request()->routeIs('shopee.orders*') ? '#fff' : 'var(--shopee-orange)' }}"></i>
-                            <p>Pesanan Shopee</p>
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a href="{{ route('shopee.settings') }}" class="nav-link {{ request()->routeIs('shopee.settings*') ? 'active bg-orange' : '' }}">
-                            <i class="nav-icon fas fa-key" style="color: {{ request()->routeIs('shopee.settings*') ? '#fff' : 'var(--shopee-orange)' }}"></i>
-                            <p>API & Webhook Setting</p>
-                        </a>
-                    </li>
+                        @if(auth()->user()->hasPermission('packing_station'))
+                            <li class="nav-item">
+                                <a href="{{ route('packing.index') }}" class="nav-link {{ request()->routeIs('packing.index') ? 'active bg-danger' : '' }}">
+                                    <i class="nav-icon fas fa-video text-danger"></i>
+                                    <p class="font-weight-bold">Stasiun Packing Video</p>
+                                </a>
+                            </li>
+                        @endif
 
-                    <li class="nav-header text-uppercase font-weight-bold text-muted mt-2" style="font-size: 10px;">Aksi Cepat</li>
-                    <li class="nav-item">
-                        <a href="#" class="nav-link" data-toggle="modal" data-target="#quickMutationModal">
-                            <i class="nav-icon fas fa-plus-circle text-success"></i>
-                            <p>Catat Mutasi Stok</p>
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a href="#" class="nav-link" data-toggle="modal" data-target="#simulatorModal">
-                            <i class="nav-icon fas fa-magic text-warning"></i>
-                            <p>Simulasi Beli di Shopee</p>
-                        </a>
+                        @if(auth()->user()->hasPermission('packing_history'))
+                            <li class="nav-item">
+                                <a href="{{ route('packing.history') }}" class="nav-link {{ request()->routeIs('packing.history') ? 'active bg-danger' : '' }}">
+                                    <i class="nav-icon fas fa-photo-film text-danger"></i>
+                                    <p>Galeri Video Packing</p>
+                                </a>
+                            </li>
+                        @endif
+                    @endif
+
+                    @if(auth()->user()->hasPermission('shopee_dashboard') || auth()->user()->hasPermission('shopee_orders') || auth()->user()->hasPermission('shopee_settings'))
+                        <li class="nav-header text-uppercase font-weight-bold text-muted mt-2" style="font-size: 10px;">Integrasi Shopee</li>
+
+                        @if(auth()->user()->hasPermission('shopee_dashboard'))
+                            <li class="nav-item">
+                                <a href="{{ route('shopee.dashboard') }}" class="nav-link {{ request()->routeIs('shopee.dashboard') ? 'active bg-orange' : '' }}">
+                                    <i class="nav-icon fas fa-store" style="color: {{ request()->routeIs('shopee.dashboard') ? '#fff' : 'var(--shopee-orange)' }}"></i>
+                                    <p>Dashboard Shopee</p>
+                                </a>
+                            </li>
+                        @endif
+
+                        @if(auth()->user()->hasPermission('shopee_orders'))
+                            <li class="nav-item">
+                                <a href="{{ route('shopee.orders') }}" class="nav-link {{ request()->routeIs('shopee.orders*') ? 'active bg-orange' : '' }}">
+                                    <i class="nav-icon fas fa-shopping-cart" style="color: {{ request()->routeIs('shopee.orders*') ? '#fff' : 'var(--shopee-orange)' }}"></i>
+                                    <p>Pesanan Shopee</p>
+                                </a>
+                            </li>
+                        @endif
+
+                        @if(auth()->user()->hasPermission('shopee_settings'))
+                            <li class="nav-item">
+                                <a href="{{ route('shopee.settings') }}" class="nav-link {{ request()->routeIs('shopee.settings*') ? 'active bg-orange' : '' }}">
+                                    <i class="nav-icon fas fa-key" style="color: {{ request()->routeIs('shopee.settings*') ? '#fff' : 'var(--shopee-orange)' }}"></i>
+                                    <p>API & Webhook Setting</p>
+                                </a>
+                            </li>
+                        @endif
+                    @endif
+
+                    @if(auth()->user()->hasPermission('role_management') || auth()->user()->hasPermission('user_management'))
+                        <li class="nav-header text-uppercase font-weight-bold text-muted mt-2" style="font-size: 10px;">Pengaturan & Hak Akses</li>
+
+                        @if(auth()->user()->hasPermission('role_management'))
+                            <li class="nav-item">
+                                <a href="{{ route('roles.index') }}" class="nav-link {{ request()->routeIs('roles.*') ? 'active' : '' }}">
+                                    <i class="nav-icon fas fa-user-shield text-info"></i>
+                                    <p>Role & Hak Akses Menu</p>
+                                </a>
+                            </li>
+                        @endif
+
+                        @if(auth()->user()->hasPermission('user_management'))
+                            <li class="nav-item">
+                                <a href="{{ route('users.index') }}" class="nav-link {{ request()->routeIs('users.*') ? 'active' : '' }}">
+                                    <i class="nav-icon fas fa-users-cog text-info"></i>
+                                    <p>Manajemen Pengguna</p>
+                                </a>
+                            </li>
+                        @endif
+                    @endif
+
+                    @if(auth()->user()->hasPermission('warehouse_mutations') || auth()->user()->hasPermission('shopee_orders'))
+                        <li class="nav-header text-uppercase font-weight-bold text-muted mt-2" style="font-size: 10px;">Aksi Cepat</li>
+                        
+                        @if(auth()->user()->hasPermission('warehouse_mutations'))
+                            <li class="nav-item">
+                                <a href="#" class="nav-link" data-toggle="modal" data-target="#quickMutationModal">
+                                    <i class="nav-icon fas fa-plus-circle text-success"></i>
+                                    <p>Catat Mutasi Stok</p>
+                                </a>
+                            </li>
+                        @endif
+
+                        @if(auth()->user()->hasPermission('shopee_orders'))
+                            <li class="nav-item">
+                                <a href="#" class="nav-link" data-toggle="modal" data-target="#simulatorModal">
+                                    <i class="nav-icon fas fa-magic text-warning"></i>
+                                    <p>Simulasi Beli di Shopee</p>
+                                </a>
+                            </li>
+                        @endif
+                    @endif
+
+                    <li class="nav-item mt-3 pt-2 border-top" style="border-color: rgba(255,255,255,0.1) !important;">
+                        <form action="{{ route('logout') }}" method="POST" id="sidebarLogoutForm">
+                            @csrf
+                            <a href="#" class="nav-link text-danger font-weight-bold" onclick="event.preventDefault(); document.getElementById('sidebarLogoutForm').submit();">
+                                <i class="nav-icon fas fa-sign-out-alt"></i>
+                                <p>Keluar (Logout)</p>
+                            </a>
+                        </form>
                     </li>
                 </ul>
             </nav>
@@ -568,28 +748,38 @@
 
     <!-- Mobile Bottom Navigation -->
     <nav class="mobile-bottom-nav">
-        <a href="{{ route('dashboard') }}" class="mobile-bottom-nav-item {{ request()->routeIs('dashboard') ? 'active' : '' }}">
-            <i class="fas fa-warehouse"></i>
-            <span>Gudang</span>
-        </a>
-        <a href="{{ route('warehouse.products') }}" class="mobile-bottom-nav-item {{ request()->routeIs('warehouse.products*') ? 'active' : '' }}">
-            <i class="fas fa-boxes"></i>
-            <span>Produk</span>
-        </a>
-        <a href="{{ route('packing.index') }}" class="mobile-bottom-nav-item">
-            <div class="mobile-bottom-nav-fab bg-danger">
-                <i class="fas fa-video"></i>
-            </div>
-            <span style="margin-top: 4px; color: #dc2626; font-weight: bold;">Packing</span>
-        </a>
-        <a href="{{ route('warehouse.mutations') }}" class="mobile-bottom-nav-item {{ request()->routeIs('warehouse.mutations*') ? 'active' : '' }}">
-            <i class="fas fa-history"></i>
-            <span>Riwayat</span>
-        </a>
-        <a href="{{ route('shopee.dashboard') }}" class="mobile-bottom-nav-item shopee-nav {{ request()->routeIs('shopee.*') ? 'active' : '' }}">
-            <i class="fas fa-shopping-bag"></i>
-            <span>Shopee</span>
-        </a>
+        @if(auth()->check() && auth()->user()->hasPermission('dashboard'))
+            <a href="{{ route('dashboard') }}" class="mobile-bottom-nav-item {{ request()->routeIs('dashboard') ? 'active' : '' }}">
+                <i class="fas fa-warehouse"></i>
+                <span>Gudang</span>
+            </a>
+        @endif
+        @if(auth()->check() && auth()->user()->hasPermission('warehouse_products'))
+            <a href="{{ route('warehouse.products') }}" class="mobile-bottom-nav-item {{ request()->routeIs('warehouse.products*') ? 'active' : '' }}">
+                <i class="fas fa-boxes"></i>
+                <span>Produk</span>
+            </a>
+        @endif
+        @if(auth()->check() && auth()->user()->hasPermission('packing_station'))
+            <a href="{{ route('packing.index') }}" class="mobile-bottom-nav-item">
+                <div class="mobile-bottom-nav-fab bg-danger">
+                    <i class="fas fa-video"></i>
+                </div>
+                <span style="margin-top: 4px; color: #dc2626; font-weight: bold;">Packing</span>
+            </a>
+        @endif
+        @if(auth()->check() && auth()->user()->hasPermission('warehouse_mutations'))
+            <a href="{{ route('warehouse.mutations') }}" class="mobile-bottom-nav-item {{ request()->routeIs('warehouse.mutations*') ? 'active' : '' }}">
+                <i class="fas fa-history"></i>
+                <span>Riwayat</span>
+            </a>
+        @endif
+        @if(auth()->check() && auth()->user()->hasPermission('shopee_dashboard'))
+            <a href="{{ route('shopee.dashboard') }}" class="mobile-bottom-nav-item shopee-nav {{ request()->routeIs('shopee.*') ? 'active' : '' }}">
+                <i class="fas fa-shopping-bag"></i>
+                <span>Shopee</span>
+            </a>
+        @endif
     </nav>
 
     <!-- Main Footer (Desktop Only) -->
@@ -615,6 +805,49 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
 
 <script>
+    function toggleFullscreen() {
+        var elem = document.documentElement;
+        if (!document.fullscreenElement && !document.mozFullScreenElement &&
+            !document.webkitFullscreenElement && !document.msFullscreenElement) {
+            if (elem.requestFullscreen) {
+                elem.requestFullscreen().catch(err => console.log(err));
+            } else if (elem.webkitRequestFullscreen) {
+                elem.webkitRequestFullscreen();
+            } else if (elem.msRequestFullscreen) {
+                elem.msRequestFullscreen();
+            } else if (elem.mozRequestFullScreen) {
+                elem.mozRequestFullScreen();
+            }
+        } else {
+            if (document.exitFullscreen) {
+                document.exitFullscreen().catch(err => console.log(err));
+            } else if (document.webkitExitFullscreen) {
+                document.webkitExitFullscreen();
+            } else if (document.msExitFullscreen) {
+                document.msExitFullscreen();
+            } else if (document.mozCancelFullScreen) {
+                document.mozCancelFullScreen();
+            }
+        }
+    }
+
+    function updateFullscreenIcon() {
+        var isFull = !!(document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement || document.msFullscreenElement);
+        var icon = document.querySelector('#fullscreenToggleBtn i');
+        if (icon) {
+            if (isFull) {
+                icon.className = 'fas fa-compress-arrows-alt';
+            } else {
+                icon.className = 'fas fa-expand-arrows-alt';
+            }
+        }
+    }
+
+    document.addEventListener('fullscreenchange', updateFullscreenIcon);
+    document.addEventListener('webkitfullscreenchange', updateFullscreenIcon);
+    document.addEventListener('mozfullscreenchange', updateFullscreenIcon);
+    document.addEventListener('MSFullscreenChange', updateFullscreenIcon);
+
     $(document).ready(function() {
         $('#mutationTypeSelect').on('change', function() {
             var val = $(this).val();

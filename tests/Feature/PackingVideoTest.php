@@ -3,8 +3,13 @@
 use App\Models\PackingRecord;
 use App\Models\Product;
 use App\Models\ShopeeOrder;
+use App\Models\User;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
+
+beforeEach(function () {
+    $this->user = User::where('email', 'admin@medina.com')->first();
+});
 
 test('it blocks packing for cancelled Shopee orders and creates blocked packing log', function () {
     $order = ShopeeOrder::create([
@@ -19,7 +24,7 @@ test('it blocks packing for cancelled Shopee orders and creates blocked packing 
         ],
     ]);
 
-    $response = $this->postJson(route('packing.check'), [
+    $response = $this->actingAs($this->user)->postJson(route('packing.check'), [
         'query' => 'RESI-CANCEL-999',
         'packer_name' => 'Budi Packer',
     ]);
@@ -65,7 +70,7 @@ test('it allows valid ready_to_ship orders and returns items checklist', functio
         ],
     ]);
 
-    $response = $this->postJson(route('packing.check'), [
+    $response = $this->actingAs($this->user)->postJson(route('packing.check'), [
         'query' => 'RESI-VALID-888',
     ]);
 
@@ -96,7 +101,7 @@ test('it can upload and store packing video and create completed record', functi
 
     $dummyVideo = UploadedFile::fake()->create('packing_video.webm', 1024, 'video/webm');
 
-    $response = $this->postJson(route('packing.upload'), [
+    $response = $this->actingAs($this->user)->postJson(route('packing.upload'), [
         'order_sn' => 'ORD-UPLOAD-TEST-003',
         'tracking_number' => 'RESI-UPLOAD-777',
         'video' => $dummyVideo,
@@ -124,6 +129,6 @@ test('it can upload and store packing video and create completed record', functi
 });
 
 test('it renders packing index and history views', function () {
-    $this->get(route('packing.index'))->assertStatus(200);
-    $this->get(route('packing.history'))->assertStatus(200);
+    $this->actingAs($this->user)->get(route('packing.index'))->assertStatus(200);
+    $this->actingAs($this->user)->get(route('packing.history'))->assertStatus(200);
 });
