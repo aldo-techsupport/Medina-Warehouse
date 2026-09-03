@@ -233,9 +233,9 @@
         <div class="col-6 col-md-3">
             <div class="small-box">
                 <div class="inner">
-                    <div class="text-muted text-uppercase font-weight-bold" style="font-size: 11px;">Model AI Aktif</div>
-                    <h3 class="text-purple text-truncate" style="font-size: 1.15rem;" title="{{ $aiConfig['model'] }}">
-                        {{ Str::limit($aiConfig['model'], 18) }}
+                    <div class="text-muted text-uppercase font-weight-bold" style="font-size: 11px;">Asisten Cerdas Toko</div>
+                    <h3 class="text-purple text-truncate" style="font-size: 1.15rem;">
+                        Asisten Penjualan
                     </h3>
                     <div class="text-muted text-truncate" style="font-size: 11.5px;">
                         @if($aiConfig['is_configured'])
@@ -269,7 +269,7 @@
                             <i class="far fa-clock mr-1"></i> {{ $latestAnalysis ? $latestAnalysis->created_at->translatedFormat('d M Y, H:i') : '-' }}
                         </span>
                         <span class="badge badge-purple text-white ml-1" style="font-size: 10px;">
-                            {{ $latestAnalysis->model_used ?? 'AI Engine' }}
+                            Asisten Penjualan Medina
                         </span>
                     </div>
                 </div>
@@ -451,7 +451,7 @@
                             @elseif($msg->role === 'assistant')
                                 <div class="chat-bubble chat-bubble-assistant">
                                     <div class="font-weight-bold text-purple mb-1" style="font-size: 11px;">
-                                        <i class="fas fa-robot mr-1"></i> {{ $msg->model_used ?: 'AI Advisor' }}
+                                        <i class="fas fa-robot mr-1"></i> Asisten Penjualan Medina
                                     </div>
                                     <div class="chat-formatted-text">{!! nl2br(e($msg->content)) !!}</div>
                                     <div class="chat-meta">
@@ -639,7 +639,7 @@ $(document).ready(function() {
         const bubble = `
             <div class="chat-bubble chat-bubble-assistant">
                 <div class="font-weight-bold text-purple mb-1" style="font-size: 11px;">
-                    <i class="fas fa-robot mr-1"></i> ${escapeHtml(model)}
+                    <i class="fas fa-robot mr-1"></i> Asisten Penjualan Medina
                 </div>
                 <div class="chat-formatted-text">${formatted}</div>
                 <div class="chat-meta">

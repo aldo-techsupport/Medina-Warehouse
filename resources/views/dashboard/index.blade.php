@@ -16,41 +16,75 @@
 
 @section('content')
 
-<!-- Shopee Connection & Sync Status Banner -->
-<div class="card mb-3 border-0 bg-white shadow-sm overflow-hidden" style="border-left: 4px solid var(--shopee-orange) !important;">
-    <div class="card-body p-3">
-        <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center">
-            <div class="d-flex align-items-center mb-2 mb-md-0">
-                <div class="rounded-circle p-2 d-flex align-items-center justify-content-center mr-2 mr-md-3 flex-shrink-0" style="background-color: rgba(238, 77, 45, 0.1); width: 40px; height: 40px;">
-                    <i class="fas fa-store" style="color: var(--shopee-orange)"></i>
-                </div>
-                <div>
-                    <div class="d-flex flex-wrap align-items-center mb-1">
-                        <strong class="text-dark mr-2" style="font-size: 13px;">Shopee Open API:</strong>
-                        @if($shopeeSetting->isConnected())
-                            <span class="badge badge-success px-2 py-1"><i class="fas fa-check-circle mr-1"></i> Terhubung ({{ ucfirst($shopeeSetting->environment) }})</span>
-                        @else
-                            <span class="badge badge-info px-2 py-1"><i class="fas fa-vial mr-1"></i> Sandbox / Simulasi</span>
-                        @endif
-                    </div>
-                    <div class="text-muted" style="font-size: 11px;">
-                        Toko: <strong>{{ $shopeeSetting->shop_name }}</strong> &bull;
-                        Auto-Deduct: <strong class="text-success">Aktif</strong> &bull;
-                        Terhubung: <strong>{{ $shopeeConnectedCount }} SKU</strong>
-                    </div>
-                </div>
+<!-- Top Stats Grid -->
+<div class="row">
+    <!-- Total SKU -->
+    <div class="col-6 col-lg-3 col-md-6 mb-2 mb-md-3">
+        <div class="small-box bg-white p-2 p-md-3 border h-100 mb-0">
+            <div class="inner">
+                <p class="text-muted text-uppercase mb-1 font-weight-bold" style="font-size: 10px;">Total SKU</p>
+                <h3 class="font-weight-bold text-dark mb-0" style="font-size: 1.4rem;">{{ number_format($totalProducts) }}</h3>
             </div>
-            <div class="d-flex align-items-center mt-2 mt-md-0">
-                <form action="{{ route('shopee.sync.all') }}" method="POST" class="mr-2 flex-fill flex-md-grow-0">
-                    @csrf
-                    <button type="submit" class="btn btn-xs btn-outline-secondary btn-block">
-                        <i class="fas fa-sync-alt mr-1"></i> Push Stok
-                    </button>
-                </form>
-                <a href="{{ route('shopee.dashboard') }}" class="btn btn-xs btn-shopee flex-fill flex-md-grow-0">
-                    <i class="fas fa-external-link-alt mr-1"></i> Channel Shopee
-                </a>
+            <div class="icon d-none d-sm-block" style="top: 10px; right: 12px; opacity: 0.12; position: absolute;">
+                <i class="fas fa-boxes text-primary fa-2x"></i>
             </div>
+            <a href="{{ route('warehouse.products') }}" class="small-box-footer mt-1 d-block font-weight-bold" style="font-size: 11px;">
+                Lihat Katalog &rarr;
+            </a>
+        </div>
+    </div>
+
+    <!-- Total Fisik Stok Gudang -->
+    <div class="col-6 col-lg-3 col-md-6 mb-2 mb-md-3">
+        <div class="small-box bg-white p-2 p-md-3 border h-100 mb-0">
+            <div class="inner">
+                <p class="text-muted text-uppercase mb-1 font-weight-bold" style="font-size: 10px;">Stok Gudang</p>
+                <h3 class="font-weight-bold text-primary mb-0" style="font-size: 1.4rem;">
+                    {{ number_format($totalStock) }} <span style="font-size: 11px; font-weight: normal;" class="text-muted">Unit</span>
+                </h3>
+            </div>
+            <div class="icon d-none d-sm-block" style="top: 10px; right: 12px; opacity: 0.12; position: absolute;">
+                <i class="fas fa-cubes text-info fa-2x"></i>
+            </div>
+            <a href="{{ route('warehouse.mutations') }}" class="small-box-footer mt-1 d-block font-weight-bold" style="font-size: 11px;">
+                Riwayat Mutasi &rarr;
+            </a>
+        </div>
+    </div>
+
+    <!-- Nilai Total Aset -->
+    <div class="col-6 col-lg-3 col-md-6 mb-2 mb-md-3">
+        <div class="small-box bg-white p-2 p-md-3 border h-100 mb-0">
+            <div class="inner">
+                <p class="text-muted text-uppercase mb-1 font-weight-bold" style="font-size: 10px;">Estimasi Aset</p>
+                <h3 class="font-weight-bold text-success mb-0" style="font-size: 1.15rem; line-height: 1.2;">
+                    Rp {{ number_format($totalAssetValue, 0, ',', '.') }}
+                </h3>
+            </div>
+            <div class="icon d-none d-sm-block" style="top: 10px; right: 12px; opacity: 0.12; position: absolute;">
+                <i class="fas fa-wallet text-success fa-2x"></i>
+            </div>
+            <div class="small-box-footer text-muted mt-1" style="font-size: 10px;">
+                Harga HPP
+            </div>
+        </div>
+    </div>
+
+    <!-- Stok Kritis Alert -->
+    <div class="col-6 col-lg-3 col-md-6 mb-2 mb-md-3">
+        <div class="small-box bg-white p-2 p-md-3 border h-100 mb-0 {{ $lowStockCount > 0 ? 'border-danger' : '' }}">
+            <div class="inner">
+                <p class="text-muted text-uppercase mb-1 font-weight-bold" style="font-size: 10px;">Stok Kritis</p>
+                <h3 class="font-weight-bold {{ $lowStockCount > 0 ? 'text-danger' : 'text-success' }} mb-0" style="font-size: 1.4rem;">
+                    {{ $lowStockCount }} <span style="font-size: 11px; font-weight: normal;" class="text-muted">SKU</span>
+                </h3>
+            </div>
+            <div class="icon d-none d-sm-block" style="top: 10px; right: 12px; opacity: 0.12; position: absolute;">
+                <i class="fas fa-triangle-exclamation text-danger fa-2x"></i>
+            </div>
+            <a href="{{ route('warehouse.products', ['stock_status' => 'low']) }}" class="small-box-footer text-danger mt-1 d-block font-weight-bold" style="font-size: 11px;">
+                Cek SKU &rarr;
+            </a>
         </div>
     </div>
 </div>
@@ -71,7 +105,7 @@
                             AI Executive Summary & Rekomendasi Hari Ini
                         </h5>
                         <span class="badge badge-purple text-white px-2 py-1" style="font-size: 10px;">
-                            <i class="fas fa-robot mr-1"></i> {{ $latestAiAnalysis->model_used ?? 'Medina AI' }}
+                            <i class="fas fa-robot mr-1"></i> Asisten Penjualan Medina
                         </span>
                     </div>
                     <div class="text-muted" style="font-size: 11.5px;">
@@ -164,75 +198,41 @@
 </div>
 @endif
 
-<!-- Top Stats Grid -->
-<div class="row">
-    <!-- Total SKU -->
-    <div class="col-6 col-lg-3 col-md-6 mb-2 mb-md-3">
-        <div class="small-box bg-white p-2 p-md-3 border h-100 mb-0">
-            <div class="inner">
-                <p class="text-muted text-uppercase mb-1 font-weight-bold" style="font-size: 10px;">Total SKU</p>
-                <h3 class="font-weight-bold text-dark mb-0" style="font-size: 1.4rem;">{{ number_format($totalProducts) }}</h3>
+<!-- Shopee Connection & Sync Status Banner -->
+<div class="card mb-3 border-0 bg-white shadow-sm overflow-hidden" style="border-left: 4px solid var(--shopee-orange) !important;">
+    <div class="card-body p-3">
+        <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center">
+            <div class="d-flex align-items-center mb-2 mb-md-0">
+                <div class="rounded-circle p-2 d-flex align-items-center justify-content-center mr-2 mr-md-3 flex-shrink-0" style="background-color: rgba(238, 77, 45, 0.1); width: 40px; height: 40px;">
+                    <i class="fas fa-store" style="color: var(--shopee-orange)"></i>
+                </div>
+                <div>
+                    <div class="d-flex flex-wrap align-items-center mb-1">
+                        <strong class="text-dark mr-2" style="font-size: 13px;">Shopee Open API:</strong>
+                        @if($shopeeSetting->isConnected())
+                            <span class="badge badge-success px-2 py-1"><i class="fas fa-check-circle mr-1"></i> Terhubung ({{ ucfirst($shopeeSetting->environment) }})</span>
+                        @else
+                            <span class="badge badge-info px-2 py-1"><i class="fas fa-vial mr-1"></i> Sandbox / Simulasi</span>
+                        @endif
+                    </div>
+                    <div class="text-muted" style="font-size: 11px;">
+                        Toko: <strong>{{ $shopeeSetting->shop_name }}</strong> &bull;
+                        Auto-Deduct: <strong class="text-success">Aktif</strong> &bull;
+                        Terhubung: <strong>{{ $shopeeConnectedCount }} SKU</strong>
+                    </div>
+                </div>
             </div>
-            <div class="icon d-none d-sm-block" style="top: 10px; right: 12px; opacity: 0.12; position: absolute;">
-                <i class="fas fa-boxes text-primary fa-2x"></i>
+            <div class="d-flex align-items-center mt-2 mt-md-0">
+                <form action="{{ route('shopee.sync.all') }}" method="POST" class="mr-2 flex-fill flex-md-grow-0">
+                    @csrf
+                    <button type="submit" class="btn btn-xs btn-outline-secondary btn-block">
+                        <i class="fas fa-sync-alt mr-1"></i> Push Stok
+                    </button>
+                </form>
+                <a href="{{ route('shopee.dashboard') }}" class="btn btn-xs btn-shopee flex-fill flex-md-grow-0">
+                    <i class="fas fa-external-link-alt mr-1"></i> Channel Shopee
+                </a>
             </div>
-            <a href="{{ route('warehouse.products') }}" class="small-box-footer mt-1 d-block font-weight-bold" style="font-size: 11px;">
-                Lihat Katalog &rarr;
-            </a>
-        </div>
-    </div>
-
-    <!-- Total Fisik Stok Gudang -->
-    <div class="col-6 col-lg-3 col-md-6 mb-2 mb-md-3">
-        <div class="small-box bg-white p-2 p-md-3 border h-100 mb-0">
-            <div class="inner">
-                <p class="text-muted text-uppercase mb-1 font-weight-bold" style="font-size: 10px;">Stok Gudang</p>
-                <h3 class="font-weight-bold text-primary mb-0" style="font-size: 1.4rem;">
-                    {{ number_format($totalStock) }} <span style="font-size: 11px; font-weight: normal;" class="text-muted">Unit</span>
-                </h3>
-            </div>
-            <div class="icon d-none d-sm-block" style="top: 10px; right: 12px; opacity: 0.12; position: absolute;">
-                <i class="fas fa-cubes text-info fa-2x"></i>
-            </div>
-            <a href="{{ route('warehouse.mutations') }}" class="small-box-footer mt-1 d-block font-weight-bold" style="font-size: 11px;">
-                Riwayat Mutasi &rarr;
-            </a>
-        </div>
-    </div>
-
-    <!-- Nilai Total Aset -->
-    <div class="col-6 col-lg-3 col-md-6 mb-2 mb-md-3">
-        <div class="small-box bg-white p-2 p-md-3 border h-100 mb-0">
-            <div class="inner">
-                <p class="text-muted text-uppercase mb-1 font-weight-bold" style="font-size: 10px;">Estimasi Aset</p>
-                <h3 class="font-weight-bold text-success mb-0" style="font-size: 1.15rem; line-height: 1.2;">
-                    Rp {{ number_format($totalAssetValue, 0, ',', '.') }}
-                </h3>
-            </div>
-            <div class="icon d-none d-sm-block" style="top: 10px; right: 12px; opacity: 0.12; position: absolute;">
-                <i class="fas fa-wallet text-success fa-2x"></i>
-            </div>
-            <div class="small-box-footer text-muted mt-1" style="font-size: 10px;">
-                Harga HPP
-            </div>
-        </div>
-    </div>
-
-    <!-- Stok Kritis Alert -->
-    <div class="col-6 col-lg-3 col-md-6 mb-2 mb-md-3">
-        <div class="small-box bg-white p-2 p-md-3 border h-100 mb-0 {{ $lowStockCount > 0 ? 'border-danger' : '' }}">
-            <div class="inner">
-                <p class="text-muted text-uppercase mb-1 font-weight-bold" style="font-size: 10px;">Stok Kritis</p>
-                <h3 class="font-weight-bold {{ $lowStockCount > 0 ? 'text-danger' : 'text-success' }} mb-0" style="font-size: 1.4rem;">
-                    {{ $lowStockCount }} <span style="font-size: 11px; font-weight: normal;" class="text-muted">SKU</span>
-                </h3>
-            </div>
-            <div class="icon d-none d-sm-block" style="top: 10px; right: 12px; opacity: 0.12; position: absolute;">
-                <i class="fas fa-triangle-exclamation text-danger fa-2x"></i>
-            </div>
-            <a href="{{ route('warehouse.products', ['stock_status' => 'low']) }}" class="small-box-footer text-danger mt-1 d-block font-weight-bold" style="font-size: 11px;">
-                Cek SKU &rarr;
-            </a>
         </div>
     </div>
 </div>

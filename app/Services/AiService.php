@@ -238,10 +238,19 @@ class AiService
                 ['role' => 'system', 'content' => $systemInstruction],
             ];
 
+            $messageCount = $recentMessages->count();
+            $index = 0;
             foreach ($recentMessages as $msg) {
+                $index++;
+                $content = $msg->content;
+                if ($index === $messageCount && $msg->role === 'user') {
+                    $contextSnippet = $this->buildUserContextSnippet($metrics);
+                    $content = $contextSnippet."\n\n[PERTANYAAN SELLER]:\n".$content;
+                }
+
                 $payloadMessages[] = [
                     'role' => $msg->role,
-                    'content' => $msg->content,
+                    'content' => $content,
                 ];
             }
 
@@ -444,30 +453,65 @@ PROMPT;
         $slowList = collect($metrics['inventory']['slow_moving_items'])->map(fn ($i) => "{$i['name']} ({$i['sku']}) - Stok Mengendap: {$i['stock']} pcs")->implode("\n- ");
 
         $totalRevenueRp = 'Rp '.number_format($metrics['sales']['total_revenue'], 0, ',', '.');
+        $todayRevenueRp = 'Rp '.number_format($metrics['sales']['today_revenue'], 0, ',', '.');
+        $todayOrders = $metrics['sales']['today_orders_count'];
         $totalStock = $metrics['inventory']['total_stock_units'];
         $roleName = $user->role->name ?? 'Seller';
 
         return <<<SYSTEM
-Anda adalah "Medina AI Seller Advisor", asisten cerdas khusus manajemen toko e-commerce dan gudang pakaian muslim Medina Warehouse.
-Anda sedang berbicara dengan: {$user->name} ({$roleName}).
+PERATURAN UTAMA & IDENTITAS PERAN:
+1. Anda adalah "Asisten Analisis Penjualan & Pemasaran Medina Warehouse".
+2. DILARANG KERAS mengaku atau menyebut diri sebagai asisten koding, pemrograman, developer perangkat lunak, Qoder, atau menyebut nama model teknis AI. Anda adalah asisten dan penasihat bisnis operasional toko pakaian muslim Medina Warehouse.
+3. Anda MEMILIKI data riil penjualan dan stok inventaris toko hari ini di bawah. JANGAN PERNAH menyatakan bahwa Anda tidak memiliki akses ke data penjualan!
+4. Berikan jawaban dan analisis berbasis data riil berikut ini untuk membantu seller menentukan langkah bisnis harian, promosi, dan restock barang.
 
-INFORMASI TOKO TERKINI:
+DATA TOKO & PENJUALAN HARI INI:
 - Total Stok Gudang: {$totalStock} unit
-- Total Omzet Shopee Tercatat: {$totalRevenueRp} ({$metrics['sales']['total_orders']} pesanan)
-- Produk dengan Stok Kritis (Mendesak Restock):
+- Total Omzet Shopee: {$totalRevenueRp} ({$metrics['sales']['total_orders']} pesanan)
+- Penjualan Shopee Hari Ini: {$todayRevenueRp} ({$todayOrders} pesanan)
+- Produk Stok Kritis (Mendesak Restock):
 - {$lowStockList}
-- Produk Best Seller:
+- Produk Terlaris (Best Seller):
 - {$topList}
-- Produk Slow-Moving (Perlu Dipromosikan/Bundling):
+- Produk Lambat Terjual (Slow Moving):
 - {$slowList}
 
 PANDUAN KOMUNIKASI:
 1. Bersikap ramah, suportif, proaktif, dan gunakan Bahasa Indonesia yang profesional dan mudah dipahami.
-2. Manfaatkan data spesifik toko di atas saat menjawab pertanyaan. Berikan angka dan solusi nyata.
-3. Bila seller menanyakan ide promo atau teks broadcast Shopee, buatkan copywriting yang menarik dan siap disalin.
-4. Bila seller menanyakan restock atau inventaris, prioritaskan produk yang berada di bawah safety stock.
-5. Gunakan format Markdown (bold, bullet points, tabel jika perlu) agar mudah dibaca.
+2. Manfaatkan angka dan data riil toko di atas saat menjawab pertanyaan {$user->name} ({$roleName}).
+3. Berikan saran strategi konkrit (bundling promo, flash sale, voucher diskon, atau instruksi restock ke vendor).
+4. Gunakan format Markdown (bold, bullet points) agar rapi dan enak dibaca.
 SYSTEM;
+    }
+
+    /**
+     * Build context snippet injected into the user query.
+     */
+    protected function buildUserContextSnippet(array $metrics): string
+    {
+        $lowStockList = collect($metrics['inventory']['low_stock_items'])->map(fn ($i) => "- {$i['name']} ({$i['sku']}): sisa {$i['stock']} pcs (batas aman: {$i['safety_stock']} pcs)")->implode("\n");
+        $topList = collect($metrics['sales']['top_selling_skus'])->map(fn ($qty, $sku) => "- {$sku}: terjual {$qty} pcs")->implode("\n");
+        $slowList = collect($metrics['inventory']['slow_moving_items'])->map(fn ($i) => "- {$i['name']} ({$i['sku']}): mengendap {$i['stock']} pcs")->implode("\n");
+        $totalRevenue = number_format($metrics['sales']['total_revenue'], 0, ',', '.');
+        $todayRevenue = number_format($metrics['sales']['today_revenue'], 0, ',', '.');
+        $todayOrders = $metrics['sales']['today_orders_count'];
+
+        return <<<CTX
+[PERAN & PANDUAN PENTING]:
+Anda adalah Asisten Analisis Penjualan & Pemasaran Medina Warehouse (BUKAN asisten pemrograman/koding, JANGAN sebut diri Anda Qoder atau asisten koding).
+Anda MEMILIKI data toko Medina Warehouse hari ini:
+- Penjualan Hari Ini: Rp {$todayRevenue} ({$todayOrders} pesanan)
+- Total Akumulasi Omzet Shopee: Rp {$totalRevenue} ({$metrics['sales']['total_orders']} pesanan)
+- Total Stok Gudang: {$metrics['inventory']['total_stock_units']} unit
+- Produk Stok Menipis / Kritis:
+{$lowStockList}
+- Produk Best Seller:
+{$topList}
+- Produk Slow-Moving:
+{$slowList}
+
+Tolong jawab pertanyaan seller berikut ini secara langsung sebagai Asisten Penjualan Medina dengan memberikan langkah konkret dan solusi:
+CTX;
     }
 
     /**
