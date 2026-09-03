@@ -27,11 +27,10 @@ class AuthController extends Controller
     public function login(Request $request): RedirectResponse
     {
         $credentials = $request->validate([
-            'email' => ['required', 'email'],
+            'username' => ['required', 'string'],
             'password' => ['required', 'string'],
         ], [
-            'email.required' => 'Alamat email wajib diisi.',
-            'email.email' => 'Format email tidak valid.',
+            'username.required' => 'Username wajib diisi.',
             'password.required' => 'Password wajib diisi.',
         ]);
 
@@ -46,8 +45,8 @@ class AuthController extends Controller
                 $request->session()->regenerateToken();
 
                 return back()->withErrors([
-                    'email' => 'Akun Anda dinonaktifkan oleh administrator. Silakan hubungi tim IT.',
-                ])->onlyInput('email');
+                    'username' => 'Akun Anda dinonaktifkan oleh administrator. Silakan hubungi tim IT.',
+                ])->onlyInput('username');
             }
 
             $request->session()->regenerate();
@@ -57,8 +56,8 @@ class AuthController extends Controller
         }
 
         return back()->withErrors([
-            'email' => 'Email atau password yang Anda masukkan salah.',
-        ])->onlyInput('email');
+            'username' => 'Username atau password yang Anda masukkan salah.',
+        ])->onlyInput('username');
     }
 
     /**

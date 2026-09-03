@@ -151,6 +151,30 @@ class PackingController extends Controller
             }
         }
 
+        // Check if Order has already been packed previously
+        $existingPacking = PackingRecord::where('status', 'completed')
+            ->where(function ($q) use ($order, $query) {
+                $q->where('order_sn', $order->order_sn);
+                if (! empty($order->tracking_number)) {
+                    $q->orWhere('tracking_number', $order->tracking_number);
+                }
+                if (! empty($query)) {
+                    $q->orWhere('tracking_number', $query);
+                }
+            })
+            ->latest()
+            ->first();
+
+        $alreadyPacked = $existingPacking !== null;
+        $existingPackingData = $alreadyPacked ? [
+            'id' => $existingPacking->id,
+            'packed_at' => $existingPacking->created_at->translatedFormat('d M Y, H:i'),
+            'packed_time_diff' => $existingPacking->created_at->diffForHumans(),
+            'packer_name' => $existingPacking->packer_name ?: 'Staff Packing',
+            'video_url' => $existingPacking->video_url,
+            'duration' => $existingPacking->formatted_duration,
+        ] : null;
+
         return response()->json([
             'status' => 'ready',
             'order_id' => $order->id,
@@ -161,7 +185,11 @@ class PackingController extends Controller
             'buyer_username' => $order->buyer_username,
             'total_amount' => (float) $order->total_amount,
             'items' => $formattedItems,
-            'message' => 'Pesanan aktif & valid. Silakan periksa produk dan mulai perekaman video packing.',
+            'already_packed' => $alreadyPacked,
+            'existing_packing' => $existingPackingData,
+            'message' => $alreadyPacked
+                ? "Resi ini sudah pernah dipacking oleh {$existingPacking->packer_name} ({$existingPacking->created_at->diffForHumans()})."
+                : 'Pesanan aktif & valid. Silakan periksa produk dan mulai perekaman video packing.',
         ]);
     }
 

@@ -5,7 +5,6 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Support\Facades\Storage;
 
 class PackingRecord extends Model
 {
@@ -41,10 +40,15 @@ class PackingRecord extends Model
     public function getVideoUrlAttribute(): ?string
     {
         if ($this->video_path) {
-            return Storage::disk('public')->url($this->video_path);
+            return '/storage/'.ltrim($this->video_path, '/');
         }
 
         return null;
+    }
+
+    public function hasVideo(): bool
+    {
+        return ! empty($this->video_path);
     }
 
     public function getFormattedDurationAttribute(): string
@@ -56,5 +60,10 @@ class PackingRecord extends Model
         $seconds = $this->video_duration % 60;
 
         return sprintf('%02d:%02d', $minutes, $seconds);
+    }
+
+    public function getDurationFormattedAttribute(): string
+    {
+        return $this->formatted_duration;
     }
 }

@@ -191,10 +191,10 @@
             @csrf
             
             <div class="form-group mb-3">
-                <label class="font-weight-semibold text-dark mb-1" style="font-size: 13px;">Email Pengguna</label>
+                <label class="font-weight-semibold text-dark mb-1" style="font-size: 13px;">Username</label>
                 <div class="input-wrapper">
-                    <i class="fas fa-envelope input-icon"></i>
-                    <input type="email" name="email" id="inputEmail" class="form-control form-control-custom" placeholder="contoh: admin@medina.com" value="{{ old('email') }}" required autofocus>
+                    <i class="fas fa-user input-icon"></i>
+                    <input type="text" name="username" id="inputUsername" class="form-control form-control-custom" placeholder="Masukkan username" value="{{ old('username') }}" required autofocus>
                 </div>
             </div>
 
@@ -231,16 +231,16 @@
                 <span class="text-muted" style="font-size: 11px;">(Pass: password)</span>
             </div>
             <div class="d-flex flex-wrap">
-                <button type="button" class="demo-pill" onclick="fillDemo('admin@medina.com')">
+                <button type="button" class="demo-pill" onclick="fillDemo('admin')">
                     👑 Super Admin
                 </button>
-                <button type="button" class="demo-pill" onclick="fillDemo('gudang@medina.com')">
+                <button type="button" class="demo-pill" onclick="fillDemo('gudang')">
                     📦 Admin Gudang
                 </button>
-                <button type="button" class="demo-pill" onclick="fillDemo('packer@medina.com')">
+                <button type="button" class="demo-pill" onclick="fillDemo('packer')">
                     📹 Operator Packing
                 </button>
-                <button type="button" class="demo-pill" onclick="fillDemo('shopee@medina.com')">
+                <button type="button" class="demo-pill" onclick="fillDemo('shopee')">
                     🛍️ Staff Shopee
                 </button>
             </div>
@@ -268,8 +268,8 @@
         }
     }
 
-    function fillDemo(email) {
-        document.getElementById('inputEmail').value = email;
+    function fillDemo(username) {
+        document.getElementById('inputUsername').value = username;
         document.getElementById('inputPassword').value = 'password';
     }
 </script>

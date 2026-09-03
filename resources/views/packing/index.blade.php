@@ -138,8 +138,11 @@
                                 <i class="fas fa-barcode mr-1"></i> SCAN RESI
                             </span>
                         </div>
-                        <input type="text" id="barcodeInput" class="form-control form-control-lg font-weight-bold" placeholder="Scan barcode / QR resi atau ketik No. Resi..." autofocus autocomplete="off">
+                        <input type="text" id="barcodeInput" class="form-control form-control-lg font-weight-bold" placeholder="Scan barcode / QR resi atau ketik No. Resi..." autocomplete="off">
                         <div class="input-group-append">
+                            <button type="button" class="btn btn-outline-secondary px-3" id="btnToggleKeyboard" onclick="toggleVirtualKeyboard()" title="Buka/Tutup Keyboard Virtual HP">
+                                <i class="fas fa-keyboard" id="keyboardIcon"></i>
+                            </button>
                             <button type="submit" class="btn btn-primary px-3 font-weight-bold" id="btnCheckResi">
                                 <i class="fas fa-search mr-1"></i> Cek
                             </button>
@@ -280,6 +283,12 @@
             </div>
             
             <div class="card-body p-3">
+                <!-- Repack Warning Alert -->
+                <div id="repackWarningBanner" class="alert alert-warning py-2 px-3 text-xs mb-3 font-weight-bold" style="display: none;">
+                    <i class="fas fa-exclamation-triangle mr-1 text-warning"></i>
+                    <strong>Peringatan:</strong> Resi ini sudah pernah dipacking oleh <span id="repackPackerText">-</span> (<span id="repackTimeText">-</span>). Anda sedang melakukan packing ulang.
+                </div>
+
                 <!-- Order Details Header -->
                 <div class="bg-light p-2 rounded mb-3">
                     <div class="row">
@@ -410,6 +419,108 @@
     </div>
 </div>
 
+<!-- ⚠️ MODAL POPUP: RESI SUDAH PERNAH DI-PACKING SEBELUMNYA -->
+<div class="modal fade" id="alreadyPackedModal" tabindex="-1" role="dialog" aria-labelledby="alreadyPackedModalLabel" aria-hidden="true" data-backdrop="static" data-keyboard="false">
+    <div class="modal-dialog modal-dialog-centered" role="document">
+        <div class="modal-content border-0 shadow-lg" style="border: 3px solid #f59e0b !important; border-radius: 12px; overflow: hidden;">
+            <div class="modal-header bg-warning text-dark py-3 d-flex justify-content-between align-items-center">
+                <h5 class="modal-title font-weight-bold" id="alreadyPackedModalLabel">
+                    <i class="fas fa-exclamation-triangle mr-2"></i> RESI SUDAH PERNAH DI-PACK!
+                </h5>
+                <button type="button" class="close text-dark" data-dismiss="modal" aria-label="Close" onclick="resetPackingState()">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body p-4 text-center bg-white">
+                <div class="rounded-circle bg-warning text-white p-3 d-inline-flex align-items-center justify-content-center mb-3 shadow" style="width: 72px; height: 72px;">
+                    <i class="fas fa-box-check fa-3x text-dark"></i>
+                </div>
+                <h5 class="font-weight-bold text-dark mb-1">Paket Ini Sudah Pernah Dikemas!</h5>
+                <p class="text-muted mb-3 text-sm">Resi ini tercatat sudah selesai dipacking dan tersimpan di sistem.</p>
+
+                <div class="bg-light p-3 rounded text-left border mb-3">
+                    <div class="row">
+                        <div class="col-6 mb-2">
+                            <small class="text-muted d-block font-weight-semibold">Nomor Resi / AWB:</small>
+                            <span class="font-weight-bold text-dark" id="alreadyPackedTrackingText">-</span>
+                        </div>
+                        <div class="col-6 mb-2">
+                            <small class="text-muted d-block font-weight-semibold">Order SN:</small>
+                            <span class="font-weight-bold text-dark" id="alreadyPackedOrderSnText">-</span>
+                        </div>
+                        <div class="col-6 mb-2">
+                            <small class="text-muted d-block font-weight-semibold">Waktu Packing:</small>
+                            <span class="font-weight-bold text-dark" id="alreadyPackedTimeText">-</span>
+                        </div>
+                        <div class="col-6 mb-2">
+                            <small class="text-muted d-block font-weight-semibold">Petugas Packing:</small>
+                            <span class="badge badge-info px-2 py-1 font-weight-bold" id="alreadyPackedPackerText">-</span>
+                        </div>
+                        <div class="col-12">
+                            <small class="text-muted d-block font-weight-semibold">Durasi Video:</small>
+                            <span class="font-weight-bold text-success" id="alreadyPackedDurationText">-</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 🎬 INLINE VIDEO PLAYER PREVIEW -->
+                <div id="alreadyPackedVideoContainer" class="mb-3 text-left" style="display: none;">
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <small class="font-weight-bold text-dark"><i class="fas fa-play-circle text-danger mr-1"></i> Rekaman Packing Sebelumnya:</small>
+                        <button type="button" class="btn btn-xs btn-outline-secondary" onclick="closeInlineVideo()"><i class="fas fa-times"></i> Tutup</button>
+                    </div>
+                    <div class="bg-black rounded overflow-hidden shadow-sm" style="max-height: 260px; background: #000;">
+                        <video id="alreadyPackedInlineVideo" controls playsinline preload="metadata" style="max-height: 250px; width: 100%; object-fit: contain; background: #000;"></video>
+                    </div>
+                </div>
+
+                <div class="alert alert-warning text-left py-2 mb-0 text-xs">
+                    <i class="fas fa-info-circle mr-1"></i> Anda dapat memutar video sebelumnya untuk memeriksa paket, atau melanjutkan <strong>Packing Ulang</strong> jika kemasan perlu diperbaiki.
+                </div>
+            </div>
+            <div class="modal-footer bg-light py-2 d-flex justify-content-between">
+                <button type="button" class="btn btn-secondary btn-sm" onclick="resetPackingState()">
+                    <i class="fas fa-times mr-1"></i> Batal / Scan Paket Lain
+                </button>
+                <div class="d-flex">
+                    <button type="button" class="btn btn-info btn-sm mr-2 font-weight-bold" id="btnPreviewPackedVideo" onclick="viewExistingPackingVideo()">
+                        <i class="fas fa-play mr-1"></i> Putar Video
+                    </button>
+                    <button type="button" class="btn btn-warning btn-sm font-weight-bold" onclick="proceedToRepack()">
+                        <i class="fas fa-redo mr-1"></i> Tetap Packing Ulang
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 🎬 VIDEO PREVIEW MODAL -->
+<div class="modal fade" id="stationVideoPlayerModal" tabindex="-1" role="dialog" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg" role="document">
+        <div class="modal-content bg-dark text-white border-0 shadow">
+            <div class="modal-header border-secondary py-2">
+                <h6 class="modal-title font-weight-bold" id="stationVideoModalTitle">Video Rekaman Packing Sebelumnya</h6>
+                <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close" onclick="stopStationModalVideo()">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body p-0 bg-black text-center">
+                <video id="stationModalVideoElement" controls autoplay style="max-height: 440px; width: 100%; object-fit: contain; background: #000;"></video>
+            </div>
+            <div class="modal-footer border-secondary py-2 d-flex justify-content-between">
+                <small class="text-muted" id="stationVideoModalMeta"></small>
+                <div>
+                    <button type="button" class="btn btn-warning btn-xs font-weight-bold mr-2" onclick="closeVideoAndProceedToRepack()">
+                        <i class="fas fa-redo mr-1"></i> Lanjut Packing Ulang
+                    </button>
+                    <button type="button" class="btn btn-secondary btn-xs" data-dismiss="modal" onclick="stopStationModalVideo()">Tutup</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 @endsection
 
 @push('scripts')
@@ -461,6 +572,11 @@
         playBeep(300, 'sawtooth', 0.25);
         setTimeout(() => playBeep(250, 'sawtooth', 0.25), 150);
         setTimeout(() => playBeep(300, 'sawtooth', 0.3), 300);
+    }
+
+    function playWarningSound() {
+        playBeep(650, 'sine', 0.15);
+        setTimeout(() => playBeep(650, 'sine', 0.2), 180);
     }
 
     // Camera Init & QR/Barcode Reader Integration
@@ -528,6 +644,29 @@
         }
     }
 
+    const isMobileDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || ('ontouchstart' in window);
+    let isKeyboardEnabled = false;
+
+    function toggleVirtualKeyboard() {
+        const input = document.getElementById('barcodeInput');
+        const icon = document.getElementById('keyboardIcon');
+        const btn = document.getElementById('btnToggleKeyboard');
+
+        isKeyboardEnabled = !isKeyboardEnabled;
+
+        if (isKeyboardEnabled) {
+            input.setAttribute('inputmode', 'text');
+            btn.className = 'btn btn-warning px-3';
+            btn.title = 'Keyboard HP Aktif (Klik untuk sembunyikan)';
+            input.focus();
+        } else {
+            input.setAttribute('inputmode', 'none');
+            btn.className = 'btn btn-outline-secondary px-3';
+            btn.title = 'Keyboard HP Nonaktif (Klik untuk mengetik)';
+            input.blur();
+        }
+    }
+
     function onDetectedBarcode(rawCode) {
         const now = Date.now();
         // Prevent duplicate scan within 3 seconds
@@ -538,20 +677,42 @@
         lastScannedCode = rawCode;
         lastScanTime = now;
 
-        document.getElementById('barcodeInput').value = rawCode;
+        const input = document.getElementById('barcodeInput');
+        input.value = rawCode;
+        input.blur();
+        if (document.activeElement && typeof document.activeElement.blur === 'function') {
+            document.activeElement.blur();
+        }
+
         checkResiOrder(rawCode);
     }
 
     // Scan Submission Handler
     async function handleScanSubmit(e) {
         e.preventDefault();
-        const query = document.getElementById('barcodeInput').value.trim();
+        const input = document.getElementById('barcodeInput');
+        const query = input.value.trim();
         if (!query) return;
+
+        input.blur();
+        if (document.activeElement && typeof document.activeElement.blur === 'function') {
+            document.activeElement.blur();
+        }
 
         checkResiOrder(query);
     }
 
     async function checkResiOrder(query) {
+        // Dismiss mobile keyboard if open
+        const input = document.getElementById('barcodeInput');
+        input.blur();
+        if (document.activeElement && typeof document.activeElement.blur === 'function') {
+            document.activeElement.blur();
+        }
+        if (isMobileDevice && isKeyboardEnabled) {
+            toggleVirtualKeyboard();
+        }
+
         document.getElementById('btnCheckResi').innerHTML = '<i class="fas fa-spinner fa-spin"></i> Cek...';
         document.getElementById('btnCheckResi').disabled = true;
 
@@ -575,17 +736,26 @@
             if (data.status === 'blocked_cancelled') {
                 // 🚫 BLOCKED: ORDER IS CANCELLED IN SHOPEE
                 $('#productPhotoPopupModal').modal('hide');
+                $('#alreadyPackedModal').modal('hide');
                 playAlarmSound();
                 showCancelledOrder(data);
             } else if (data.status === 'ready') {
-                // ✅ VALID: ORDER IS READY TO PACK
-                playSuccessSound();
-                showActiveOrder(data);
+                currentOrderData = data;
 
-                // 🖼️ AUTO POPUP FOTO PRODUK
-                showProductPhotoModal();
+                if (data.already_packed) {
+                    // ⚠️ WARNING: ALREADY PACKED PREVIOUSLY
+                    $('#productPhotoPopupModal').modal('hide');
+                    playWarningSound();
+                    showAlreadyPackedModal(data);
+                } else {
+                    // ✅ FRESH PACKING
+                    playSuccessSound();
+                    showActiveOrder(data);
+                    showProductPhotoModal();
+                }
             } else {
                 $('#productPhotoPopupModal').modal('hide');
+                $('#alreadyPackedModal').modal('hide');
                 Swal.fire({
                     icon: 'error',
                     title: 'Gagal',
@@ -775,16 +945,127 @@
     function resetPackingState() {
         currentOrderData = null;
         $('#cancelledOrderModal').modal('hide');
+        $('#alreadyPackedModal').modal('hide');
         $('#productPhotoPopupModal').modal('hide');
+        $('#stationVideoPlayerModal').modal('hide');
+        stopStationModalVideo();
+        closeInlineVideo();
+        const repackBanner = document.getElementById('repackWarningBanner');
+        if (repackBanner) repackBanner.style.display = 'none';
         document.getElementById('emptyOrderState').style.display = 'flex';
         document.getElementById('activeOrderSection').style.display = 'none';
         document.getElementById('btnStartRecord').disabled = true;
         document.getElementById('btnStopRecord').disabled = true;
         document.getElementById('barcodeInput').value = '';
-        document.getElementById('barcodeInput').focus();
+
+        if (!isMobileDevice) {
+            document.getElementById('barcodeInput').focus();
+        } else {
+            document.getElementById('barcodeInput').blur();
+        }
+
         isScanningActive = true;
         document.getElementById('scanLaserOverlay').style.display = 'block';
         document.getElementById('cameraModeBadge').innerHTML = '<i class="fas fa-qrcode mr-1"></i> Auto-Scan Aktif';
+    }
+
+    function showAlreadyPackedModal(data) {
+        closeInlineVideo();
+        document.getElementById('alreadyPackedTrackingText').innerText = data.tracking_number || data.order_sn;
+        document.getElementById('alreadyPackedOrderSnText').innerText = data.order_sn;
+        document.getElementById('alreadyPackedTimeText').innerText = data.existing_packing ? `${data.existing_packing.packed_at} (${data.existing_packing.packed_time_diff})` : '-';
+        document.getElementById('alreadyPackedPackerText').innerText = data.existing_packing ? data.existing_packing.packer_name : 'Staff';
+        document.getElementById('alreadyPackedDurationText').innerText = data.existing_packing ? `${data.existing_packing.duration}` : '-';
+
+        const btnPlay = document.getElementById('btnPreviewPackedVideo');
+        if (data.existing_packing && data.existing_packing.video_url) {
+            btnPlay.style.display = 'inline-block';
+            btnPlay.innerHTML = '<i class="fas fa-play mr-1"></i> Putar Video';
+            btnPlay.className = 'btn btn-info btn-sm mr-2 font-weight-bold';
+        } else {
+            btnPlay.style.display = 'none';
+        }
+
+        $('#alreadyPackedModal').modal('show');
+    }
+
+    function viewExistingPackingVideo() {
+        if (!currentOrderData || !currentOrderData.existing_packing || !currentOrderData.existing_packing.video_url) {
+            Swal.fire('Video Tidak Tersedia', 'File rekaman video sebelumnya tidak ditemukan di server.', 'info');
+            return;
+        }
+
+        const exp = currentOrderData.existing_packing;
+        const container = document.getElementById('alreadyPackedVideoContainer');
+        const videoEl = document.getElementById('alreadyPackedInlineVideo');
+        const btn = document.getElementById('btnPreviewPackedVideo');
+
+        if (container.style.display === 'none' || !container.style.display) {
+            // Show inline video player inside the modal
+            videoEl.src = exp.video_url;
+            container.style.display = 'block';
+            btn.innerHTML = '<i class="fas fa-stop mr-1"></i> Tutup Video';
+            btn.className = 'btn btn-secondary btn-sm mr-2 font-weight-bold';
+
+            videoEl.load();
+            const playPromise = videoEl.play();
+            if (playPromise !== undefined) {
+                playPromise.catch(err => {
+                    console.log('Autoplay blocked or prevented:', err);
+                });
+            }
+        } else {
+            closeInlineVideo();
+        }
+    }
+
+    function closeInlineVideo() {
+        const videoEl = document.getElementById('alreadyPackedInlineVideo');
+        if (videoEl) {
+            videoEl.pause();
+            videoEl.src = '';
+        }
+        const container = document.getElementById('alreadyPackedVideoContainer');
+        if (container) {
+            container.style.display = 'none';
+        }
+        const btn = document.getElementById('btnPreviewPackedVideo');
+        if (btn) {
+            btn.innerHTML = '<i class="fas fa-play mr-1"></i> Putar Video';
+            btn.className = 'btn btn-info btn-sm mr-2 font-weight-bold';
+        }
+    }
+
+    function stopStationModalVideo() {
+        const videoEl = document.getElementById('stationModalVideoElement');
+        if (videoEl) {
+            videoEl.pause();
+            videoEl.src = '';
+        }
+    }
+
+    function closeVideoAndProceedToRepack() {
+        stopStationModalVideo();
+        $('#stationVideoPlayerModal').modal('hide');
+        proceedToRepack();
+    }
+
+    function proceedToRepack() {
+        closeInlineVideo();
+        stopStationModalVideo();
+        $('#alreadyPackedModal').modal('hide');
+        if (!currentOrderData) return;
+
+        showActiveOrder(currentOrderData);
+
+        const repackBanner = document.getElementById('repackWarningBanner');
+        if (repackBanner && currentOrderData.already_packed && currentOrderData.existing_packing) {
+            document.getElementById('repackPackerText').innerText = currentOrderData.existing_packing.packer_name;
+            document.getElementById('repackTimeText').innerText = currentOrderData.existing_packing.packed_at;
+            repackBanner.style.display = 'block';
+        }
+
+        showProductPhotoModal();
     }
 
     // Quick Test Helper for Demo
@@ -917,7 +1198,11 @@
 
     document.addEventListener('DOMContentLoaded', () => {
         startCamera();
-        document.getElementById('barcodeInput').focus();
+        if (isMobileDevice) {
+            document.getElementById('barcodeInput').setAttribute('inputmode', 'none');
+        } else {
+            document.getElementById('barcodeInput').focus();
+        }
     });
 </script>
 @endpush

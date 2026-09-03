@@ -21,7 +21,7 @@
                             <div class="input-group-prepend">
                                 <span class="input-group-text"><i class="fas fa-search"></i></span>
                             </div>
-                            <input type="text" name="search" class="form-control" placeholder="Cari nama atau email..." value="{{ request('search') }}">
+                            <input type="text" name="search" class="form-control" placeholder="Cari nama, username, atau email..." value="{{ request('search') }}">
                         </div>
                     </div>
                     <div class="col-md-3 col-6 my-1">
@@ -75,7 +75,14 @@
                                             {{ strtoupper(substr($user->name, 0, 1)) }}
                                         </div>
                                         <div>
-                                            <div class="font-weight-bold text-dark">{{ $user->name }}</div>
+                                            <div class="font-weight-bold text-dark d-flex align-items-center">
+                                                {{ $user->name }}
+                                                @if($user->username)
+                                                    <span class="badge badge-light border text-muted ml-2 font-weight-normal" style="font-size: 11px;">
+                                                        <i class="fas fa-at text-secondary"></i>{{ $user->username }}
+                                                    </span>
+                                                @endif
+                                            </div>
                                             <div class="text-muted" style="font-size: 12px;">
                                                 <i class="fas fa-envelope mr-1"></i> {{ $user->email }}
                                             </div>
@@ -110,7 +117,7 @@
                                 <td class="text-center">
                                     <div class="btn-group btn-group-sm">
                                         <button type="button" class="btn btn-outline-primary" 
-                                                onclick="openEditUserModal('{{ $user->id }}', '{{ addslashes($user->name) }}', '{{ addslashes($user->email) }}', '{{ $user->role_id }}', '{{ $user->status }}')">
+                                                onclick="openEditUserModal('{{ $user->id }}', '{{ addslashes($user->name) }}', '{{ addslashes($user->username ?? '') }}', '{{ addslashes($user->email) }}', '{{ $user->role_id }}', '{{ $user->status }}')">
                                             <i class="fas fa-edit"></i> Edit
                                         </button>
                                         @if($user->id !== auth()->id())
@@ -159,9 +166,15 @@
                     </button>
                 </div>
                 <div class="modal-body">
-                    <div class="form-group mb-3">
-                        <label class="font-weight-semibold">Nama Lengkap <span class="text-danger">*</span></label>
-                        <input type="text" name="name" class="form-control" placeholder="Contoh: Ahmad Fauzi" required>
+                    <div class="form-row">
+                        <div class="form-group col-md-6 mb-3">
+                            <label class="font-weight-semibold">Nama Lengkap <span class="text-danger">*</span></label>
+                            <input type="text" name="name" class="form-control" placeholder="Contoh: Ahmad Fauzi" required>
+                        </div>
+                        <div class="form-group col-md-6 mb-3">
+                            <label class="font-weight-semibold">Username <span class="text-danger">*</span></label>
+                            <input type="text" name="username" class="form-control" placeholder="contoh: ahmad_fauzi" required>
+                        </div>
                     </div>
 
                     <div class="form-group mb-3">
@@ -220,9 +233,15 @@
                     </button>
                 </div>
                 <div class="modal-body">
-                    <div class="form-group mb-3">
-                        <label class="font-weight-semibold">Nama Lengkap <span class="text-danger">*</span></label>
-                        <input type="text" name="name" id="editUserName" class="form-control" required>
+                    <div class="form-row">
+                        <div class="form-group col-md-6 mb-3">
+                            <label class="font-weight-semibold">Nama Lengkap <span class="text-danger">*</span></label>
+                            <input type="text" name="name" id="editUserName" class="form-control" required>
+                        </div>
+                        <div class="form-group col-md-6 mb-3">
+                            <label class="font-weight-semibold">Username <span class="text-danger">*</span></label>
+                            <input type="text" name="username" id="editUserUsername" class="form-control" required>
+                        </div>
                     </div>
 
                     <div class="form-group mb-3">
@@ -267,9 +286,10 @@
 
 @push('scripts')
 <script>
-    function openEditUserModal(id, name, email, roleId, status) {
+    function openEditUserModal(id, name, username, email, roleId, status) {
         document.getElementById('editUserForm').action = '/users/' + id;
         document.getElementById('editUserName').value = name;
+        document.getElementById('editUserUsername').value = username;
         document.getElementById('editUserEmail').value = email;
         document.getElementById('editUserRole').value = roleId;
         document.getElementById('editUserStatus').value = status;

@@ -33,6 +33,7 @@ class UserController extends Controller
             $search = $request->search;
             $query->where(function ($q) use ($search) {
                 $q->where('name', 'like', "%{$search}%")
+                    ->orWhere('username', 'like', "%{$search}%")
                     ->orWhere('email', 'like', "%{$search}%");
             });
         }
@@ -50,12 +51,16 @@ class UserController extends Controller
     {
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
+            'username' => ['required', 'string', 'alpha_dash', 'max:50', 'unique:users,username'],
             'email' => ['required', 'string', 'email', 'max:255', 'unique:users,email'],
             'password' => ['required', 'string', Password::min(6)],
             'role_id' => ['required', 'exists:roles,id'],
             'status' => ['required', 'in:active,inactive'],
         ], [
             'name.required' => 'Nama pengguna wajib diisi.',
+            'username.required' => 'Username wajib diisi.',
+            'username.unique' => 'Username ini sudah digunakan.',
+            'username.alpha_dash' => 'Username hanya boleh berisi huruf, angka, tanda hubung (-), dan garis bawah (_).',
             'email.required' => 'Alamat email wajib diisi.',
             'email.unique' => 'Email ini sudah terdaftar.',
             'password.required' => 'Password wajib diisi.',
@@ -66,6 +71,7 @@ class UserController extends Controller
 
         User::create([
             'name' => $validated['name'],
+            'username' => strtolower($validated['username']),
             'email' => $validated['email'],
             'password' => Hash::make($validated['password']),
             'role_id' => $validated['role_id'],
@@ -83,12 +89,16 @@ class UserController extends Controller
     {
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
+            'username' => ['required', 'string', 'alpha_dash', 'max:50', Rule::unique('users', 'username')->ignore($user->id)],
             'email' => ['required', 'string', 'email', 'max:255', Rule::unique('users', 'email')->ignore($user->id)],
             'password' => ['nullable', 'string', Password::min(6)],
             'role_id' => ['required', 'exists:roles,id'],
             'status' => ['required', 'in:active,inactive'],
         ], [
             'name.required' => 'Nama pengguna wajib diisi.',
+            'username.required' => 'Username wajib diisi.',
+            'username.unique' => 'Username ini sudah digunakan.',
+            'username.alpha_dash' => 'Username hanya boleh berisi huruf, angka, tanda hubung (-), dan garis bawah (_).',
             'email.required' => 'Alamat email wajib diisi.',
             'email.unique' => 'Email ini sudah digunakan.',
             'password.min' => 'Password minimal 6 karakter.',
@@ -97,6 +107,7 @@ class UserController extends Controller
 
         $data = [
             'name' => $validated['name'],
+            'username' => strtolower($validated['username']),
             'email' => $validated['email'],
             'role_id' => $validated['role_id'],
             'status' => $validated['status'],

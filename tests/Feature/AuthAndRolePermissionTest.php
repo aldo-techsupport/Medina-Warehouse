@@ -10,7 +10,7 @@ test('login page is accessible to guests', function () {
 
 test('users can authenticate with valid credentials', function () {
     $response = $this->post(route('login.post'), [
-        'email' => 'admin@medina.com',
+        'username' => 'admin',
         'password' => 'password',
     ]);
 
@@ -20,7 +20,7 @@ test('users can authenticate with valid credentials', function () {
 
 test('users cannot authenticate with invalid password', function () {
     $this->post(route('login.post'), [
-        'email' => 'admin@medina.com',
+        'username' => 'admin',
         'password' => 'wrong-password',
     ]);
 
@@ -31,6 +31,7 @@ test('inactive users are blocked from logging in', function () {
     $inactiveRole = Role::where('slug', 'admin_gudang')->first();
     User::create([
         'name' => 'Inactive User',
+        'username' => 'inactive_user',
         'email' => 'inactive@medina.com',
         'password' => Hash::make('password'),
         'role_id' => $inactiveRole->id,
@@ -38,7 +39,7 @@ test('inactive users are blocked from logging in', function () {
     ]);
 
     $this->post(route('login.post'), [
-        'email' => 'inactive@medina.com',
+        'username' => 'inactive_user',
         'password' => 'password',
     ]);
 
