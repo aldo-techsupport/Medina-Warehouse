@@ -35,6 +35,32 @@
             background-color: var(--shopee-orange) !important;
             color: #ffffff !important;
         }
+        .bg-purple {
+            background-color: #8b5cf6 !important;
+            color: #ffffff !important;
+        }
+        .text-purple {
+            color: #8b5cf6 !important;
+        }
+        .btn-purple {
+            background-color: #8b5cf6;
+            color: #ffffff;
+            border-color: #8b5cf6;
+            font-weight: 600;
+        }
+        .btn-purple:hover, .btn-purple:focus {
+            background-color: #7c3aed;
+            color: #ffffff;
+        }
+        .btn-outline-purple {
+            color: #8b5cf6;
+            border-color: #8b5cf6;
+            background-color: transparent;
+        }
+        .btn-outline-purple:hover, .btn-outline-purple:focus {
+            background-color: #8b5cf6;
+            color: #ffffff;
+        }
         .btn-shopee {
             background-color: var(--shopee-orange);
             color: #ffffff;
@@ -261,6 +287,13 @@
                 <li class="nav-item d-none d-lg-inline-block">
                     <a href="{{ route('shopee.dashboard') }}" class="nav-link font-weight-bold px-2" style="color: var(--shopee-orange)">
                         <i class="fas fa-shopping-bag mr-1"></i> Shopee Sync
+                    </a>
+                </li>
+            @endif
+            @if(auth()->check() && auth()->user()->hasPermission('ai_advisor'))
+                <li class="nav-item d-none d-lg-inline-block">
+                    <a href="{{ route('ai.index') }}" class="nav-link font-weight-bold text-purple px-2">
+                        <i class="fas fa-robot mr-1"></i> AI Advisor
                     </a>
                 </li>
             @endif
@@ -499,6 +532,19 @@
                                 </a>
                             </li>
                         @endif
+                    @endif
+
+                    @if(auth()->user()->hasPermission('ai_advisor'))
+                        <li class="nav-header text-uppercase font-weight-bold text-muted mt-2" style="font-size: 10px;">AI & Pemasaran</li>
+                        <li class="nav-item">
+                            <a href="{{ route('ai.index') }}" class="nav-link {{ request()->routeIs('ai.*') ? 'active bg-purple' : '' }}">
+                                <i class="nav-icon fas fa-robot" style="color: {{ request()->routeIs('ai.*') ? '#fff' : '#8b5cf6' }}"></i>
+                                <p>
+                                    AI Seller & Analisis
+                                    <span class="badge badge-info right" style="font-size: 9px; font-weight: 700;">PRO AI</span>
+                                </p>
+                            </a>
+                        </li>
                     @endif
 
                     @if(auth()->user()->hasPermission('role_management') || auth()->user()->hasPermission('user_management'))

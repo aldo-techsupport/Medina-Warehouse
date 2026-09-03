@@ -55,6 +55,115 @@
     </div>
 </div>
 
+@if($latestAiAnalysis && (auth()->user()->isSuperAdmin() || auth()->user()->hasPermission('ai_advisor')))
+<!-- AI Executive Intelligence & Daily Action Steps Banner -->
+<div class="card mb-3 border-0 shadow-sm overflow-hidden" style="border-radius: 12px; background: linear-gradient(135deg, #ffffff 0%, #faf5ff 100%); border-left: 5px solid #8b5cf6 !important; border-top: 1px solid #e9d5ff; border-right: 1px solid #e9d5ff; border-bottom: 1px solid #e9d5ff;">
+    <div class="card-body p-3 p-md-4">
+        <!-- Header -->
+        <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-3 pb-2 border-bottom" style="border-color: rgba(139, 92, 246, 0.15) !important;">
+            <div class="d-flex align-items-center mb-2 mb-md-0">
+                <div class="rounded-circle d-flex align-items-center justify-content-center text-white mr-2 mr-md-3 shadow-xs flex-shrink-0" style="width: 42px; height: 42px; background: linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%); font-size: 18px;">
+                    <i class="fas fa-brain"></i>
+                </div>
+                <div>
+                    <div class="d-flex align-items-center flex-wrap">
+                        <h5 class="font-weight-bold mb-0 mr-2 text-dark" style="font-size: 15px;">
+                            AI Executive Summary & Rekomendasi Hari Ini
+                        </h5>
+                        <span class="badge badge-purple text-white px-2 py-1" style="font-size: 10px;">
+                            <i class="fas fa-robot mr-1"></i> {{ $latestAiAnalysis->model_used ?? 'Medina AI' }}
+                        </span>
+                    </div>
+                    <div class="text-muted" style="font-size: 11.5px;">
+                        <i class="far fa-clock mr-1"></i> Analisis: <strong>{{ $latestAiAnalysis->created_at->diffForHumans() }}</strong> ({{ $latestAiAnalysis->created_at->translatedFormat('d M Y, H:i') }})
+                    </div>
+                </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="d-flex align-items-center flex-wrap">
+                <button type="button" id="btnQuickRegenerateAi" class="btn btn-xs btn-outline-purple mr-2 font-weight-bold shadow-xs">
+                    <i class="fas fa-sync-alt mr-1" id="dashAiSpinner"></i> Analisis Ulang AI
+                </button>
+                <a href="{{ route('ai.index') }}" class="btn btn-xs btn-purple font-weight-bold shadow-sm">
+                    <i class="fas fa-comments mr-1"></i> Konsultasi / Chat AI &rarr;
+                </a>
+            </div>
+        </div>
+
+        <!-- Body: Summary & Action Checklist -->
+        <div class="row">
+            <!-- Left: Executive Summary -->
+            <div class="col-lg-7 col-12 mb-3 mb-lg-0">
+                <div class="p-3 bg-white rounded border shadow-xs h-100" style="border-color: #f1f5f9 !important;">
+                    <div class="d-flex align-items-center mb-2">
+                        <span class="badge badge-light border text-purple font-weight-bold mr-2" style="font-size: 11px;">
+                            <i class="fas fa-chart-line mr-1"></i> Kinerja & Tren Toko
+                        </span>
+                        @if(!empty($latestAiAnalysis->raw_metrics['sales']['top_selling_skus']))
+                            <div class="text-truncate text-muted" style="font-size: 11px;">
+                                Best Seller: <strong>{{ array_key_first($latestAiAnalysis->raw_metrics['sales']['top_selling_skus']) }}</strong>
+                            </div>
+                        @endif
+                    </div>
+                    <p class="text-dark mb-2" style="font-size: 13px; line-height: 1.6;">
+                        {{ Str::limit($latestAiAnalysis->summary, 320) }}
+                    </p>
+
+                    @if(!empty($latestAiAnalysis->marketing_advice[0]))
+                        <div class="p-2 rounded mt-2" style="background-color: #fdf4ff; border: 1px dashed #d946ef;">
+                            <div class="d-flex align-items-center text-dark font-weight-bold" style="font-size: 12px;">
+                                <i class="fas fa-bullhorn text-warning mr-1"></i> Saran Pemasaran: {{ $latestAiAnalysis->marketing_advice[0]['title'] }}
+                            </div>
+                            <small class="text-muted d-block mt-1" style="font-size: 11px; line-height: 1.3;">
+                                {{ $latestAiAnalysis->marketing_advice[0]['description'] }}
+                            </small>
+                        </div>
+                    @endif
+                </div>
+            </div>
+
+            <!-- Right: Actionable Steps Checklist -->
+            <div class="col-lg-5 col-12">
+                <div class="p-3 bg-white rounded border shadow-xs h-100" style="border-color: #f1f5f9 !important;">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span class="font-weight-bold text-dark" style="font-size: 12.5px;">
+                            <i class="fas fa-tasks text-success mr-1"></i> Langkah Prioritas Hari Ini
+                        </span>
+                        <span class="badge badge-success" style="font-size: 9.5px;">Checklist Aksi</span>
+                    </div>
+
+                    <div class="daily-action-steps" style="display: flex; flex-direction: column; gap: 6px;">
+                        @if(!empty($latestAiAnalysis->actionable_steps))
+                            @foreach(array_slice($latestAiAnalysis->actionable_steps, 0, 3) as $step)
+                                <div class="d-flex align-items-start p-2 rounded" style="background-color: #f8fafc; border-left: 3px solid #10b981;">
+                                    <span class="badge badge-success rounded-circle mr-2 mt-1" style="width: 18px; height: 18px; display: flex; align-items: center; justify-content: center; font-size: 10px; flex-shrink: 0;">
+                                        {{ $step['step'] ?? $loop->iteration }}
+                                    </span>
+                                    <div class="flex-grow-1" style="font-size: 12px; line-height: 1.35;">
+                                        <div class="font-weight-bold text-dark">{{ $step['task'] ?? '' }}</div>
+                                        <div class="text-muted mt-1" style="font-size: 10.5px;">
+                                            <span class="badge badge-light border">{{ $step['category'] ?? 'Umum' }}</span>
+                                            @if(!empty($step['target_sku']))
+                                                &bull; Target: <strong class="text-primary">{{ $step['target_sku'] }}</strong>
+                                            @endif
+                                        </div>
+                                    </div>
+                                </div>
+                            @endforeach
+                        @else
+                            <div class="text-muted text-center py-2" style="font-size: 12px;">
+                                Tidak ada tindakan mendesak hari ini.
+                            </div>
+                        @endif
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+@endif
+
 <!-- Top Stats Grid -->
 <div class="row">
     <!-- Total SKU -->
@@ -380,6 +489,50 @@
                     }
                 }
             }
+        });
+
+        // Quick AI Regenerate from Dashboard
+        $('#btnQuickRegenerateAi').on('click', function() {
+            const btn = $(this);
+            const spinner = $('#dashAiSpinner');
+            btn.prop('disabled', true);
+            spinner.addClass('fa-spin');
+
+            Swal.fire({
+                title: 'Menganalisis Data Toko...',
+                text: 'AI sedang mengevaluasi penjualan hari ini dan menyusun checklist aksi prioritas.',
+                allowOutsideClick: false,
+                didOpen: () => {
+                    Swal.showLoading();
+                }
+            });
+
+            $.ajax({
+                url: "{{ route('ai.analyze') }}",
+                type: "POST",
+                data: {
+                    _token: "{{ csrf_token() }}"
+                },
+                dataType: 'json',
+                success: function(res) {
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Analisis Selesai!',
+                        text: res.message || 'Analisis data hari ini berhasil diperbarui.',
+                        confirmButtonColor: '#8b5cf6'
+                    }).then(() => {
+                        location.reload();
+                    });
+                },
+                error: function(xhr) {
+                    const msg = xhr.responseJSON ? xhr.responseJSON.message : xhr.statusText;
+                    Swal.fire('Gagal', 'Terjadi kendala saat menganalisis: ' + msg, 'error');
+                },
+                complete: function() {
+                    btn.prop('disabled', false);
+                    spinner.removeClass('fa-spin');
+                }
+            });
         });
     });
 </script>

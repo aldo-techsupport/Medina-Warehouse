@@ -58,7 +58,7 @@ class DatabaseSeeder extends Seeder
             [
                 'name' => 'Staff Shopee',
                 'description' => 'Spesialis operasional marketplace, sinkronisasi stok shopee, dan pemantauan order.',
-                'permissions' => ['shopee_dashboard', 'shopee_orders', 'shopee_settings'],
+                'permissions' => ['shopee_dashboard', 'shopee_orders', 'shopee_settings', 'ai_advisor'],
             ]
         );
 

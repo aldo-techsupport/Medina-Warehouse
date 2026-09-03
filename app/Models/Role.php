@@ -82,6 +82,14 @@ class Role extends Model
                 'route' => 'shopee.settings',
             ],
         ],
+        'AI & Pemasaran' => [
+            'ai_advisor' => [
+                'name' => 'AI Seller & Analisis',
+                'description' => 'Analisis data penjualan, saran pemasaran, & asisten chat AI',
+                'icon' => 'fas fa-robot',
+                'route' => 'ai.index',
+            ],
+        ],
         'Pengaturan Sistem' => [
             'role_management' => [
                 'name' => 'Manajemen Role & Akses',

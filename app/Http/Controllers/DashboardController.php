@@ -2,10 +2,12 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\AiAnalysis;
 use App\Models\Product;
 use App\Models\ShopeeOrder;
 use App\Models\ShopeeSetting;
 use App\Models\StockMutation;
+use App\Services\AiService;
 
 class DashboardController extends Controller
 {
@@ -16,6 +18,19 @@ class DashboardController extends Controller
         $totalAssetValue = Product::selectRaw('SUM(stock * purchase_price) as total_val')->value('total_val') ?? 0;
         $lowStockCount = Product::whereColumn('stock', '<=', 'safety_stock')->count();
         $todayMutationsCount = StockMutation::whereDate('created_at', today())->count();
+
+        // AI Daily Intelligence
+        $latestAiAnalysis = null;
+        if (auth()->check() && (auth()->user()->isSuperAdmin() || auth()->user()->hasPermission('ai_advisor'))) {
+            $latestAiAnalysis = AiAnalysis::latest()->first();
+            if (! $latestAiAnalysis) {
+                try {
+                    $latestAiAnalysis = app(AiService::class)->generateSalesAnalysis(auth()->id());
+                } catch (\Throwable) {
+                    $latestAiAnalysis = null;
+                }
+            }
+        }
 
         // Shopee metrics
         $shopeeConnectedCount = Product::whereNotNull('shopee_item_id')->count();
@@ -68,7 +83,8 @@ class DashboardController extends Controller
             'chartOutbound',
             'chartShopee',
             'allProducts',
-            'shopeeSetting'
+            'shopeeSetting',
+            'latestAiAnalysis'
         ));
     }
 }

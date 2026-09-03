@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\AiAdvisorController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\PackingController;
@@ -80,6 +81,15 @@ Route::middleware('auth')->group(function () {
             Route::post('/settings', [ShopeeController::class, 'updateSettings'])->name('settings.update');
             Route::get('/callback', [ShopeeController::class, 'handleCallback'])->name('callback');
         });
+    });
+
+    // AI Sales Advisor & Marketing Chat
+    Route::prefix('ai')->name('ai.')->middleware('menu:ai_advisor')->group(function () {
+        Route::get('/', [AiAdvisorController::class, 'index'])->name('index');
+        Route::post('/analyze', [AiAdvisorController::class, 'analyze'])->name('analyze');
+        Route::post('/chat', [AiAdvisorController::class, 'chat'])->name('chat');
+        Route::post('/chat/clear', [AiAdvisorController::class, 'clearChat'])->name('chat.clear');
+        Route::post('/test-connection', [AiAdvisorController::class, 'testConnection'])->name('test');
     });
 
     // Role & Menu Access Management
