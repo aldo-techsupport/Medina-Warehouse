@@ -174,11 +174,11 @@ class AiService
                 ]);
             }
 
-            Log::warning('AI Analysis response was not valid JSON, using fallback parser', ['response' => $response]);
+            Log::warning('AI Analysis response was not valid JSON, using fallback parser');
 
             return $this->generateFallbackAnalysis($metrics, $userId, config('ai.model'));
         } catch (\Throwable $e) {
-            Log::error('AI Analysis failed: '.$e->getMessage(), ['trace' => $e->getTraceAsString()]);
+            Log::warning('AI Analysis fallback activated: '.$e->getMessage());
 
             return $this->generateFallbackAnalysis($metrics, $userId, 'Fallback Engine (Koneksi Router Error: '.$e->getMessage().')');
         }

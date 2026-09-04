@@ -186,7 +186,6 @@ class ShopeeService
             $this->setting->token_expires_at->diffInMinutes(now(), false) > -10;
 
         if ($needsRefresh && ! empty($this->setting->refresh_token)) {
-            Log::info('Shopee Access Token is expiring or expired. Auto-refreshing...');
             $refreshResult = $this->refreshAccessToken();
 
             if ($refreshResult['success']) {

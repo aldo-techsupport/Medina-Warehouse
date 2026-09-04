@@ -245,10 +245,10 @@ class ShopeeController extends Controller
         }
 
         $data = $request->json()->all();
-        Log::info('Shopee Webhook Received', ['data' => $data]);
-
         $code = $data['code'] ?? null; // e.g. 3 = order status update
         $dataContent = $data['data'] ?? [];
+        $orderSn = $dataContent['order_sn'] ?? 'N/A';
+        Log::info("Shopee Webhook Received: code {$code}, order {$orderSn}");
 
         if (isset($dataContent['order_sn'])) {
             $orderSn = $dataContent['order_sn'];
