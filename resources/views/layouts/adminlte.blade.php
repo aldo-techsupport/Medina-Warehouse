@@ -429,22 +429,6 @@
 
         <!-- Sidebar -->
         <div class="sidebar">
-            <!-- Sidebar User Panel -->
-            @auth
-                <div class="user-panel mt-3 pb-3 mb-2 d-flex align-items-center border-bottom" style="border-color: rgba(255,255,255,0.1) !important;">
-                    <div class="image">
-                        <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center font-weight-bold shadow-xs" style="width: 34px; height: 34px; font-size: 14px;">
-                            {{ strtoupper(substr(auth()->user()->name, 0, 1)) }}
-                        </div>
-                    </div>
-                    <div class="info ml-2">
-                        <span class="d-block text-white font-weight-bold" style="font-size: 13px; line-height: 1.2;">{{ auth()->user()->name }}</span>
-                        <span class="badge {{ auth()->user()->isSuperAdmin() ? 'badge-warning text-dark' : 'badge-info' }} mt-1" style="font-size: 10px;">
-                            {{ auth()->user()->role->name ?? 'Pengguna' }}
-                        </span>
-                    </div>
-                </div>
-            @endauth
 
             <!-- Sidebar Menu -->
             <nav class="mt-2">
