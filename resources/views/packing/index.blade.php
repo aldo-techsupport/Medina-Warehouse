@@ -65,23 +65,6 @@
         50% { opacity: 0.75; transform: scale(1.04); }
         100% { opacity: 1; transform: scale(1); }
     }
-    .scan-laser {
-        position: absolute;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 3px;
-        background: #10b981;
-        box-shadow: 0 0 10px #10b981, 0 0 20px #10b981;
-        animation: scanAnimation 2s infinite ease-in-out;
-        z-index: 5;
-        pointer-events: none;
-    }
-    @keyframes scanAnimation {
-        0% { top: 5%; opacity: 0.8; }
-        50% { top: 90%; opacity: 1; }
-        100% { top: 5%; opacity: 0.8; }
-    }
     .item-check-card {
         border-radius: 8px;
         border: 2px solid #e5e7eb;
@@ -120,13 +103,246 @@
         height: 90px;
         object-fit: cover;
     }
+
+    /* ========================================================
+       📱 MOBILE FULLSCREEN CAMERA STATION STYLING
+       ======================================================== */
+    @media (max-width: 767.98px) {
+        /* Sembunyikan elemen UI luar AdminLTE pada HP */
+        .main-header.navbar,
+        .content-header,
+        .mobile-bottom-nav,
+        .desktop-only-packing,
+        .main-footer {
+            display: none !important;
+        }
+
+        html, body {
+            overflow: hidden !important;
+            height: 100% !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            background: #000 !important;
+        }
+
+        .content-wrapper {
+            margin: 0 !important;
+            padding: 0 !important;
+            background: #000 !important;
+            height: 100vh !important;
+            height: 100dvh !important;
+            overflow: hidden !important;
+        }
+
+        .content, .container-fluid {
+            padding: 0 !important;
+            margin: 0 !important;
+            height: 100% !important;
+            width: 100% !important;
+        }
+
+        .row {
+            margin: 0 !important;
+        }
+
+        .col-12, .col-lg-5 {
+            padding: 0 !important;
+            margin: 0 !important;
+        }
+
+        .card {
+            border-radius: 0 !important;
+            border: none !important;
+            background: transparent !important;
+            box-shadow: none !important;
+            margin: 0 !important;
+        }
+
+        .card-body {
+            padding: 0 !important;
+        }
+
+        .desktop-cam-card-header,
+        .desktop-cam-card-footer {
+            display: none !important;
+        }
+
+        /* Kamera preview fixed 100% satu layar penuh HP */
+        .video-preview-wrapper {
+            position: fixed !important;
+            top: 0 !important;
+            left: 0 !important;
+            width: 100vw !important;
+            height: 100vh !important;
+            height: 100dvh !important;
+            min-height: 100vh !important;
+            border-radius: 0 !important;
+            z-index: 1035 !important;
+            background: #000 !important;
+        }
+
+        #cameraPreview {
+            width: 100vw !important;
+            height: 100vh !important;
+            height: 100dvh !important;
+            object-fit: cover !important;
+            border-radius: 0 !important;
+        }
+
+        .mobile-only-cam-ui {
+            display: block !important;
+        }
+
+        /* Floating glassmorphism buttons */
+        .btn-cam-glass {
+            width: 42px;
+            height: 42px;
+            border-radius: 50%;
+            background: rgba(0, 0, 0, 0.45);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.25);
+            color: #ffffff !important;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 15px;
+            text-decoration: none !important;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+            transition: all 0.2s ease;
+        }
+
+        .btn-cam-glass:active, .btn-cam-glass.active {
+            background: rgba(37, 99, 235, 0.85);
+            border-color: #60a5fa;
+            transform: scale(0.94);
+        }
+
+        /* Top Header Floating */
+        .mobile-cam-header {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 30;
+            padding: calc(12px + env(safe-area-inset-top, 0px)) 16px 12px 16px;
+            background: linear-gradient(180deg, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0.2) 75%, rgba(0,0,0,0) 100%);
+            pointer-events: auto;
+        }
+
+        .mobile-cam-pill {
+            display: inline-flex;
+            align-items: center;
+            padding: 6px 14px;
+            border-radius: 20px;
+            background: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            border: 1px solid rgba(255, 255, 255, 0.25);
+            color: #ffffff;
+            font-size: 12px;
+            font-weight: 700;
+            letter-spacing: 0.3px;
+        }
+
+        .mobile-cam-pill.pill-rec {
+            background: rgba(220, 38, 38, 0.9);
+            border-color: #ef4444;
+            box-shadow: 0 0 16px rgba(239, 68, 68, 0.7);
+        }
+
+        /* Center Reticle / Viewfinder Targeting Box */
+        .mobile-cam-reticle-box {
+            position: absolute;
+            top: 45%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 250px;
+            height: 180px;
+            pointer-events: none;
+            z-index: 25;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .reticle-corner {
+            position: absolute;
+            width: 26px;
+            height: 26px;
+            border-color: #10b981;
+            border-style: solid;
+        }
+
+        .corner-tl { top: 0; left: 0; border-width: 3.5px 0 0 3.5px; border-top-left-radius: 12px; }
+        .corner-tr { top: 0; right: 0; border-width: 3.5px 3.5px 0 0; border-top-right-radius: 12px; }
+        .corner-bl { bottom: 0; left: 0; border-width: 0 0 3.5px 3.5px; border-bottom-left-radius: 12px; }
+        .corner-br { bottom: 0; right: 0; border-width: 0 3.5px 3.5px 0; border-bottom-right-radius: 12px; }
+
+
+
+        /* Bottom Controls Floating */
+        .mobile-cam-bottom {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            z-index: 30;
+            padding: 16px 16px calc(14px + env(safe-area-inset-bottom, 0px)) 16px;
+            background: linear-gradient(0deg, rgba(0,0,0,0.88) 0%, rgba(0,0,0,0.4) 65%, rgba(0,0,0,0) 100%);
+            pointer-events: auto;
+        }
+
+        .mobile-standby-pill {
+            background: rgba(15, 23, 42, 0.85);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.18);
+            border-radius: 25px;
+            padding: 9px 18px;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+        }
+
+        .mobile-order-sheet {
+            background: rgba(15, 23, 42, 0.94);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1.5px solid rgba(255, 255, 255, 0.22);
+            border-radius: 20px;
+            padding: 14px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.6);
+            animation: slideUp 0.25s ease-out;
+        }
+
+        @keyframes slideUp {
+            from { transform: translateY(25px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+
+        .mobile-record-btn {
+            height: 52px;
+            font-size: 15px;
+            letter-spacing: 0.5px;
+            transition: all 0.2s ease;
+        }
+
+        .mobile-record-btn:active {
+            transform: scale(0.97);
+        }
+    }
+
+    @media (min-width: 768px) {
+        .mobile-only-cam-ui {
+            display: none !important;
+        }
+    }
 </style>
 @endpush
 
 @section('content')
 
 <!-- Compact Top Bar: Scanner & Live Info -->
-<div class="card shadow-sm border-0 mb-3 bg-white">
+<div class="card shadow-sm border-0 mb-3 bg-white desktop-only-packing">
     <div class="card-body p-2 p-md-3">
         <div class="row align-items-center">
             <!-- Scan Input -->
@@ -196,7 +412,7 @@
     <!-- LEFT: Camera Video Stream, Auto QR Scanner & Record Controls -->
     <div class="col-lg-5 col-12 mb-3">
         <div class="card shadow-sm border-0 mb-0">
-            <div class="card-header bg-dark text-white py-2 d-flex justify-content-between align-items-center">
+            <div class="card-header bg-dark text-white py-2 d-flex justify-content-between align-items-center desktop-cam-card-header">
                 <span class="font-weight-bold" style="font-size: 13px;">
                     <i class="fas fa-camera mr-1 text-danger"></i> Kamera Auto-Scan & Video Rekam
                 </span>
@@ -207,8 +423,6 @@
             </div>
             <div class="card-body p-2 bg-black">
                 <div class="video-preview-wrapper" id="cameraWrapper">
-                    <!-- Scanner Laser Overlay -->
-                    <div class="scan-laser" id="scanLaserOverlay"></div>
 
                     <!-- Direct Video for Recording -->
                     <video id="cameraPreview" autoplay playsinline muted></video>
@@ -224,9 +438,104 @@
                         <p class="text-muted mb-2" style="font-size: 12px;">Kamera belum diizinkan atau tidak aktif.</p>
                         <button class="btn btn-primary btn-xs" onclick="startCamera()">Aktifkan Kamera</button>
                     </div>
+
+                    <!-- 📱 MOBILE FULLSCREEN CAMERA OVERLAYS -->
+                    <div class="mobile-cam-header mobile-only-cam-ui">
+                        <div class="d-flex align-items-center justify-content-between w-100">
+                            <a href="{{ route('dashboard') }}" class="btn-cam-glass" title="Kembali ke Dashboard">
+                                <i class="fas fa-arrow-left"></i>
+                            </a>
+                            
+                            <div class="text-center">
+                                <span class="mobile-cam-pill" id="mobileStatusPill">
+                                    <i class="fas fa-qrcode text-success mr-1"></i> Auto-Scan Resi
+                                </span>
+                                <span class="mobile-cam-pill pill-rec" id="mobileStatusPillRec" style="display: none;">
+                                    <i class="fas fa-circle text-danger mr-1 animate-pulse"></i> <span id="mobileRecTimerText">REC 00:00</span>
+                                </span>
+                            </div>
+
+                            <div class="d-flex align-items-center">
+                                <button type="button" class="btn-cam-glass mr-2" id="mobileTorchBtn" onclick="toggleTorch()" title="Lampu Flash">
+                                    <i class="fas fa-bolt" id="torchIcon"></i>
+                                </button>
+                                <button type="button" class="btn-cam-glass mr-2" onclick="toggleCameraDevice()" title="Ganti Kamera">
+                                    <i class="fas fa-camera-rotate"></i>
+                                </button>
+                                <button type="button" class="btn-cam-glass" onclick="openManualInputModal()" title="Ketik Resi Manual / Demo">
+                                    <i class="fas fa-keyboard"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Center Viewfinder Reticle -->
+                    <div class="mobile-cam-reticle-box mobile-only-cam-ui" id="mobileCamReticle">
+                        <div class="reticle-corner corner-tl"></div>
+                        <div class="reticle-corner corner-tr"></div>
+                        <div class="reticle-corner corner-bl"></div>
+                        <div class="reticle-corner corner-br"></div>
+                    </div>
+
+                    <!-- Bottom Floating Controls -->
+                    <div class="mobile-cam-bottom mobile-only-cam-ui">
+                        <!-- Standby Info (Shown when no order active) -->
+                        <div id="mobileStandbyInfo">
+                            <div class="mobile-standby-pill d-flex align-items-center justify-content-between">
+                                <span class="text-white text-xs font-weight-bold">
+                                    <i class="fas fa-check-circle text-success mr-1"></i> <span id="mobilePackedCounter">{{ $todayPackedCount }}</span> Di-Pack
+                                </span>
+                                <span class="text-white-50 text-xs" id="mobilePackerNameBadge">
+                                    <i class="fas fa-user mr-1"></i> Staff 1
+                                </span>
+                                <span class="text-white text-xs font-weight-bold">
+                                    <i class="fas fa-ban text-danger mr-1"></i> <span id="mobileBlockedCounter">{{ $todayBlockedCount }}</span> Batal
+                                </span>
+                            </div>
+                            <div class="text-center text-white-50 mt-2" style="font-size: 11px;">
+                                <i class="fas fa-circle-notch fa-spin mr-1 text-primary"></i> Kamera siap otomatis mendeteksi resi
+                            </div>
+                        </div>
+
+                        <!-- Active Order Card (Shown when order scanned & valid) -->
+                        <div id="mobileActiveOrderCard" style="display: none;">
+                            <div class="mobile-order-sheet">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <div>
+                                        <span class="badge badge-success px-2 py-1"><i class="fas fa-check mr-1"></i> Valid</span>
+                                        <strong class="text-white ml-1 font-weight-bold" id="mobileOrderCarrier">SPX</strong>
+                                        <span class="text-white-50 ml-1 text-xs" id="mobileOrderTracking">SPXID...</span>
+                                    </div>
+                                    <button type="button" class="btn btn-xs btn-outline-info font-weight-bold" onclick="showProductPhotoModal()">
+                                        <i class="fas fa-images mr-1"></i> Foto Barang
+                                    </button>
+                                </div>
+
+                                <div class="text-white-50 text-xs mb-3 d-flex justify-content-between">
+                                    <span id="mobileOrderBuyer">Pembeli: -</span>
+                                    <span class="text-warning font-weight-bold" id="mobileOrderItemsCount">0 Barang</span>
+                                </div>
+
+                                <!-- Big Shutter Record Button -->
+                                <button type="button" class="btn btn-danger btn-block btn-lg font-weight-bold shadow-lg py-3 rounded-pill mobile-record-btn" id="mobileBtnStartRecord" onclick="startPackingRecording()">
+                                    <i class="fas fa-circle mr-2"></i> MULAI REKAM PACKING
+                                </button>
+
+                                <button type="button" class="btn btn-success btn-block btn-lg font-weight-bold shadow-lg py-3 rounded-pill mobile-record-btn" id="mobileBtnStopRecord" onclick="stopPackingRecording()" style="display: none;">
+                                    <i class="fas fa-check-circle mr-2"></i> SELESAI & SIMPAN (<span id="mobileRecBtnTimer">00:00</span>)
+                                </button>
+
+                                <div class="text-center mt-2">
+                                    <button type="button" class="btn btn-link text-white-50 text-xs p-0" onclick="resetPackingState()">
+                                        <i class="fas fa-arrow-rotate-left mr-1"></i> Batal / Scan Paket Lain
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
-            <div class="card-footer bg-white p-2">
+            <div class="card-footer bg-white p-2 desktop-cam-card-footer">
                 <div class="row no-gutters">
                     <div class="col-6 pr-1">
                         <button type="button" class="btn btn-danger btn-block font-weight-bold py-2 shadow-sm" id="btnStartRecord" onclick="startPackingRecording()" disabled>
@@ -249,7 +558,7 @@
     </div>
 
     <!-- RIGHT: Order Details & Product Checklist -->
-    <div class="col-lg-7 col-12 mb-3">
+    <div class="col-lg-7 col-12 mb-3 desktop-only-packing">
         
         <!-- INITIAL EMPTY STATE -->
         <div id="emptyOrderState" class="card shadow-sm border-0 d-flex align-items-center justify-content-center text-center p-4" style="min-height: 380px;">
@@ -521,6 +830,62 @@
     </div>
 </div>
 
+<!-- 📱 MODAL INPUT MANUAL & PENGATURAN HP -->
+<div class="modal fade" id="mobileManualModal" tabindex="-1" role="dialog" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" role="document">
+        <div class="modal-content border-0 shadow-lg" style="border-radius: 16px; overflow: hidden;">
+            <div class="modal-header bg-primary text-white py-2">
+                <h6 class="modal-title font-weight-bold"><i class="fas fa-keyboard mr-2"></i> Input Resi Manual & Opsi</h6>
+                <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body p-3">
+                <form onsubmit="handleMobileManualSubmit(event)">
+                    <div class="form-group mb-3">
+                        <label class="font-weight-bold text-dark text-xs mb-1">Nomor Resi / AWB:</label>
+                        <div class="input-group">
+                            <input type="text" id="mobileManualResiInput" class="form-control font-weight-bold" placeholder="Ketik atau tempel No. Resi...">
+                            <div class="input-group-append">
+                                <button type="submit" class="btn btn-primary font-weight-bold">
+                                    <i class="fas fa-search mr-1"></i> Cek
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+
+                <div class="form-group mb-3">
+                    <label class="font-weight-bold text-dark text-xs mb-1">Nama Petugas Packing:</label>
+                    <input type="text" id="mobilePackerInput" class="form-control form-control-sm font-weight-bold" value="Staff Packing 1" onchange="syncPackerName(this.value)">
+                </div>
+
+                <div class="border-top pt-2 mt-3">
+                    <label class="text-muted font-weight-bold text-xs mb-1">Contoh Cepat Resi (Demo):</label>
+                    <div class="d-flex flex-wrap">
+                        @if($allOrders->isNotEmpty())
+                            @foreach($allOrders->take(3) as $ord)
+                                <button type="button" class="btn btn-xs btn-outline-dark mr-1 mb-1" onclick="quickTestOrderMobile('{{ $ord->tracking_number ?: $ord->order_sn }}')">
+                                    {{ $ord->tracking_number ?: $ord->order_sn }}
+                                </button>
+                            @endforeach
+                        @endif
+                        <button type="button" class="btn btn-xs btn-outline-danger mb-1" onclick="quickTestCancelOrderMobile()">
+                            <i class="fas fa-ban mr-1"></i> Resi Cancelled
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer bg-light py-2">
+                <a href="{{ route('packing.history') }}" class="btn btn-outline-secondary btn-xs font-weight-bold">
+                    <i class="fas fa-history mr-1"></i> Galeri Video Packing
+                </a>
+                <button type="button" class="btn btn-secondary btn-xs" data-dismiss="modal">Tutup</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 @endsection
 
 @push('scripts')
@@ -540,6 +905,8 @@
     let isScanningActive = true;
     let lastScannedCode = null;
     let lastScanTime = 0;
+    let currentTrack = null;
+    let isTorchOn = false;
 
     // Audio Synthesizer Beeps
     const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -600,6 +967,18 @@
             document.getElementById('cameraStatusBadge').innerHTML = '<i class="fas fa-circle mr-1" style="font-size: 7px;"></i> Siap';
             document.getElementById('cameraStatusBadge').className = 'badge badge-success';
 
+            // Check Torch Capability
+            currentTrack = mediaStream.getVideoTracks()[0];
+            const capabilities = currentTrack && currentTrack.getCapabilities ? currentTrack.getCapabilities() : {};
+            const torchBtn = document.getElementById('mobileTorchBtn');
+            if (torchBtn) {
+                torchBtn.style.display = capabilities.torch ? 'inline-flex' : 'none';
+            }
+            isTorchOn = false;
+            const torchIcon = document.getElementById('torchIcon');
+            if (torchIcon) torchIcon.className = 'fas fa-bolt text-white';
+            if (torchBtn) torchBtn.classList.remove('active');
+
             // Start Barcode / 2D QR code detection loop from video stream
             initCameraBarcodeDetector(videoEl);
         } catch (err) {
@@ -611,8 +990,47 @@
     }
 
     function toggleCameraDevice() {
+        isTorchOn = false;
         currentFacingMode = currentFacingMode === 'environment' ? 'user' : 'environment';
         startCamera();
+    }
+
+    async function toggleTorch() {
+        if (!mediaStream) return;
+        const tracks = mediaStream.getVideoTracks();
+        if (!tracks || tracks.length === 0) return;
+        const track = tracks[0];
+
+        try {
+            const capabilities = track.getCapabilities ? track.getCapabilities() : {};
+            if (!capabilities.torch) {
+                Swal.fire({
+                    icon: 'info',
+                    title: 'Flash Tidak Tersedia',
+                    text: 'Kamera yang aktif saat ini tidak mendukung lampu flash/torch.',
+                    timer: 2000,
+                    showConfirmButton: false
+                });
+                return;
+            }
+
+            isTorchOn = !isTorchOn;
+            await track.applyConstraints({
+                advanced: [{ torch: isTorchOn }]
+            });
+
+            const icon = document.getElementById('torchIcon');
+            const btn = document.getElementById('mobileTorchBtn');
+            if (isTorchOn) {
+                if (icon) icon.className = 'fas fa-bolt text-warning';
+                if (btn) btn.classList.add('active');
+            } else {
+                if (icon) icon.className = 'fas fa-bolt text-white';
+                if (btn) btn.classList.remove('active');
+            }
+        } catch (err) {
+            console.warn('Torch error:', err);
+        }
     }
 
     // Direct Real-time Barcode / 2D QR Code Detector using Native BarcodeDetector or Canvas scanning
@@ -678,8 +1096,10 @@
         lastScanTime = now;
 
         const input = document.getElementById('barcodeInput');
-        input.value = rawCode;
-        input.blur();
+        if (input) {
+            input.value = rawCode;
+            input.blur();
+        }
         if (document.activeElement && typeof document.activeElement.blur === 'function') {
             document.activeElement.blur();
         }
@@ -705,7 +1125,9 @@
     async function checkResiOrder(query) {
         // Dismiss mobile keyboard if open
         const input = document.getElementById('barcodeInput');
-        input.blur();
+        if (input) {
+            input.blur();
+        }
         if (document.activeElement && typeof document.activeElement.blur === 'function') {
             document.activeElement.blur();
         }
@@ -713,8 +1135,11 @@
             toggleVirtualKeyboard();
         }
 
-        document.getElementById('btnCheckResi').innerHTML = '<i class="fas fa-spinner fa-spin"></i> Cek...';
-        document.getElementById('btnCheckResi').disabled = true;
+        const btnCheck = document.getElementById('btnCheckResi');
+        if (btnCheck) {
+            btnCheck.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Cek...';
+            btnCheck.disabled = true;
+        }
 
         try {
             const response = await fetch("{{ route('packing.check') }}", {
@@ -730,8 +1155,10 @@
             });
 
             const data = await response.json();
-            document.getElementById('btnCheckResi').innerHTML = '<i class="fas fa-search mr-1"></i> Cek';
-            document.getElementById('btnCheckResi').disabled = false;
+            if (btnCheck) {
+                btnCheck.innerHTML = '<i class="fas fa-search mr-1"></i> Cek';
+                btnCheck.disabled = false;
+            }
 
             if (data.status === 'blocked_cancelled') {
                 // 🚫 BLOCKED: ORDER IS CANCELLED IN SHOPEE
@@ -763,8 +1190,10 @@
                 });
             }
         } catch (err) {
-            document.getElementById('btnCheckResi').innerHTML = '<i class="fas fa-search mr-1"></i> Cek';
-            document.getElementById('btnCheckResi').disabled = false;
+            if (btnCheck) {
+                btnCheck.innerHTML = '<i class="fas fa-search mr-1"></i> Cek';
+                btnCheck.disabled = false;
+            }
             $('#productPhotoPopupModal').modal('hide');
             Swal.fire({
                 icon: 'error',
@@ -784,13 +1213,26 @@
         document.getElementById('cancelledStatusBadge').innerText = data.order_status || 'CANCELLED';
         document.getElementById('cancelledBuyerText').innerText = data.buyer_username || '-';
 
-        // Update blocked counter
+        // Update blocked counters
         const blockedEl = document.getElementById('todayBlockedCounter');
-        blockedEl.innerText = (parseInt(blockedEl.innerText) + 1);
+        if (blockedEl) {
+            const nextBlocked = parseInt(blockedEl.innerText || 0) + 1;
+            blockedEl.innerText = nextBlocked;
+            const mobileBlockedEl = document.getElementById('mobileBlockedCounter');
+            if (mobileBlockedEl) mobileBlockedEl.innerText = nextBlocked;
+        }
 
         // Disable recording
         document.getElementById('btnStartRecord').disabled = true;
         document.getElementById('btnStopRecord').disabled = true;
+
+        // Reset mobile active card
+        const mActiveCard = document.getElementById('mobileActiveOrderCard');
+        const mStandby = document.getElementById('mobileStandbyInfo');
+        const mReticle = document.getElementById('mobileCamReticle');
+        if (mActiveCard) mActiveCard.style.display = 'none';
+        if (mStandby) mStandby.style.display = 'block';
+        if (mReticle) mReticle.style.display = 'flex';
 
         // Pop up the Cancelled Alert Modal
         $('#cancelledOrderModal').modal('show');
@@ -842,7 +1284,30 @@
 
         updateChecklistCounter();
         document.getElementById('btnStartRecord').disabled = false;
-        document.getElementById('barcodeInput').value = '';
+        const bInput = document.getElementById('barcodeInput');
+        if (bInput) bInput.value = '';
+
+        // 📱 UPDATE MOBILE FULLSCREEN OVERLAY
+        const mCarrier = document.getElementById('mobileOrderCarrier');
+        const mTracking = document.getElementById('mobileOrderTracking');
+        const mBuyer = document.getElementById('mobileOrderBuyer');
+        const mItems = document.getElementById('mobileOrderItemsCount');
+        const mActiveCard = document.getElementById('mobileActiveOrderCard');
+        const mStandby = document.getElementById('mobileStandbyInfo');
+        const mReticle = document.getElementById('mobileCamReticle');
+
+        if (mCarrier) mCarrier.innerText = data.shipping_carrier || 'Shopee';
+        if (mTracking) mTracking.innerText = data.tracking_number || data.order_sn;
+        if (mBuyer) mBuyer.innerText = `Pembeli: ${data.buyer_username || '-'}`;
+        if (mItems) mItems.innerText = `${data.items ? data.items.length : 0} Barang`;
+        if (mActiveCard) mActiveCard.style.display = 'block';
+        if (mStandby) mStandby.style.display = 'none';
+        if (mReticle) mReticle.style.display = 'none';
+
+        const mBtnStart = document.getElementById('mobileBtnStartRecord');
+        const mBtnStop = document.getElementById('mobileBtnStopRecord');
+        if (mBtnStart) { mBtnStart.style.display = 'block'; mBtnStart.disabled = false; }
+        if (mBtnStop) { mBtnStop.style.display = 'none'; }
     }
 
     // 🖼️ POPUP MODAL FOTO BARANG
@@ -956,17 +1421,38 @@
         document.getElementById('activeOrderSection').style.display = 'none';
         document.getElementById('btnStartRecord').disabled = true;
         document.getElementById('btnStopRecord').disabled = true;
-        document.getElementById('barcodeInput').value = '';
+        const bInput = document.getElementById('barcodeInput');
+        if (bInput) bInput.value = '';
 
-        if (!isMobileDevice) {
-            document.getElementById('barcodeInput').focus();
-        } else {
-            document.getElementById('barcodeInput').blur();
+        if (!isMobileDevice && bInput) {
+            bInput.focus();
+        } else if (bInput) {
+            bInput.blur();
         }
 
         isScanningActive = true;
-        document.getElementById('scanLaserOverlay').style.display = 'block';
         document.getElementById('cameraModeBadge').innerHTML = '<i class="fas fa-qrcode mr-1"></i> Auto-Scan Aktif';
+
+        // 📱 RESET MOBILE FULLSCREEN OVERLAY
+        const mActiveCard = document.getElementById('mobileActiveOrderCard');
+        const mStandby = document.getElementById('mobileStandbyInfo');
+        const mPillStandby = document.getElementById('mobileStatusPill');
+        const mPillRec = document.getElementById('mobileStatusPillRec');
+        const mReticle = document.getElementById('mobileCamReticle');
+        const mBtnStart = document.getElementById('mobileBtnStartRecord');
+        const mBtnStop = document.getElementById('mobileBtnStopRecord');
+
+        if (mActiveCard) mActiveCard.style.display = 'none';
+        if (mStandby) mStandby.style.display = 'block';
+        if (mPillStandby) mPillStandby.style.display = 'inline-flex';
+        if (mPillRec) mPillRec.style.display = 'none';
+        if (mReticle) mReticle.style.display = 'flex';
+        if (mBtnStart) { mBtnStart.style.display = 'block'; mBtnStart.disabled = false; }
+        if (mBtnStop) {
+            mBtnStop.style.display = 'none';
+            mBtnStop.disabled = false;
+            mBtnStop.innerHTML = '<i class="fas fa-check-circle mr-2"></i> SELESAI & SIMPAN (<span id="mobileRecBtnTimer">00:00</span>)';
+        }
     }
 
     function showAlreadyPackedModal(data) {
@@ -1070,7 +1556,8 @@
 
     // Quick Test Helper for Demo
     function quickTestOrder(val) {
-        document.getElementById('barcodeInput').value = val;
+        const bInput = document.getElementById('barcodeInput');
+        if (bInput) bInput.value = val;
         checkResiOrder(val);
     }
 
@@ -1087,7 +1574,6 @@
 
         // Pause barcode auto-scan during video recording
         isScanningActive = false;
-        document.getElementById('scanLaserOverlay').style.display = 'none';
         document.getElementById('cameraModeBadge').innerHTML = '<i class="fas fa-video mr-1"></i> Mode Rekam';
 
         recordedChunks = [];
@@ -1114,12 +1600,31 @@
         document.getElementById('btnStartRecord').disabled = true;
         document.getElementById('btnStopRecord').disabled = false;
 
+        // 📱 MOBILE RECORDING STATE
+        const mBtnStart = document.getElementById('mobileBtnStartRecord');
+        const mBtnStop = document.getElementById('mobileBtnStopRecord');
+        const mPillStandby = document.getElementById('mobileStatusPill');
+        const mPillRec = document.getElementById('mobileStatusPillRec');
+        const mReticle = document.getElementById('mobileCamReticle');
+
+        if (mBtnStart) mBtnStart.style.display = 'none';
+        if (mBtnStop) { mBtnStop.style.display = 'block'; mBtnStop.disabled = false; }
+        if (mPillStandby) mPillStandby.style.display = 'none';
+        if (mPillRec) mPillRec.style.display = 'inline-flex';
+        if (mReticle) mReticle.style.display = 'none';
+
         timerInterval = setInterval(() => {
             const elapsedSeconds = Math.floor((Date.now() - recordStartTime) / 1000);
             recordDuration = elapsedSeconds;
             const mins = String(Math.floor(elapsedSeconds / 60)).padStart(2, '0');
             const secs = String(elapsedSeconds % 60).padStart(2, '0');
             document.getElementById('recordingTimerText').innerText = `REC ${mins}:${secs}`;
+
+            // Mobile timer display
+            const mTimerText = document.getElementById('mobileRecTimerText');
+            const mBtnTimerText = document.getElementById('mobileRecBtnTimer');
+            if (mTimerText) mTimerText.innerText = `REC ${mins}:${secs}`;
+            if (mBtnTimerText) mBtnTimerText.innerText = `${mins}:${secs}`;
         }, 500);
 
         playBeep(600, 'sine', 0.2);
@@ -1132,6 +1637,12 @@
         document.getElementById('recordingBadge').style.display = 'none';
         document.getElementById('btnStopRecord').disabled = true;
         document.getElementById('btnStopRecord').innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i> Menyimpan...';
+
+        const mBtnStop = document.getElementById('mobileBtnStopRecord');
+        if (mBtnStop) {
+            mBtnStop.disabled = true;
+            mBtnStop.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Menyimpan...';
+        }
 
         mediaRecorder.stop();
         playBeep(750, 'sine', 0.2);
@@ -1174,9 +1685,14 @@
                     showConfirmButton: true
                 });
 
-                // Increment counter
+                // Increment counters
                 const packedCounter = document.getElementById('todayPackedCounter');
-                packedCounter.innerText = parseInt(packedCounter.innerText) + 1;
+                if (packedCounter) {
+                    const nextCount = parseInt(packedCounter.innerText || 0) + 1;
+                    packedCounter.innerText = nextCount;
+                    const mPacked = document.getElementById('mobilePackedCounter');
+                    if (mPacked) mPacked.innerText = nextCount;
+                }
 
                 resetPackingState();
             } else {
@@ -1196,12 +1712,52 @@
         }
     }
 
+    // 📱 MOBILE HELPER FUNCTIONS
+    function openManualInputModal() {
+        const currentPacker = document.getElementById('packerNameInput').value;
+        const mobilePacker = document.getElementById('mobilePackerInput');
+        if (mobilePacker) mobilePacker.value = currentPacker;
+        $('#mobileManualModal').modal('show');
+        setTimeout(() => {
+            const inp = document.getElementById('mobileManualResiInput');
+            if (inp) inp.focus();
+        }, 400);
+    }
+
+    function handleMobileManualSubmit(e) {
+        e.preventDefault();
+        const input = document.getElementById('mobileManualResiInput');
+        const val = input.value.trim();
+        if (!val) return;
+        $('#mobileManualModal').modal('hide');
+        input.value = '';
+        checkResiOrder(val);
+    }
+
+    function quickTestOrderMobile(val) {
+        $('#mobileManualModal').modal('hide');
+        checkResiOrder(val);
+    }
+
+    function quickTestCancelOrderMobile() {
+        $('#mobileManualModal').modal('hide');
+        quickTestCancelOrder();
+    }
+
+    function syncPackerName(val) {
+        document.getElementById('packerNameInput').value = val;
+        const badge = document.getElementById('mobilePackerNameBadge');
+        if (badge) badge.innerHTML = `<i class="fas fa-user mr-1"></i> ${val}`;
+    }
+
     document.addEventListener('DOMContentLoaded', () => {
         startCamera();
         if (isMobileDevice) {
-            document.getElementById('barcodeInput').setAttribute('inputmode', 'none');
+            const bInput = document.getElementById('barcodeInput');
+            if (bInput) bInput.setAttribute('inputmode', 'none');
         } else {
-            document.getElementById('barcodeInput').focus();
+            const bInput = document.getElementById('barcodeInput');
+            if (bInput) bInput.focus();
         }
     });
 </script>
