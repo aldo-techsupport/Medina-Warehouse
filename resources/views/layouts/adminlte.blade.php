@@ -5,6 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
     <title>@yield('title', 'Dashboard') - Medina Warehouse & Shopee Sync</title>
 
+    <!-- Favicon & Icons -->
+    <link rel="icon" type="image/png" sizes="32x32" href="{{ asset('favicon-32x32.png') }}">
+    <link rel="icon" type="image/png" href="{{ asset('favicon.png') }}">
+    <link rel="shortcut icon" href="{{ asset('favicon.ico') }}">
+    <link rel="apple-touch-icon" sizes="180x180" href="{{ asset('apple-touch-icon.png') }}">
+
     <!-- Google Font: Inter & Source Sans -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -299,8 +305,8 @@
             @endif
             <!-- Mobile Brand Title in Header -->
             <li class="nav-item d-inline-block d-lg-none ml-1">
-                <span class="font-weight-bold text-dark" style="font-size: 13.5px;">
-                    <i class="fas fa-boxes-stacked text-primary mr-1"></i> Medina
+                <span class="font-weight-bold text-dark d-inline-flex align-items-center" style="font-size: 13.5px;">
+                    <img src="{{ asset('images/logo.png') }}" alt="Medina" class="rounded-circle shadow-xs mr-1" style="width: 24px; height: 24px; object-fit: cover; border: 1px solid rgba(0,0,0,0.1);"> Medina
                 </span>
             </li>
         </ul>
@@ -421,9 +427,7 @@
     <aside class="main-sidebar sidebar-dark-primary elevation-4">
         <!-- Brand Logo -->
         <a href="{{ route('dashboard') }}" class="brand-link d-flex align-items-center">
-            <div class="brand-image img-circle elevation-2 d-flex align-items-center justify-content-center bg-primary text-white" style="width: 33px; height: 33px; font-size: 16px;">
-                <i class="fas fa-boxes-stacked"></i>
-            </div>
+            <img src="{{ asset('images/logo.png') }}" alt="Medina Logo" class="brand-image img-circle elevation-2" style="width: 33px; height: 33px; object-fit: cover; background: #ffffff; border: 1px solid rgba(255,255,255,0.2);">
             <span class="brand-text font-weight-bold ml-2">Medina Warehouse</span>
         </a>
 

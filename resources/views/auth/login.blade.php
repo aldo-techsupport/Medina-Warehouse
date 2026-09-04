@@ -5,6 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
     <title>Login - Medina Warehouse & Shopee Sync</title>
 
+    <!-- Favicon & Icons -->
+    <link rel="icon" type="image/png" sizes="32x32" href="{{ asset('favicon-32x32.png') }}">
+    <link rel="icon" type="image/png" href="{{ asset('favicon.png') }}">
+    <link rel="shortcut icon" href="{{ asset('favicon.ico') }}">
+    <link rel="apple-touch-icon" sizes="180x180" href="{{ asset('apple-touch-icon.png') }}">
+
     <!-- Google Font: Inter -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -138,8 +144,8 @@
 <div class="login-card-box">
     <!-- Header -->
     <div class="login-header-bg">
-        <div class="brand-icon-circle">
-            <i class="fas fa-boxes-stacked"></i>
+        <div class="brand-icon-circle p-1 bg-white shadow" style="overflow: hidden;">
+            <img src="{{ asset('images/logo.png') }}" alt="Medina Logo" style="width: 100%; height: 100%; object-fit: cover; border-radius: 10px;">
         </div>
         <h4 class="font-weight-bold mb-1" style="letter-spacing: -0.5px;">Medina Warehouse</h4>
         <p class="mb-0 text-white-50" style="font-size: 13px;">Sistem Gudang & Sinkronisasi Shopee OpenAPI</p>
