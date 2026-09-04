@@ -131,25 +131,6 @@
             box-shadow: 0 6px 16px rgba(37, 99, 235, 0.45);
             transform: translateY(-1px);
         }
-        .demo-pill {
-            font-size: 11px;
-            padding: 5px 10px;
-            border-radius: 20px;
-            cursor: pointer;
-            border: 1px solid #e2e8f0;
-            background: #f8fafc;
-            color: #475569;
-            transition: all 0.15s;
-            display: inline-block;
-            margin: 3px 2px;
-            font-weight: 600;
-        }
-        .demo-pill:hover {
-            background: #e2e8f0;
-            color: #0f172a;
-            border-color: #cbd5e1;
-            transform: translateY(-1px);
-        }
     </style>
 </head>
 <body>
@@ -221,30 +202,6 @@
                 <i class="fas fa-sign-in-alt mr-2"></i> Masuk ke Sistem
             </button>
         </form>
-
-        <!-- Quick Demo Accounts -->
-        <div class="mt-4 pt-3 border-top">
-            <div class="d-flex align-items-center justify-content-between mb-2">
-                <span class="text-muted font-weight-bold" style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">
-                    <i class="fas fa-bolt text-warning mr-1"></i> Demo Quick Login:
-                </span>
-                <span class="text-muted" style="font-size: 11px;">(Pass: password)</span>
-            </div>
-            <div class="d-flex flex-wrap">
-                <button type="button" class="demo-pill" onclick="fillDemo('admin')">
-                    👑 Super Admin
-                </button>
-                <button type="button" class="demo-pill" onclick="fillDemo('gudang')">
-                    📦 Admin Gudang
-                </button>
-                <button type="button" class="demo-pill" onclick="fillDemo('packer')">
-                    📹 Operator Packing
-                </button>
-                <button type="button" class="demo-pill" onclick="fillDemo('shopee')">
-                    🛍️ Staff Shopee
-                </button>
-            </div>
-        </div>
     </div>
 </div>
 
@@ -266,11 +223,6 @@
             icon.classList.remove('fa-eye-slash');
             icon.classList.add('fa-eye');
         }
-    }
-
-    function fillDemo(username) {
-        document.getElementById('inputUsername').value = username;
-        document.getElementById('inputPassword').value = 'password';
     }
 </script>
 </body>
