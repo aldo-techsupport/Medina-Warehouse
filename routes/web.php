@@ -73,7 +73,9 @@ Route::middleware('auth')->group(function () {
 
         Route::middleware('menu:shopee_orders')->group(function () {
             Route::get('/orders', [ShopeeController::class, 'orders'])->name('orders');
+            Route::post('/orders/pull', [ShopeeController::class, 'pullOrders'])->name('orders.pull');
             Route::post('/simulate-order', [ShopeeController::class, 'simulateOrder'])->name('simulate.order');
+            Route::get('/fetch-products', [ShopeeController::class, 'fetchShopProducts'])->name('fetch.products');
         });
 
         Route::middleware('menu:shopee_settings')->group(function () {

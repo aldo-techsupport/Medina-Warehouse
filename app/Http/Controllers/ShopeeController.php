@@ -311,4 +311,56 @@ class ShopeeController extends Controller
             return redirect()->back()->with('error', 'Gagal memproses simulasi: '.$e->getMessage());
         }
     }
+
+    /**
+     * Pull recent orders directly from Shopee Open API v2.
+     */
+    public function pullOrders(Request $request)
+    {
+        $days = (int) $request->input('days', 3);
+        $days = min(15, max(1, $days));
+
+        $result = $this->shopeeService->pullAndSyncOrders($days, $this->mutationService);
+
+        if ($result['success']) {
+            $count = $result['synced_count'] ?? 0;
+            $msg = $count > 0
+                ? "Berhasil menarik & mensinkronkan {$count} pesanan terbaru dari Shopee!"
+                : 'Pengecekan selesai: Tidak ada pesanan Shopee baru dalam rentang waktu tersebut.';
+
+            return redirect()->back()->with('success', $msg);
+        }
+
+        return redirect()->back()->with('error', 'Gagal menarik pesanan dari Shopee: '.($result['error'] ?? 'Terjadi kesalahan sistem'));
+    }
+
+    /**
+     * Fetch products from Shopee API for interactive product mapping.
+     */
+    public function fetchShopProducts(Request $request)
+    {
+        $offset = (int) $request->input('offset', 0);
+        $pageSize = min(50, (int) $request->input('page_size', 20));
+
+        $result = $this->shopeeService->getItemList($offset, $pageSize);
+
+        if (! $result['success']) {
+            return response()->json([
+                'success' => false,
+                'message' => $result['error'] ?? 'Gagal mengambil produk dari Shopee',
+            ], 400);
+        }
+
+        $items = $result['data']['item'] ?? [];
+        $itemIds = array_column($items, 'item_id');
+
+        $baseInfoResult = ! empty($itemIds) ? $this->shopeeService->getItemBaseInfo($itemIds) : ['success' => true, 'data' => ['item_list' => []]];
+
+        return response()->json([
+            'success' => true,
+            'items' => $baseInfoResult['data']['item_list'] ?? [],
+            'has_next_page' => $result['data']['has_next_page'] ?? false,
+            'total_count' => $result['data']['total_count'] ?? count($items),
+        ]);
+    }
 }

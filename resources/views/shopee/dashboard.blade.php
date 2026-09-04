@@ -5,6 +5,13 @@
 
 @section('page_actions')
     <div class="btn-group d-none d-sm-inline-flex">
+        <form action="{{ route('shopee.orders.pull') }}" method="POST" class="d-inline mr-1">
+            @csrf
+            <input type="hidden" name="days" value="7">
+            <button type="submit" class="btn btn-outline-success btn-sm" onclick="this.disabled=true; this.innerHTML='<i class=\'fas fa-spinner fa-spin mr-1\'></i> Menarik...'; this.form.submit();">
+                <i class="fas fa-cloud-download-alt mr-1"></i> Tarik Pesanan
+            </button>
+        </form>
         <form action="{{ route('shopee.sync.all') }}" method="POST" class="d-inline mr-1">
             @csrf
             <button type="submit" class="btn btn-outline-secondary btn-sm">
@@ -38,9 +45,18 @@
                                 <span class="mr-2">
                                     <i class="fas fa-id-badge mr-1"></i> Shop ID: <strong>{{ $setting->shop_id ?: '-' }}</strong>
                                 </span>
-                                <span>
+                                <span class="mr-2">
                                     Auto-Deduct: <strong class="text-success"><i class="fas fa-check"></i> AKTIF</strong>
                                 </span>
+                                @if($setting->isConnected())
+                                    <span class="badge badge-success px-2 py-1">
+                                        <i class="fas fa-check-circle mr-1"></i> Token Valid (Auto-Refresh)
+                                    </span>
+                                @else
+                                    <span class="badge badge-warning px-2 py-1">
+                                        <i class="fas fa-exclamation-triangle mr-1"></i> Belum Terhubung
+                                    </span>
+                                @endif
                             </div>
                         </div>
                     </div>

@@ -4,6 +4,13 @@
 @section('page_title', 'Pesanan Masuk dari Shopee')
 
 @section('page_actions')
+    <form action="{{ route('shopee.orders.pull') }}" method="POST" class="d-inline-block mr-1">
+        @csrf
+        <input type="hidden" name="days" value="7">
+        <button type="submit" class="btn btn-outline-success btn-sm" onclick="this.disabled=true; this.innerHTML='<i class=\'fas fa-spinner fa-spin mr-1\'></i> Menarik...'; this.form.submit();">
+            <i class="fas fa-cloud-download-alt mr-1"></i> Tarik Pesanan Shopee (Pull API)
+        </button>
+    </form>
     <button type="button" class="btn btn-shopee btn-sm d-none d-sm-inline-block" data-toggle="modal" data-target="#simulatorModal">
         <i class="fas fa-bolt mr-1"></i> Simulasi Pesanan
     </button>

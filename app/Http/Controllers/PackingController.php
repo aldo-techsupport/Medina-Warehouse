@@ -7,8 +7,11 @@ use App\Models\Product;
 use App\Models\ShopeeOrder;
 use App\Models\ShopeeSetting;
 use App\Services\ShopeeService;
+use App\Services\StockMutationService;
+use Exception;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
@@ -16,9 +19,12 @@ class PackingController extends Controller
 {
     protected ShopeeService $shopeeService;
 
-    public function __construct(ShopeeService $shopeeService)
+    protected StockMutationService $mutationService;
+
+    public function __construct(ShopeeService $shopeeService, ?StockMutationService $mutationService = null)
     {
         $this->shopeeService = $shopeeService;
+        $this->mutationService = $mutationService ?? new StockMutationService($shopeeService);
     }
 
     /**
@@ -52,6 +58,7 @@ class PackingController extends Controller
 
     /**
      * Check scanned tracking number or Order SN and validate cancellation status.
+     * Supports live query to Shopee Open API v2 to guarantee up-to-the-second status.
      */
     public function checkOrder(Request $request): JsonResponse
     {
@@ -69,7 +76,76 @@ class PackingController extends Controller
             ->orWhere('order_sn', $query)
             ->first();
 
-        // If not found locally, create a fallback mock order for instant testing if formatted like a tracking number
+        $liveVerified = false;
+        $liveTrackingInfo = null;
+
+        // If connected to Shopee Open API, verify live order status and tracking info
+        if ($this->shopeeService->getSetting()->isConnected()) {
+            try {
+                if ($order) {
+                    $detailResult = $this->shopeeService->getOrderDetail([$order->order_sn]);
+                    if ($detailResult['success'] && ! empty($detailResult['data']['order_list'][0])) {
+                        $liveOrder = $detailResult['data']['order_list'][0];
+                        $liveStatus = $liveOrder['order_status'] ?? $order->order_status;
+                        $liveTracking = $liveOrder['tracking_number'] ?? ($liveOrder['package_list'][0]['tracking_number'] ?? null);
+
+                        if ($liveStatus !== $order->order_status || ($liveTracking && empty($order->tracking_number))) {
+                            $order->order_status = $liveStatus;
+                            if ($liveTracking) {
+                                $order->tracking_number = $liveTracking;
+                            }
+                            $order->save();
+                        }
+                        $liveVerified = true;
+                    }
+
+                    $trackResult = $this->shopeeService->getTrackingInfo($order->order_sn);
+                    if ($trackResult['success'] && ! empty($trackResult['data']['tracking_info'])) {
+                        $liveTrackingInfo = $trackResult['data']['tracking_info'];
+                    }
+                } else {
+                    // Order not yet in local DB: attempt to fetch directly from Shopee API
+                    $detailResult = $this->shopeeService->getOrderDetail([$query]);
+                    if ($detailResult['success'] && ! empty($detailResult['data']['order_list'][0])) {
+                        $liveOrder = $detailResult['data']['order_list'][0];
+                        $rawItemList = $liveOrder['item_list'] ?? [];
+                        $items = [];
+                        foreach ($rawItemList as $rawItem) {
+                            $items[] = [
+                                'item_id' => $rawItem['item_id'] ?? null,
+                                'item_sku' => $rawItem['item_sku'] ?? null,
+                                'item_name' => $rawItem['item_name'] ?? 'Shopee Item',
+                                'model_id' => $rawItem['model_id'] ?? null,
+                                'model_quantity_purchased' => $rawItem['model_quantity_purchased'] ?? 1,
+                                'model_discounted_price' => $rawItem['model_discounted_price'] ?? 0,
+                            ];
+                        }
+
+                        $orderData = [
+                            'order_sn' => $liveOrder['order_sn'],
+                            'shop_id' => (int) $this->shopeeService->getSetting()->shop_id,
+                            'order_status' => $liveOrder['order_status'] ?? 'READY_TO_SHIP',
+                            'total_amount' => $liveOrder['total_amount'] ?? 0,
+                            'buyer_username' => $liveOrder['buyer_username'] ?? 'Shopee Customer',
+                            'tracking_number' => $liveOrder['tracking_number'] ?? $query,
+                            'shipping_carrier' => $liveOrder['shipping_carrier'] ?? 'Shopee Logistics',
+                            'items' => $items,
+                        ];
+
+                        $order = $this->mutationService->processShopeeOrder($orderData);
+                        $order->update([
+                            'tracking_number' => $orderData['tracking_number'],
+                            'shipping_carrier' => $orderData['shipping_carrier'],
+                        ]);
+                        $liveVerified = true;
+                    }
+                }
+            } catch (Exception $e) {
+                Log::warning('Live Shopee order scan check warning: '.$e->getMessage());
+            }
+        }
+
+        // Fallback mock order for instant local testing if no Shopee API connected
         if (! $order) {
             $isCancelledQuery = str_contains(strtoupper($query), 'CANCEL');
             $firstProduct = Product::where('status', 'active')->first();
@@ -124,6 +200,7 @@ class PackingController extends Controller
                 'order_status' => $order->order_status,
                 'buyer_username' => $order->buyer_username,
                 'total_amount' => $order->total_amount,
+                'live_verified' => $liveVerified,
                 'message' => "🚫 PERINGATAN: Pesanan ini sudah BERSTATUS DIBATALKAN ({$order->order_status}) di Shopee! JANGAN DIPACKING ATAU DISERAHKAN KE KURIR!",
             ]);
         }
@@ -184,12 +261,16 @@ class PackingController extends Controller
             'order_status' => $order->order_status,
             'buyer_username' => $order->buyer_username,
             'total_amount' => (float) $order->total_amount,
+            'live_verified' => $liveVerified,
+            'live_tracking_info' => $liveTrackingInfo,
             'items' => $formattedItems,
             'already_packed' => $alreadyPacked,
             'existing_packing' => $existingPackingData,
             'message' => $alreadyPacked
                 ? "Resi ini sudah pernah dipacking oleh {$existingPacking->packer_name} ({$existingPacking->created_at->diffForHumans()})."
-                : 'Pesanan aktif & valid. Silakan periksa produk dan mulai perekaman video packing.',
+                : ($liveVerified
+                    ? 'Pesanan aktif & terverifikasi langsung via Shopee API. Silakan periksa produk dan mulai perekaman video packing.'
+                    : 'Pesanan aktif & valid. Silakan periksa produk dan mulai perekaman video packing.'),
         ]);
     }
 

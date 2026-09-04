@@ -1246,7 +1246,8 @@
 
         document.getElementById('orderCarrierText').innerText = data.shipping_carrier || 'Shopee Shipping';
         document.getElementById('orderTrackingText').innerText = data.tracking_number || data.order_sn;
-        document.getElementById('orderStatusBadge').innerText = data.order_status;
+        document.getElementById('orderStatusBadge').innerText = data.order_status + (data.live_verified ? ' • Live Shopee' : '');
+        document.getElementById('orderStatusBadge').className = data.live_verified ? 'badge badge-success font-weight-bold px-2 py-1' : 'badge badge-warning font-weight-bold px-2 py-1';
         document.getElementById('activeOrderSnText').innerText = data.order_sn;
         document.getElementById('activeBuyerText').innerText = data.buyer_username;
 
