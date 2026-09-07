@@ -277,9 +277,31 @@
         .corner-tl { top: 0; left: 0; border-width: 3.5px 0 0 3.5px; border-top-left-radius: 12px; }
         .corner-tr { top: 0; right: 0; border-width: 3.5px 3.5px 0 0; border-top-right-radius: 12px; }
         .corner-bl { bottom: 0; left: 0; border-width: 0 0 3.5px 3.5px; border-bottom-left-radius: 12px; }
-        .corner-br { bottom: 0; right: 0; border-width: 0 3.5px 3.5px 0; border-bottom-right-radius: 12px; }
+        .reticle-corner.corner-br {
+            bottom: 0;
+            right: 0;
+            border-bottom: 3px solid #22c55e;
+            border-right: 3px solid #22c55e;
+            border-bottom-right-radius: 6px;
+        }
 
+        .reticle-laser {
+            width: 85%;
+            height: 2px;
+            background: linear-gradient(90deg, rgba(34, 197, 94, 0) 0%, rgba(34, 197, 94, 0.9) 50%, rgba(34, 197, 94, 0) 100%);
+            box-shadow: 0 0 8px rgba(34, 197, 94, 0.8);
+            animation: scanLaser 2s infinite ease-in-out;
+        }
+        @keyframes scanLaser {
+            0% { transform: translateY(-65px); opacity: 0.2; }
+            50% { transform: translateY(65px); opacity: 1; }
+            100% { transform: translateY(-65px); opacity: 0.2; }
+        }
 
+        .mobile-cam-reticle-box.reticle-detected .reticle-corner {
+            border-color: #3b82f6 !important;
+            box-shadow: 0 0 16px rgba(59, 130, 246, 1);
+        }
 
         /* Bottom Controls Floating */
         .mobile-cam-bottom {
@@ -381,6 +403,9 @@
 
                     <div class="d-flex align-items-center">
                         <input type="text" id="packerNameInput" class="form-control form-control-sm font-weight-bold mr-2" value="Staff Packing 1" style="width: 130px;" title="Nama Staf">
+                        <button class="btn btn-sm btn-outline-secondary mr-2" onclick="toggleCameraZoom()" id="desktopZoomBtn" title="Zoom Kamera">
+                            <i class="fas fa-search-plus mr-1"></i> 1x
+                        </button>
                         <button class="btn btn-sm btn-outline-secondary" onclick="toggleCameraDevice()" id="switchCamBtn" title="Ganti Kamera Depan/Belakang">
                             <i class="fas fa-camera-rotate mr-1"></i> Ganti Kamera
                         </button>
@@ -456,6 +481,9 @@
                             </div>
 
                             <div class="d-flex align-items-center">
+                                <button type="button" class="btn-cam-glass mr-2 font-weight-bold" id="mobileZoomBtn" onclick="toggleCameraZoom()" title="Zoom Kamera">
+                                    1x
+                                </button>
                                 <button type="button" class="btn-cam-glass mr-2" id="mobileTorchBtn" onclick="toggleTorch()" title="Lampu Flash">
                                     <i class="fas fa-bolt" id="torchIcon"></i>
                                 </button>
@@ -475,6 +503,7 @@
                         <div class="reticle-corner corner-tr"></div>
                         <div class="reticle-corner corner-bl"></div>
                         <div class="reticle-corner corner-br"></div>
+                        <div class="reticle-laser"></div>
                     </div>
 
                     <!-- Bottom Floating Controls -->
@@ -889,7 +918,9 @@
 @endsection
 
 @push('scripts')
-<!-- Barcode & QR Code Engine: ZXing MultiFormat for Cross-Platform iOS Safari & Android Support -->
+<!-- Barcode & QR Code Engines: ZBar WebAssembly + BarcodeDetector Polyfill for High-Accuracy 1D Code 128 / QR on iOS Safari + ZXing Fallback -->
+<script src="https://cdn.jsdelivr.net/npm/@undecaf/zbar-wasm@0.9.15/dist/index.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@undecaf/barcode-detector-polyfill@0.9.21/dist/index.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.min.js"></script>
 
 <script>
@@ -901,12 +932,26 @@
     let timerInterval = null;
     let recordDuration = 0;
     let currentFacingMode = 'environment'; // 'user' or 'environment'
-    let zxingReader = null;
+    let currentZoom = 1;
     let isScanningActive = true;
     let lastScannedCode = null;
     let lastScanTime = 0;
     let currentTrack = null;
     let isTorchOn = false;
+    let scanEngineName = 'Siap';
+    let scanCanvas = null;
+    let scanCtx = null;
+    let isDetectingFrame = false;
+
+    // Polyfill BarcodeDetector with ZBar WebAssembly on iOS Safari if native API is absent
+    try {
+        if (!('BarcodeDetector' in window) && typeof barcodeDetectorPolyfill !== 'undefined' && barcodeDetectorPolyfill.BarcodeDetectorPolyfill) {
+            window.BarcodeDetector = barcodeDetectorPolyfill.BarcodeDetectorPolyfill;
+            console.log('BarcodeDetector polyfilled via ZBar WebAssembly for iOS Safari compatibility.');
+        }
+    } catch (polyErr) {
+        console.warn('BarcodeDetector polyfill note:', polyErr);
+    }
 
     // Audio Synthesizer Beeps
     const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -955,23 +1000,26 @@
         setTimeout(() => playBeep(650, 'sine', 0.2), 180);
     }
 
+    function updateScannerStatusBadge(engine) {
+        const dBadge = document.getElementById('cameraModeBadge');
+        if (dBadge) dBadge.innerHTML = `<i class="fas fa-qrcode mr-1"></i> Auto-Scan (${engine})`;
+        const mBadge = document.getElementById('mobileStatusPill');
+        if (mBadge) mBadge.innerHTML = `<i class="fas fa-qrcode text-success mr-1"></i> Scan [${engine}]`;
+    }
+
     // Camera Init & QR/Barcode Reader Integration
     async function startCamera() {
         try {
             if (mediaStream) {
                 mediaStream.getTracks().forEach(track => track.stop());
             }
-            if (zxingReader) {
-                try {
-                    zxingReader.reset();
-                } catch(e) {}
-            }
 
             const constraints = {
                 video: {
                     facingMode: { ideal: currentFacingMode },
                     width: { ideal: 1280 },
-                    height: { ideal: 720 }
+                    height: { ideal: 720 },
+                    advanced: [{ focusMode: 'continuous' }]
                 },
                 audio: false
             };
@@ -1019,6 +1067,13 @@
             if (torchIcon) torchIcon.className = 'fas fa-bolt text-white';
             if (torchBtn) torchBtn.classList.remove('active');
 
+            // Reset zoom state
+            currentZoom = 1;
+            const mZoom = document.getElementById('mobileZoomBtn');
+            if (mZoom) mZoom.innerText = '1x';
+            const dZoom = document.getElementById('desktopZoomBtn');
+            if (dZoom) dZoom.innerHTML = '<i class="fas fa-search-plus mr-1"></i> 1x';
+
             // Start Barcode / 2D QR code detection loop from video stream
             initCameraBarcodeDetector(videoEl);
         } catch (err) {
@@ -1033,6 +1088,42 @@
         isTorchOn = false;
         currentFacingMode = currentFacingMode === 'environment' ? 'user' : 'environment';
         startCamera();
+    }
+
+    async function toggleCameraZoom() {
+        if (!mediaStream) return;
+        const tracks = mediaStream.getVideoTracks();
+        if (!tracks || tracks.length === 0) return;
+        const track = tracks[0];
+
+        try {
+            const capabilities = track.getCapabilities ? track.getCapabilities() : {};
+            if (capabilities.zoom) {
+                const min = capabilities.zoom.min || 1;
+                const max = capabilities.zoom.max || 3;
+                const target = (currentZoom === 1) ? Math.min(2, max) : min;
+                currentZoom = target;
+                await track.applyConstraints({
+                    advanced: [{ zoom: currentZoom }]
+                });
+            } else {
+                // Digital CSS Zoom fallback
+                currentZoom = (currentZoom === 1) ? 1.6 : 1;
+                const videoEl = document.getElementById('cameraPreview');
+                if (videoEl) {
+                    videoEl.style.transform = (currentZoom === 1) ? 'none' : `scale(${currentZoom})`;
+                    videoEl.style.transformOrigin = 'center center';
+                }
+            }
+
+            const mBtn = document.getElementById('mobileZoomBtn');
+            if (mBtn) mBtn.innerText = `${currentZoom}x`;
+            const dBtn = document.getElementById('desktopZoomBtn');
+            if (dBtn) dBtn.innerHTML = `<i class="fas fa-search mr-1"></i> Zoom ${currentZoom}x`;
+            playBeep(920, 'sine', 0.05);
+        } catch (err) {
+            console.warn('Camera zoom constraint notice:', err);
+        }
     }
 
     async function toggleTorch() {
@@ -1073,28 +1164,49 @@
         }
     }
 
-    // Direct Real-time Barcode / 2D QR Code Detector (Native BarcodeDetector + ZXing Fallback for iPhone / Safari)
+    // Direct Real-time Barcode / 2D QR Code Detector (Multi-Engine: ZBar WASM / Native BarcodeDetector / ZXing Canvas)
     async function initCameraBarcodeDetector(videoElement) {
-        // Engine 1: Native BarcodeDetector (Supported in Android Chrome & Chromium)
+        // Engine 1: BarcodeDetector (Native Chromium/Android OR ZBar WebAssembly Polyfill for iOS Safari)
         if ('BarcodeDetector' in window) {
             try {
-                const formats = await BarcodeDetector.getSupportedFormats().catch(() => [
-                    'qr_code', 'code_128', 'code_39', 'ean_13', 'data_matrix', 'pdf417'
-                ]);
+                let supportedFormats = [];
+                try {
+                    supportedFormats = await BarcodeDetector.getSupportedFormats();
+                } catch(e) {}
+
+                const targetFormats = ['code_128', 'code_39', 'ean_13', 'qr_code', 'data_matrix'];
+                const activeFormats = supportedFormats && supportedFormats.length > 0 
+                    ? targetFormats.filter(f => supportedFormats.includes(f)) 
+                    : targetFormats;
+
                 const detector = new BarcodeDetector({
-                    formats: formats && formats.length > 0 ? formats : ['qr_code', 'code_128', 'code_39', 'ean_13', 'data_matrix']
+                    formats: activeFormats.length > 0 ? activeFormats : ['code_128', 'qr_code']
                 });
 
-                console.log('Scanner initialized using Native BarcodeDetector (Chromium/Android)');
+                const isZBarWasm = (typeof barcodeDetectorPolyfill !== 'undefined' && window.BarcodeDetector === barcodeDetectorPolyfill.BarcodeDetectorPolyfill);
+                scanEngineName = isZBarWasm ? 'ZBar WASM' : 'Native';
+                updateScannerStatusBadge(scanEngineName);
+                console.log('Scanner active with engine:', scanEngineName);
+
+                let lastDetectTime = 0;
                 const scanLoop = async () => {
-                    if (isScanningActive && videoElement.readyState >= 2) {
+                    const now = Date.now();
+                    if (isScanningActive && !isDetectingFrame && videoElement.readyState >= 2 && videoElement.videoWidth > 0 && (now - lastDetectTime >= 120)) {
+                        lastDetectTime = now;
+                        isDetectingFrame = true;
                         try {
                             const barcodes = await detector.detect(videoElement);
-                            if (barcodes.length > 0) {
-                                const detected = barcodes[0].rawValue.trim();
-                                onDetectedBarcode(detected);
+                            if (barcodes && barcodes.length > 0) {
+                                const detected = barcodes[0].rawValue ? barcodes[0].rawValue.trim() : '';
+                                if (detected) {
+                                    onDetectedBarcode(detected);
+                                }
                             }
-                        } catch (e) {}
+                        } catch (e) {
+                            // ignore frame detection noise
+                        } finally {
+                            isDetectingFrame = false;
+                        }
                     }
                     if (mediaStream && mediaStream.active) {
                         requestAnimationFrame(scanLoop);
@@ -1103,45 +1215,78 @@
                 requestAnimationFrame(scanLoop);
                 return;
             } catch (e) {
-                console.warn('Native BarcodeDetector failed, falling back to ZXing:', e);
+                console.warn('BarcodeDetector failed, falling back to ZXing Canvas Scanner:', e);
             }
         }
 
-        // Engine 2: ZXing MultiFormat Reader (Universal support: iOS Safari iPhone/iPad, Mac Safari, Firefox)
-        if (typeof ZXing !== 'undefined' && ZXing.BrowserMultiFormatReader) {
+        // Engine 2: ZXing MultiFormat Reader via Custom Controlled Canvas Scan Loop
+        if (typeof ZXing !== 'undefined' && ZXing.MultiFormatReader) {
             try {
-                if (!zxingReader) {
-                    const hints = new Map();
-                    const formats = [
-                        ZXing.BarcodeFormat.QR_CODE,
-                        ZXing.BarcodeFormat.CODE_128,
-                        ZXing.BarcodeFormat.CODE_39,
-                        ZXing.BarcodeFormat.EAN_13,
-                        ZXing.BarcodeFormat.DATA_MATRIX,
-                        ZXing.BarcodeFormat.ITF
-                    ];
-                    hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, formats);
-                    hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
-                    zxingReader = new ZXing.BrowserMultiFormatReader(hints, 300);
-                }
+                scanEngineName = 'ZXing';
+                updateScannerStatusBadge(scanEngineName);
+                console.log('Scanner active with engine: ZXing Canvas');
 
-                console.log('Scanner initialized using ZXing MultiFormat Engine (iOS Safari / Universal)');
-                zxingReader.decodeFromVideoElementContinuously(videoElement, (result, err) => {
-                    if (!isScanningActive) return;
-                    if (result) {
-                        const rawCode = result.getText ? result.getText().trim() : '';
-                        if (rawCode) {
-                            onDetectedBarcode(rawCode);
+                const hints = new Map();
+                const formats = [
+                    ZXing.BarcodeFormat.CODE_128,
+                    ZXing.BarcodeFormat.CODE_39,
+                    ZXing.BarcodeFormat.EAN_13,
+                    ZXing.BarcodeFormat.QR_CODE,
+                    ZXing.BarcodeFormat.DATA_MATRIX
+                ];
+                hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, formats);
+                hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
+
+                const zxingMultiReader = new ZXing.MultiFormatReader();
+                zxingMultiReader.setHints(hints);
+
+                let lastDetectTime = 0;
+                const zxingScanLoop = async () => {
+                    const now = Date.now();
+                    if (isScanningActive && !isDetectingFrame && videoElement.readyState >= 2 && videoElement.videoWidth > 0 && (now - lastDetectTime >= 150)) {
+                        lastDetectTime = now;
+                        isDetectingFrame = true;
+                        try {
+                            if (!scanCanvas) {
+                                scanCanvas = document.createElement('canvas');
+                                scanCtx = scanCanvas.getContext('2d', { willReadFrequently: true });
+                            }
+                            const w = Math.min(videoElement.videoWidth, 1280);
+                            const h = Math.round(videoElement.videoHeight * (w / videoElement.videoWidth));
+                            if (scanCanvas.width !== w || scanCanvas.height !== h) {
+                                scanCanvas.width = w;
+                                scanCanvas.height = h;
+                            }
+                            scanCtx.drawImage(videoElement, 0, 0, w, h);
+
+                            const luminanceSource = new ZXing.HTMLCanvasElementLuminanceSource(scanCanvas);
+                            const binaryBitmap = new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(luminanceSource));
+                            const result = zxingMultiReader.decode(binaryBitmap);
+                            if (result && result.getText()) {
+                                const detected = result.getText().trim();
+                                if (detected) {
+                                    onDetectedBarcode(detected);
+                                }
+                            }
+                        } catch (err) {
+                            // NotFoundException is expected when no barcode is in current frame
+                        } finally {
+                            isDetectingFrame = false;
                         }
                     }
-                });
+                    if (mediaStream && mediaStream.active) {
+                        requestAnimationFrame(zxingScanLoop);
+                    }
+                };
+                requestAnimationFrame(zxingScanLoop);
                 return;
             } catch (zxingErr) {
                 console.warn('ZXing initialization error:', zxingErr);
             }
         }
 
-        console.warn('No active barcode camera engine available, manual scanner remains ready.');
+        scanEngineName = 'Manual Input';
+        updateScannerStatusBadge(scanEngineName);
     }
 
     const isMobileDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || ('ontouchstart' in window);
@@ -1176,6 +1321,12 @@
 
         lastScannedCode = rawCode;
         lastScanTime = now;
+
+        const reticle = document.getElementById('mobileCamReticle');
+        if (reticle) {
+            reticle.classList.add('reticle-detected');
+            setTimeout(() => reticle.classList.remove('reticle-detected'), 600);
+        }
 
         const input = document.getElementById('barcodeInput');
         if (input) {
