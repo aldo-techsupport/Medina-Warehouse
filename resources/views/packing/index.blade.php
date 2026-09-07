@@ -425,7 +425,7 @@
                 <div class="video-preview-wrapper" id="cameraWrapper">
 
                     <!-- Direct Video for Recording -->
-                    <video id="cameraPreview" autoplay playsinline muted></video>
+                    <video id="cameraPreview" autoplay playsinline webkit-playsinline muted></video>
 
                     <!-- Recording Badge with Live Timer -->
                     <div class="recording-badge" id="recordingBadge">
@@ -889,8 +889,8 @@
 @endsection
 
 @push('scripts')
-<!-- Html5-QRCode for 1D Barcode and 2D QR Code Camera Scanning -->
-<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<!-- Barcode & QR Code Engine: ZXing MultiFormat for Cross-Platform iOS Safari & Android Support -->
+<script src="https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.min.js"></script>
 
 <script>
     let currentOrderData = null;
@@ -901,7 +901,7 @@
     let timerInterval = null;
     let recordDuration = 0;
     let currentFacingMode = 'environment'; // 'user' or 'environment'
-    let html5QrCode = null;
+    let zxingReader = null;
     let isScanningActive = true;
     let lastScannedCode = null;
     let lastScanTime = 0;
@@ -910,6 +910,15 @@
 
     // Audio Synthesizer Beeps
     const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+    // iOS Safari Web Audio unlock on first touch/click
+    function unlockAudioContext() {
+        if (audioCtx && audioCtx.state === 'suspended') {
+            audioCtx.resume();
+        }
+    }
+    document.addEventListener('touchstart', unlockAudioContext, { once: true, passive: true });
+    document.addEventListener('click', unlockAudioContext, { once: true });
 
     function playBeep(freq = 800, type = 'sine', duration = 0.15) {
         try {
@@ -952,17 +961,48 @@
             if (mediaStream) {
                 mediaStream.getTracks().forEach(track => track.stop());
             }
+            if (zxingReader) {
+                try {
+                    zxingReader.reset();
+                } catch(e) {}
+            }
+
             const constraints = {
                 video: {
-                    facingMode: currentFacingMode,
+                    facingMode: { ideal: currentFacingMode },
                     width: { ideal: 1280 },
                     height: { ideal: 720 }
                 },
                 audio: false
             };
-            mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
+
+            try {
+                mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
+            } catch (constraintErr) {
+                console.warn('Initial camera constraints failed, attempting fallback...', constraintErr);
+                try {
+                    mediaStream = await navigator.mediaDevices.getUserMedia({
+                        video: { facingMode: currentFacingMode },
+                        audio: false
+                    });
+                } catch (fallbackErr) {
+                    mediaStream = await navigator.mediaDevices.getUserMedia({
+                        video: true,
+                        audio: false
+                    });
+                }
+            }
+
             const videoEl = document.getElementById('cameraPreview');
             videoEl.srcObject = mediaStream;
+
+            // iOS Safari requires explicit play() call
+            try {
+                await videoEl.play();
+            } catch (playErr) {
+                console.warn('video.play() auto-trigger notice:', playErr);
+            }
+
             document.getElementById('cameraPlaceholder').style.display = 'none';
             document.getElementById('cameraStatusBadge').innerHTML = '<i class="fas fa-circle mr-1" style="font-size: 7px;"></i> Siap';
             document.getElementById('cameraStatusBadge').className = 'badge badge-success';
@@ -1033,16 +1073,21 @@
         }
     }
 
-    // Direct Real-time Barcode / 2D QR Code Detector using Native BarcodeDetector or Canvas scanning
+    // Direct Real-time Barcode / 2D QR Code Detector (Native BarcodeDetector + ZXing Fallback for iPhone / Safari)
     async function initCameraBarcodeDetector(videoElement) {
+        // Engine 1: Native BarcodeDetector (Supported in Android Chrome & Chromium)
         if ('BarcodeDetector' in window) {
             try {
+                const formats = await BarcodeDetector.getSupportedFormats().catch(() => [
+                    'qr_code', 'code_128', 'code_39', 'ean_13', 'data_matrix', 'pdf417'
+                ]);
                 const detector = new BarcodeDetector({
-                    formats: ['qr_code', 'code_128', 'code_39', 'ean_13', 'data_matrix', 'pdf417']
+                    formats: formats && formats.length > 0 ? formats : ['qr_code', 'code_128', 'code_39', 'ean_13', 'data_matrix']
                 });
 
+                console.log('Scanner initialized using Native BarcodeDetector (Chromium/Android)');
                 const scanLoop = async () => {
-                    if (isScanningActive && videoElement.readyState === videoElement.HAVE_ENOUGH_DATA) {
+                    if (isScanningActive && videoElement.readyState >= 2) {
                         try {
                             const barcodes = await detector.detect(videoElement);
                             if (barcodes.length > 0) {
@@ -1051,15 +1096,52 @@
                             }
                         } catch (e) {}
                     }
-                    if (isScanningActive) {
+                    if (mediaStream && mediaStream.active) {
                         requestAnimationFrame(scanLoop);
                     }
                 };
                 requestAnimationFrame(scanLoop);
+                return;
             } catch (e) {
-                console.log('Native BarcodeDetector not active, fallback to input scanner.');
+                console.warn('Native BarcodeDetector failed, falling back to ZXing:', e);
             }
         }
+
+        // Engine 2: ZXing MultiFormat Reader (Universal support: iOS Safari iPhone/iPad, Mac Safari, Firefox)
+        if (typeof ZXing !== 'undefined' && ZXing.BrowserMultiFormatReader) {
+            try {
+                if (!zxingReader) {
+                    const hints = new Map();
+                    const formats = [
+                        ZXing.BarcodeFormat.QR_CODE,
+                        ZXing.BarcodeFormat.CODE_128,
+                        ZXing.BarcodeFormat.CODE_39,
+                        ZXing.BarcodeFormat.EAN_13,
+                        ZXing.BarcodeFormat.DATA_MATRIX,
+                        ZXing.BarcodeFormat.ITF
+                    ];
+                    hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, formats);
+                    hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
+                    zxingReader = new ZXing.BrowserMultiFormatReader(hints, 300);
+                }
+
+                console.log('Scanner initialized using ZXing MultiFormat Engine (iOS Safari / Universal)');
+                zxingReader.decodeFromVideoElementContinuously(videoElement, (result, err) => {
+                    if (!isScanningActive) return;
+                    if (result) {
+                        const rawCode = result.getText ? result.getText().trim() : '';
+                        if (rawCode) {
+                            onDetectedBarcode(rawCode);
+                        }
+                    }
+                });
+                return;
+            } catch (zxingErr) {
+                console.warn('ZXing initialization error:', zxingErr);
+            }
+        }
+
+        console.warn('No active barcode camera engine available, manual scanner remains ready.');
     }
 
     const isMobileDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || ('ontouchstart' in window);
@@ -1578,11 +1660,33 @@
         document.getElementById('cameraModeBadge').innerHTML = '<i class="fas fa-video mr-1"></i> Mode Rekam';
 
         recordedChunks = [];
-        const options = { mimeType: 'video/webm;codecs=vp8,opus' };
+        
+        // Dynamic mimeType selection: iOS Safari prefers video/mp4, Android/Chrome prefers video/webm
+        const mimeCandidates = [
+            'video/mp4;codecs=avc1,mp4a.40.2',
+            'video/mp4',
+            'video/webm;codecs=vp8,opus',
+            'video/webm;codecs=vp9,opus',
+            'video/webm'
+        ];
+        let chosenMime = '';
+        if (typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported) {
+            for (const candidate of mimeCandidates) {
+                if (MediaRecorder.isTypeSupported(candidate)) {
+                    chosenMime = candidate;
+                    break;
+                }
+            }
+        }
+
         try {
-            mediaRecorder = new MediaRecorder(mediaStream, MediaRecorder.isTypeSupported(options.mimeType) ? options : undefined);
+            mediaRecorder = chosenMime ? new MediaRecorder(mediaStream, { mimeType: chosenMime }) : new MediaRecorder(mediaStream);
         } catch (e) {
-            mediaRecorder = new MediaRecorder(mediaStream);
+            try {
+                mediaRecorder = new MediaRecorder(mediaStream);
+            } catch (recErr) {
+                console.warn('MediaRecorder init error:', recErr);
+            }
         }
 
         mediaRecorder.ondataavailable = function(e) {
@@ -1655,9 +1759,12 @@
             return;
         }
 
-        const videoBlob = new Blob(recordedChunks, { type: 'video/webm' });
+        const mime = (mediaRecorder && mediaRecorder.mimeType) ? mediaRecorder.mimeType : 'video/webm';
+        const isMp4 = mime.includes('mp4');
+        const ext = isMp4 ? 'mp4' : 'webm';
+        const videoBlob = new Blob(recordedChunks, { type: mime });
         const formData = new FormData();
-        formData.append('video', videoBlob, `pack_${currentOrderData.order_sn}.webm`);
+        formData.append('video', videoBlob, `pack_${currentOrderData.order_sn}.${ext}`);
         formData.append('order_sn', currentOrderData.order_sn);
         formData.append('tracking_number', currentOrderData.tracking_number || '');
         formData.append('duration', recordDuration);
