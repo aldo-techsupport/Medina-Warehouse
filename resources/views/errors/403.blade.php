@@ -63,8 +63,9 @@
     </div>
     
     <h2 class="font-weight-bold text-dark mb-2">403 - Akses Ditolak</h2>
+    @auth
     <p class="text-muted mb-4" style="font-size: 14.5px;">
-        Maaf, akun Anda dengan role <strong>{{ auth()->user()->role->name ?? 'Pengguna' }}</strong> tidak memiliki hak akses untuk membuka halaman atau fitur ini.
+        Maaf, akun Anda dengan role <strong>{{ auth()->user()->role?->name ?? 'Pengguna' }}</strong> tidak memiliki hak akses untuk membuka halaman atau fitur ini.
     </p>
 
     <div class="p-3 bg-light rounded mb-4 text-left border" style="font-size: 13px;">
@@ -74,7 +75,7 @@
         </div>
         <div class="d-flex align-items-center">
             <i class="fas fa-shield-alt text-secondary mr-2"></i>
-            <span>Role Saat Ini: <span class="badge badge-secondary">{{ auth()->user()->role->name ?? 'Tanpa Role' }}</span></span>
+            <span>Role Saat Ini: <span class="badge badge-secondary">{{ auth()->user()->role?->name ?? 'Tanpa Role' }}</span></span>
         </div>
     </div>
 
@@ -89,6 +90,17 @@
             </button>
         </form>
     </div>
+    @else
+    <p class="text-muted mb-4" style="font-size: 14.5px;">
+        Maaf, Anda tidak memiliki izin atau hak akses untuk mengakses halaman/resource ini.
+    </p>
+
+    <div class="d-flex justify-content-center" style="gap: 10px;">
+        <a href="{{ route('login') }}" class="btn btn-primary font-weight-bold px-4">
+            <i class="fas fa-sign-in-alt mr-1"></i> Masuk / Login
+        </a>
+    </div>
+    @endauth
 </div>
 
 </body>
