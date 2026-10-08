@@ -5,6 +5,9 @@
 
 @section('page_actions')
     <div class="d-inline-flex align-items-center">
+        <a href="{{ route('warehouse.products', ['refresh' => 1]) }}" class="btn btn-outline-secondary btn-sm font-weight-bold shadow-sm mr-2">
+            <i class="fas fa-sync-alt mr-1"></i> Segarkan
+        </a>
         <button type="button" class="btn btn-primary btn-sm font-weight-bold shadow-sm" data-toggle="modal" data-target="#addProductModal">
             <i class="fas fa-plus mr-1"></i> Tambah Produk
         </button>
@@ -106,11 +109,11 @@
                             <td class="text-center">
                                 @if($product->isConnectedToShopee())
                                     <span class="badge badge-shopee px-2 py-1" style="font-size: 11px;">
-                                        <i class="fas fa-check mr-1"></i> ID: {{ $product->shopee_item_id }}
+                                        ID: {{ $product->shopee_item_id }}
                                     </span>
                                 @else
                                     <button type="button" class="btn btn-xs btn-outline-secondary" data-toggle="modal" data-target="#mapShopeeModal{{ $product->id }}">
-                                        <i class="fas fa-link mr-1"></i> Link
+                                        <i class="fas fa-link mr-1"></i> Hubungkan
                                     </button>
                                 @endif
                             </td>
@@ -119,14 +122,6 @@
                                     <button type="button" class="btn btn-xs btn-outline-info" data-toggle="modal" data-target="#editProductModal{{ $product->id }}" title="Edit">
                                         <i class="fas fa-edit"></i>
                                     </button>
-                                    @if($product->isConnectedToShopee())
-                                        <form action="{{ route('shopee.sync.product', $product) }}" method="POST" class="d-inline">
-                                            @csrf
-                                            <button type="submit" class="btn btn-xs btn-outline-warning" title="Push Stok">
-                                                <i class="fas fa-sync"></i>
-                                            </button>
-                                        </form>
-                                    @endif
                                     <form action="{{ route('warehouse.products.destroy', $product) }}" method="POST" class="d-inline" onsubmit="return confirm('Hapus produk {{ $product->name }}?')">
                                         @csrf
                                         @method('DELETE')
@@ -188,20 +183,28 @@
                                             </div>
                                             <div class="form-row">
                                                 <div class="form-group col-6">
-                                                    <label>Safety Stock</label>
-                                                    <input type="number" name="safety_stock" class="form-control form-control-sm" value="{{ $product->safety_stock }}" min="0">
+                                                    <label class="font-weight-bold text-primary">Stok Fisik Gudang <span class="text-danger">*</span></label>
+                                                    <input type="number" name="stock" class="form-control form-control-sm font-weight-bold" value="{{ $product->stock }}" min="0" required>
+                                                    <small class="text-muted" style="font-size: 11px;">Otomatis update ke Shopee API</small>
                                                 </div>
+                                                <div class="form-group col-6">
+                                                    <label>Safety Stock (Batas Minimum)</label>
+                                                    <input type="number" name="safety_stock" class="form-control form-control-sm" value="{{ $product->safety_stock }}" min="0">
+                                                    <small class="text-muted" style="font-size: 11px;">Peringatan jika stok menipis</small>
+                                                </div>
+                                            </div>
+                                            <div class="form-row">
                                                 <div class="form-group col-6">
                                                     <label>Shopee Item ID</label>
                                                     <input type="number" name="shopee_item_id" class="form-control form-control-sm" value="{{ $product->shopee_item_id }}">
                                                 </div>
-                                            </div>
-                                            <div class="form-group">
-                                                <label>Status</label>
-                                                <select name="status" class="form-control form-control-sm">
-                                                    <option value="active" {{ $product->status === 'active' ? 'selected' : '' }}>Aktif</option>
-                                                    <option value="inactive" {{ $product->status === 'inactive' ? 'selected' : '' }}>Non-Aktif</option>
-                                                </select>
+                                                <div class="form-group col-6">
+                                                    <label>Status</label>
+                                                    <select name="status" class="form-control form-control-sm">
+                                                        <option value="active" {{ $product->status === 'active' ? 'selected' : '' }}>Aktif</option>
+                                                        <option value="inactive" {{ $product->status === 'inactive' ? 'selected' : '' }}>Non-Aktif</option>
+                                                    </select>
+                                                </div>
                                             </div>
                                         </div>
                                         <div class="modal-footer bg-light py-2">

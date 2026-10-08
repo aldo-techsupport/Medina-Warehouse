@@ -330,7 +330,7 @@
                 </li>
             @endif
 
-            @if(auth()->check() && auth()->user()->hasPermission('shopee_orders'))
+            @if(auth()->check() && auth()->user()->hasPermission('shopee_orders') && $currentShopeeSetting->isSandbox())
                 <li class="nav-item mr-2 d-none d-xl-inline-block">
                     <button type="button" class="btn btn-sm btn-shopee shadow-sm" data-toggle="modal" data-target="#simulatorModal">
                         <i class="fas fa-vial mr-1"></i> <span>Simulasi Order</span>
@@ -355,7 +355,7 @@
                             <i class="fas fa-exchange-alt mr-2"></i> Catat Mutasi Stok
                         </a>
                     @endif
-                    @if(auth()->check() && auth()->user()->hasPermission('shopee_orders'))
+                    @if(auth()->check() && auth()->user()->hasPermission('shopee_orders') && $currentShopeeSetting->isSandbox())
                         <a href="#" class="dropdown-item py-2 font-weight-bold" style="color: var(--shopee-orange)" data-toggle="modal" data-target="#simulatorModal">
                             <i class="fas fa-bolt mr-2"></i> Simulasi Order Shopee
                         </a>
@@ -599,7 +599,7 @@
                             </li>
                         @endif
 
-                        @if(auth()->user()->hasPermission('shopee_orders'))
+                        @if(auth()->user()->hasPermission('shopee_orders') && $currentShopeeSetting->isSandbox())
                             <li class="nav-item">
                                 <a href="#" class="nav-link" data-toggle="modal" data-target="#simulatorModal">
                                     <i class="nav-icon fas fa-magic text-warning"></i>
@@ -748,7 +748,8 @@
         </div>
     </div>
 
-    <!-- Shopee Order Simulator Modal -->
+    <!-- Shopee Order Simulator Modal (Sandbox Only) -->
+    @if($currentShopeeSetting->isSandbox())
     <div class="modal fade" id="simulatorModal" tabindex="-1" role="dialog" aria-labelledby="simulatorModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered" role="document">
             <div class="modal-content border-0 shadow">
@@ -809,6 +810,7 @@
             </div>
         </div>
     </div>
+    @endif
 
     <!-- Mobile Bottom Navigation (Hidden on Packing Station to give full workspace to camera) -->
     @if(!request()->routeIs('packing*'))

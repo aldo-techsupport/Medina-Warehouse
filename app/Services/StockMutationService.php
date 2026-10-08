@@ -247,21 +247,32 @@ class StockMutationService
     }
 
     /**
-     * Push updated stock to Shopee if product is connected and auto_sync is enabled.
+     * Push updated stock live directly to Shopee API whenever product is connected.
      */
-    protected function syncStockToShopeeIfEnabled(Product $product, int $newStock): void
+    public function syncStockToShopeeIfEnabled(Product $product, int $newStock): array
     {
-        $setting = ShopeeSetting::current();
-        if ($setting->auto_sync_stock && $product->isConnectedToShopee()) {
+        if ($product->isConnectedToShopee()) {
             try {
-                $this->shopeeService->updateStock(
+                $res = $this->shopeeService->updateStock(
                     (int) $product->shopee_item_id,
                     $newStock,
                     $product->shopee_model_id ? (int) $product->shopee_model_id : null
                 );
+
+                if (! empty($res['success'])) {
+                    $product->update(['shopee_stock' => $newStock]);
+                } else {
+                    Log::warning("Shopee stock push warning for SKU {$product->sku}: ".($res['error'] ?? 'Unknown error'));
+                }
+
+                return $res;
             } catch (Exception $e) {
-                Log::warning("Failed to push stock to Shopee for SKU {$product->sku}: ".$e->getMessage());
+                Log::warning("Failed to push live stock to Shopee for SKU {$product->sku}: ".$e->getMessage());
+
+                return ['success' => false, 'error' => $e->getMessage()];
             }
         }
+
+        return ['success' => false, 'error' => 'Produk tidak terhubung ke Shopee'];
     }
 }

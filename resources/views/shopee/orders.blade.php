@@ -5,15 +5,14 @@
 
 @section('page_actions')
     <div class="d-inline-flex align-items-center">
-        <form action="{{ route('shopee.orders.pull') }}" method="POST" class="mr-2">
-            @csrf
-            <button type="submit" class="btn btn-outline-primary btn-sm shadow-sm font-weight-bold" onclick="this.disabled=true; this.innerHTML='<i class=\'fas fa-spinner fa-spin mr-1\'></i> Menarik...'; this.form.submit();">
-                <i class="fas fa-cloud-download-alt mr-1"></i> Tarik Pesanan
+        <a href="{{ route('shopee.orders', ['refresh' => 1]) }}" class="btn btn-outline-secondary btn-sm mr-2">
+            <i class="fas fa-sync-alt mr-1"></i> Segarkan
+        </a>
+        @if($currentShopeeSetting->isSandbox())
+            <button type="button" class="btn btn-shopee btn-sm shadow-sm font-weight-bold" data-toggle="modal" data-target="#simulatorModal">
+                <i class="fas fa-vial mr-1"></i> Simulasi Pesanan
             </button>
-        </form>
-        <button type="button" class="btn btn-shopee btn-sm shadow-sm font-weight-bold" data-toggle="modal" data-target="#simulatorModal">
-            <i class="fas fa-vial mr-1"></i> Simulasi Pesanan
-        </button>
+        @endif
     </div>
 @endsection
 
@@ -61,10 +60,12 @@
             <div class="text-center py-5 text-muted">
                 <i class="fas fa-box-open fa-3x mb-2 text-secondary"></i>
                 <h6>Belum ada data pesanan</h6>
-                <p class="mb-3 text-sm">Pesanan dari Shopee Open API / Webhook akan otomatis tersimpan di sini dan memotong stok gudang.</p>
+                <p class="mb-3 text-sm">Pesanan dari Shopee Open API akan otomatis masuk di sini dan memotong stok gudang.</p>
+                @if($currentShopeeSetting->isSandbox())
                 <button type="button" class="btn btn-shopee btn-sm" data-toggle="modal" data-target="#simulatorModal">
-                    <i class="fas fa-bolt mr-1"></i> Buat Pesanan Simulasi
+                    <i class="fas fa-vial mr-1"></i> Buat Pesanan Simulasi
                 </button>
+                @endif
             </div>
         @else
             <table class="table table-hover table-striped mb-0 text-sm align-middle table-mobile-responsive">

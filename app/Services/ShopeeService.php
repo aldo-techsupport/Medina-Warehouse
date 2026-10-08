@@ -6,6 +6,7 @@ use App\Models\Product;
 use App\Models\ShopeeSetting;
 use App\Models\StockMutation;
 use Exception;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
@@ -278,7 +279,8 @@ class ShopeeService
             }
 
             // If seller_stock is rejected because shop uses normal_stock, fallback to normal_stock
-            if (! empty($data['error']) && ! str_contains(strtolower($data['error']), 'auth')) {
+            $hasFailure = ! empty($data['error']) || ! empty($data['response']['failure_list']);
+            if ($hasFailure && ! str_contains(strtolower($data['error'] ?? ''), 'auth')) {
                 $normalStockList = [
                     [
                         'model_id' => $modelId ?? 0,
@@ -291,16 +293,25 @@ class ShopeeService
                     'stock_list' => $normalStockList,
                 ]);
                 $fallbackData = $fallbackResponse->json();
-                if ($fallbackResponse->successful() && empty($fallbackData['error'])) {
+                if ($fallbackResponse->successful() && empty($fallbackData['error']) && empty($fallbackData['response']['failure_list'])) {
+                    Cache::put('shopee_live_products_sync_lock', time(), now()->addSeconds(60));
+
                     return ['success' => true, 'data' => $fallbackData];
                 }
             }
 
-            if ($response->successful() && empty($data['error'])) {
+            if ($response->successful() && empty($data['error']) && empty($data['response']['failure_list'])) {
+                Cache::put('shopee_live_products_sync_lock', time(), now()->addSeconds(60));
+
                 return ['success' => true, 'data' => $data];
             }
 
-            return ['success' => false, 'error' => $data['message'] ?? $data['error'] ?? 'Gagal update stok ke Shopee'];
+            $errorMessage = $data['message'] ?? $data['error'] ?? '';
+            if (! empty($data['response']['failure_list'][0]['failed_reason'])) {
+                $errorMessage .= ' ('.$data['response']['failure_list'][0]['failed_reason'].')';
+            }
+
+            return ['success' => false, 'error' => $errorMessage ?: 'Gagal update stok ke Shopee'];
         } catch (Exception $e) {
             Log::error('Shopee update stock error: '.$e->getMessage());
 
@@ -666,7 +677,7 @@ class ShopeeService
                 $purchasePrice = round($sellingPrice * 0.7);
 
                 // Stock resolution from stock_info_v2 or model_list
-                $stock = 0;
+                $stock = null;
                 $modelId = null;
 
                 if (! empty($item['has_model'])) {
@@ -682,11 +693,13 @@ class ShopeeService
                     }
                 }
 
-                if ($stock === 0) {
+                if ($stock === null) {
                     if (isset($item['stock_info_v2']['summary_info']['total_available_stock'])) {
                         $stock = (int) $item['stock_info_v2']['summary_info']['total_available_stock'];
                     } elseif (isset($item['stock_info_v2']['seller_stock'][0]['stock'])) {
                         $stock = (int) $item['stock_info_v2']['seller_stock'][0]['stock'];
+                    } else {
+                        $stock = 0;
                     }
                 }
 
@@ -876,5 +889,74 @@ class ShopeeService
         $calculatedSign = hash_hmac('sha256', $fullUrl.'|'.$rawBody, (string) $this->setting->partner_key);
 
         return hash_equals($calculatedSign, $receivedSignature);
+    }
+
+    /**
+     * Live on-the-fly sync for products from Shopee Open API v2.
+     */
+    public function syncLiveProductsIfStale(int $seconds = 20, ?StockMutationService $mutationService = null, bool $force = false): array
+    {
+        if (! $this->setting->isConnected()) {
+            return ['success' => false, 'error' => 'Toko Shopee belum terhubung'];
+        }
+
+        $cacheKey = 'shopee_live_products_sync_lock';
+        if (! $force && Cache::has($cacheKey)) {
+            return ['success' => true, 'cached' => true, 'message' => 'Data produk sudah sinkron dengan Shopee API terbaru.'];
+        }
+
+        try {
+            Cache::put($cacheKey, time(), now()->addSeconds($seconds));
+            $result = $this->pullAndSyncProducts($mutationService);
+            $this->setting->update(['last_synced_at' => now()]);
+
+            return $result;
+        } catch (Exception $e) {
+            Log::warning('Shopee auto live sync products error: '.$e->getMessage());
+
+            return ['success' => false, 'error' => $e->getMessage()];
+        }
+    }
+
+    /**
+     * Live on-the-fly sync for orders from Shopee Open API v2.
+     */
+    public function syncLiveOrdersIfStale(int $seconds = 20, int $days = 15, ?StockMutationService $mutationService = null, bool $force = false): array
+    {
+        if (! $this->setting->isConnected()) {
+            return ['success' => false, 'error' => 'Toko Shopee belum terhubung'];
+        }
+
+        $cacheKey = 'shopee_live_orders_sync_lock';
+        if (! $force && Cache::has($cacheKey)) {
+            return ['success' => true, 'cached' => true, 'message' => 'Data pesanan sudah sinkron dengan Shopee API terbaru.'];
+        }
+
+        try {
+            Cache::put($cacheKey, time(), now()->addSeconds($seconds));
+            $result = $this->pullAndSyncOrders($days, $mutationService);
+            $this->setting->update(['last_synced_at' => now()]);
+
+            return $result;
+        } catch (Exception $e) {
+            Log::warning('Shopee auto live sync orders error: '.$e->getMessage());
+
+            return ['success' => false, 'error' => $e->getMessage()];
+        }
+    }
+
+    /**
+     * Synchronize both products & orders live on-the-fly from Shopee Open API v2.
+     */
+    public function syncAllLiveIfStale(int $seconds = 20, ?StockMutationService $mutationService = null, bool $force = false): array
+    {
+        $productsResult = $this->syncLiveProductsIfStale($seconds, $mutationService, $force);
+        $ordersResult = $this->syncLiveOrdersIfStale($seconds, 15, $mutationService, $force);
+
+        return [
+            'success' => ($productsResult['success'] ?? false) || ($ordersResult['success'] ?? false),
+            'products' => $productsResult,
+            'orders' => $ordersResult,
+        ];
     }
 }

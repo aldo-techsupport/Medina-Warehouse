@@ -8,12 +8,22 @@ use App\Models\ShopeeOrder;
 use App\Models\ShopeeSetting;
 use App\Models\StockMutation;
 use App\Services\AiService;
+use App\Services\ShopeeService;
+use App\Services\StockMutationService;
 use Illuminate\Http\JsonResponse;
 
 class DashboardController extends Controller
 {
     public function index()
     {
+        $shopeeSetting = ShopeeSetting::current();
+        if ($shopeeSetting->isConnected()) {
+            try {
+                app(ShopeeService::class)->syncAllLiveIfStale(25, app(StockMutationService::class));
+            } catch (\Throwable) {
+            }
+        }
+
         $totalProducts = Product::count();
         $totalStock = (int) Product::sum('stock');
         $totalAssetValue = Product::selectRaw('SUM(stock * purchase_price) as total_val')->value('total_val') ?? 0;
@@ -94,6 +104,14 @@ class DashboardController extends Controller
      */
     public function notifications(): JsonResponse
     {
+        $shopeeSetting = ShopeeSetting::current();
+        if ($shopeeSetting->isConnected()) {
+            try {
+                app(ShopeeService::class)->syncLiveOrdersIfStale(45, 3, app(StockMutationService::class));
+            } catch (\Throwable) {
+            }
+        }
+
         // 1. Pending Orders awaiting packing
         $pendingOrders = ShopeeOrder::where('order_status', 'READY_TO_SHIP')
             ->whereDoesntHave('packingRecords', function ($q) {

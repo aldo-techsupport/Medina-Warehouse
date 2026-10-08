@@ -15,9 +15,12 @@ class WarehouseController extends Controller
 {
     protected StockMutationService $mutationService;
 
-    public function __construct(StockMutationService $mutationService)
+    protected ShopeeService $shopeeService;
+
+    public function __construct(StockMutationService $mutationService, ShopeeService $shopeeService)
     {
         $this->mutationService = $mutationService;
+        $this->shopeeService = $shopeeService;
     }
 
     /**
@@ -26,11 +29,11 @@ class WarehouseController extends Controller
     public function products(Request $request)
     {
         $setting = ShopeeSetting::current();
-        if ($setting->isConnected() && Product::count() === 0) {
+        if ($setting->isConnected()) {
             try {
-                app(ShopeeService::class)->pullAndSyncProducts($this->mutationService);
+                $this->shopeeService->syncLiveProductsIfStale(20, $this->mutationService, $request->boolean('refresh'));
             } catch (Exception $e) {
-                Log::info('Auto-pull products on load: '.$e->getMessage());
+                Log::warning('Auto live sync products on load: '.$e->getMessage());
             }
         }
 
@@ -100,6 +103,15 @@ class WarehouseController extends Controller
             );
         }
 
+        // Live push to Shopee API if connected
+        if ($product->isConnectedToShopee()) {
+            try {
+                $this->shopeeService->updateStock((int) $product->shopee_item_id, $product->stock);
+            } catch (Exception $e) {
+                Log::warning('Live push stock on product create failed: '.$e->getMessage());
+            }
+        }
+
         return redirect()->back()->with('success', "Produk [{$product->sku}] {$product->name} berhasil ditambahkan!");
     }
 
@@ -116,14 +128,48 @@ class WarehouseController extends Controller
             'unit' => 'required|string|max:20',
             'purchase_price' => 'required|numeric|min:0',
             'selling_price' => 'required|numeric|min:0',
+            'stock' => 'nullable|integer|min:0',
             'safety_stock' => 'nullable|integer|min:0',
             'shopee_item_id' => 'nullable|integer',
             'status' => 'required|string|in:active,inactive',
         ]);
 
+        $newStock = isset($validated['stock']) ? (int) $validated['stock'] : null;
+        unset($validated['stock']);
+
+        $oldStock = $product->stock;
         $product->update($validated);
 
-        return redirect()->back()->with('success', "Produk {$product->name} berhasil diperbarui!");
+        $shopeeMsg = '';
+
+        // Jika user mengubah stok fisik di form edit produk
+        if ($newStock !== null && $newStock !== $oldStock) {
+            $this->mutationService->recordAdjustment(
+                $product,
+                $newStock,
+                'Penyesuaian stok dari Edit Produk',
+                auth()->user()?->name ?? 'Admin'
+            );
+            $product->refresh();
+            if ($product->isConnectedToShopee()) {
+                $shopeeMsg = " (Stok live di Shopee terupdate: {$product->stock} unit)";
+            }
+        } elseif ($product->isConnectedToShopee()) {
+            $res = $this->shopeeService->updateStock(
+                (int) $product->shopee_item_id,
+                $product->stock,
+                $product->shopee_model_id ? (int) $product->shopee_model_id : null
+            );
+
+            if ($res['success']) {
+                $product->update(['shopee_stock' => $product->stock]);
+                $shopeeMsg = " (Stok live di Shopee terupdate: {$product->stock} unit)";
+            } else {
+                $shopeeMsg = ' (Peringatan Shopee: '.($res['error'] ?? 'Gagal update').')';
+            }
+        }
+
+        return redirect()->back()->with('success', "Produk {$product->name} berhasil diperbarui{$shopeeMsg}!");
     }
 
     /**
@@ -151,10 +197,11 @@ class WarehouseController extends Controller
         ]);
 
         $product = Product::findOrFail($validated['product_id']);
-        $actor = $validated['actor'] ?: 'Staff Gudang';
-        $notes = $validated['notes'] ?: '';
+        $actor = ! empty($validated['actor']) ? $validated['actor'] : (auth()->user()?->name ?? 'Staff Gudang');
+        $notes = $validated['notes'] ?? '';
 
         try {
+            $shopeeMsg = '';
             if ($validated['type'] === 'inbound') {
                 $this->mutationService->recordInbound($product, (int) $validated['qty'], $notes, $actor);
                 $msg = "Berhasil mencatat Barang Masuk (+{$validated['qty']} {$product->unit}) untuk {$product->name}";
@@ -166,7 +213,12 @@ class WarehouseController extends Controller
                 $msg = "Berhasil menyesuaikan Stok Opname ({$product->name} kini: {$validated['qty']} {$product->unit})";
             }
 
-            return redirect()->back()->with('success', $msg);
+            $product->refresh();
+            if ($product->isConnectedToShopee()) {
+                $shopeeMsg = " & stok di Shopee API terupdate: {$product->stock} unit";
+            }
+
+            return redirect()->back()->with('success', $msg.$shopeeMsg);
         } catch (Exception $e) {
             return redirect()->back()->with('error', $e->getMessage());
         }

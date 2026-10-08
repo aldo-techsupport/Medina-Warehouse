@@ -1,10 +1,13 @@
 <?php
 
 use App\Models\Product;
+use App\Models\ShopeeOrder;
 use App\Models\ShopeeSetting;
 use App\Models\StockMutation;
+use App\Models\User;
 use App\Services\ShopeeService;
 use App\Services\StockMutationService;
+use Illuminate\Support\Facades\Cache;
 
 test('it correctly calculates Shopee public and shop HMAC-SHA256 signatures', function () {
     $setting = ShopeeSetting::current();
@@ -390,4 +393,333 @@ test('it handles Shopee webhook and fetches order detail when items are not in p
     $mutation = StockMutation::where('reference_no', 'SHP-WEBHOOK_ORD_7711')->first();
     expect($mutation)->not->toBeNull();
     expect($mutation->qty)->toBe(-2);
+});
+
+test('warehouse products page automatically triggers live sync from Shopee API without manual sync button', function () {
+    $admin = User::firstOrCreate(
+        ['email' => 'admin@medina.com'],
+        ['name' => 'Admin Test', 'username' => 'admintest', 'password' => bcrypt('password'), 'role' => 'superadmin', 'is_active' => true]
+    );
+
+    $setting = ShopeeSetting::current();
+    $setting->update([
+        'partner_id' => 123456,
+        'partner_key' => 'secret_partner_key',
+        'shop_id' => 789012,
+        'access_token' => 'valid_token',
+        'token_expires_at' => now()->addHours(3),
+    ]);
+
+    Http::fake([
+        '*/api/v2/product/get_item_list*' => Http::response([
+            'response' => [
+                'item' => [
+                    ['item_id' => 999888, 'item_status' => 'NORMAL', 'update_time' => time()],
+                ],
+                'has_next_page' => false,
+                'total_count' => 1,
+            ],
+            'error' => '',
+        ], 200),
+        '*/api/v2/product/get_item_base_info*' => Http::response([
+            'response' => [
+                'item_list' => [
+                    [
+                        'item_id' => 999888,
+                        'item_name' => 'Live Synced Shopee Product',
+                        'item_sku' => 'LIVE-SHP-999888',
+                        'price_info' => [
+                            ['currency' => 'IDR', 'original_price' => 75000, 'current_price' => 75000],
+                        ],
+                        'stock_info_v2' => [
+                            'summary_info' => [
+                                'total_available_stock' => 25,
+                            ],
+                        ],
+                    ],
+                ],
+            ],
+            'error' => '',
+        ], 200),
+    ]);
+
+    Cache::forget('shopee_live_products_sync_lock');
+
+    $response = $this->actingAs($admin)->get(route('warehouse.products'));
+    $response->assertStatus(200);
+
+    $syncedProduct = Product::where('shopee_item_id', 999888)->first();
+    expect($syncedProduct)->not->toBeNull();
+    expect($syncedProduct->name)->toBe('Live Synced Shopee Product');
+    expect($syncedProduct->stock)->toBe(25);
+});
+
+test('shopee orders page automatically triggers live sync from Shopee API without manual sync button', function () {
+    $admin = User::firstOrCreate(
+        ['email' => 'admin@medina.com'],
+        ['name' => 'Admin Test', 'username' => 'admintest', 'password' => bcrypt('password'), 'role' => 'superadmin', 'is_active' => true]
+    );
+
+    $product = Product::create([
+        'sku' => 'LIVE-ORD-SKU-1',
+        'name' => 'Product For Live Order',
+        'unit' => 'Pcs',
+        'stock' => 15,
+        'purchase_price' => 20000,
+        'selling_price' => 40000,
+        'shopee_item_id' => 888777,
+    ]);
+
+    $setting = ShopeeSetting::current();
+    $setting->update([
+        'partner_id' => 123456,
+        'partner_key' => 'secret_partner_key',
+        'shop_id' => 789012,
+        'access_token' => 'valid_token',
+        'token_expires_at' => now()->addHours(3),
+    ]);
+
+    Http::fake([
+        '*/api/v2/order/get_order_list*' => Http::response([
+            'response' => [
+                'order_list' => [
+                    ['order_sn' => 'LIVE_ORDER_SN_123'],
+                ],
+            ],
+            'error' => '',
+        ], 200),
+        '*/api/v2/order/get_order_detail*' => Http::response([
+            'response' => [
+                'order_list' => [
+                    [
+                        'order_sn' => 'LIVE_ORDER_SN_123',
+                        'order_status' => 'READY_TO_SHIP',
+                        'total_amount' => 40000,
+                        'buyer_username' => 'live_buyer',
+                        'tracking_number' => 'LIVE_SPX_1234',
+                        'shipping_carrier' => 'SPX Express',
+                        'item_list' => [
+                            [
+                                'item_id' => 888777,
+                                'item_sku' => 'LIVE-ORD-SKU-1',
+                                'item_name' => 'Product For Live Order',
+                                'model_quantity_purchased' => 1,
+                                'model_discounted_price' => 40000,
+                            ],
+                        ],
+                    ],
+                ],
+            ],
+            'error' => '',
+        ], 200),
+    ]);
+
+    Cache::forget('shopee_live_orders_sync_lock');
+
+    $response = $this->actingAs($admin)->get(route('shopee.orders'));
+    $response->assertStatus(200);
+
+    $order = ShopeeOrder::where('order_sn', 'LIVE_ORDER_SN_123')->first();
+    expect($order)->not->toBeNull();
+    expect($order->buyer_username)->toBe('live_buyer');
+    expect($product->fresh()->stock)->toBe(14); // 15 - 1
+});
+
+test('warehouse product update automatically pushes live stock to Shopee API', function () {
+    $admin = User::firstOrCreate(
+        ['email' => 'admin@medina.com'],
+        ['name' => 'Admin Test', 'username' => 'admintest', 'password' => bcrypt('password'), 'role' => 'superadmin', 'is_active' => true]
+    );
+
+    $product = Product::create([
+        'sku' => 'PUSH-TEST-SKU',
+        'name' => 'Push Test Product',
+        'unit' => 'Pcs',
+        'stock' => 10,
+        'purchase_price' => 30000,
+        'selling_price' => 60000,
+        'shopee_item_id' => 555444,
+        'status' => 'active',
+    ]);
+
+    $setting = ShopeeSetting::current();
+    $setting->update([
+        'partner_id' => 123456,
+        'partner_key' => 'secret_partner_key',
+        'shop_id' => 789012,
+        'access_token' => 'valid_token',
+        'token_expires_at' => now()->addHours(3),
+    ]);
+
+    Http::fake([
+        '*/api/v2/product/update_stock*' => Http::response([
+            'error' => '',
+            'message' => 'success',
+            'response' => ['success_list' => []],
+        ], 200),
+    ]);
+
+    $response = $this->actingAs($admin)->put(route('warehouse.products.update', $product), [
+        'sku' => 'PUSH-TEST-SKU',
+        'name' => 'Push Test Product Updated',
+        'unit' => 'Pcs',
+        'purchase_price' => 30000,
+        'selling_price' => 65000,
+        'shopee_item_id' => 555444,
+        'status' => 'active',
+    ]);
+
+    $response->assertRedirect();
+
+    Http::assertSent(function ($request) {
+        return str_contains($request->url(), '/api/v2/product/update_stock');
+    });
+});
+
+test('order simulation is disabled and guarded when environment is production', function () {
+    $admin = User::firstOrCreate(
+        ['email' => 'admin@medina.com'],
+        ['name' => 'Admin Test', 'username' => 'admintest', 'password' => bcrypt('password'), 'role' => 'superadmin', 'is_active' => true]
+    );
+
+    $product = Product::create([
+        'sku' => 'PROD-MODE-SKU',
+        'name' => 'Production Mode Product',
+        'unit' => 'Pcs',
+        'stock' => 10,
+        'purchase_price' => 30000,
+        'selling_price' => 60000,
+        'status' => 'active',
+    ]);
+
+    $setting = ShopeeSetting::current();
+    $setting->update([
+        'environment' => 'production',
+    ]);
+
+    expect($setting->isProduction())->toBeTrue();
+    expect($setting->isSandbox())->toBeFalse();
+
+    $response = $this->actingAs($admin)->post(route('shopee.simulate.order'), [
+        'product_id' => $product->id,
+        'qty' => 1,
+        'order_status' => 'READY_TO_SHIP',
+    ]);
+
+    $response->assertSessionHas('error');
+    expect($product->fresh()->stock)->toBe(10); // Not deducted
+});
+
+test('it updates physical stock, records adjustment mutation, and pushes to Shopee on product edit', function () {
+    $admin = User::firstOrCreate(
+        ['email' => 'admin@medina.com'],
+        ['name' => 'Admin Test', 'username' => 'admintest', 'password' => bcrypt('password'), 'role' => 'superadmin', 'is_active' => true]
+    );
+
+    $product = Product::create([
+        'sku' => 'STOCK-EDIT-SKU',
+        'name' => 'Stock Edit Product',
+        'unit' => 'Pcs',
+        'stock' => 15,
+        'purchase_price' => 50000,
+        'selling_price' => 90000,
+        'shopee_item_id' => 888777,
+        'status' => 'active',
+    ]);
+
+    $setting = ShopeeSetting::current();
+    $setting->update([
+        'partner_id' => 123456,
+        'partner_key' => 'secret_key',
+        'shop_id' => 789012,
+        'access_token' => 'valid_token',
+        'token_expires_at' => now()->addHours(3),
+    ]);
+
+    Http::fake([
+        '*/api/v2/product/update_stock*' => Http::response([
+            'error' => '',
+            'message' => 'success',
+            'response' => ['success_list' => [['model_id' => 0, 'location_id' => 'IDZ', 'stock' => 25]]],
+        ], 200),
+    ]);
+
+    $response = $this->actingAs($admin)->put(route('warehouse.products.update', $product), [
+        'sku' => 'STOCK-EDIT-SKU',
+        'name' => 'Stock Edit Product',
+        'unit' => 'Pcs',
+        'purchase_price' => 50000,
+        'selling_price' => 90000,
+        'stock' => 25,
+        'safety_stock' => 5,
+        'shopee_item_id' => 888777,
+        'status' => 'active',
+    ]);
+
+    $response->assertRedirect();
+    $fresh = $product->fresh();
+    expect($fresh->stock)->toBe(25);
+    expect($fresh->shopee_stock)->toBe(25);
+
+    $mutation = StockMutation::where('product_id', $product->id)->latest()->first();
+    expect($mutation)->not->toBeNull();
+    expect($mutation->type)->toBe('adjustment');
+    expect($mutation->stock_before)->toBe(15);
+    expect($mutation->stock_after)->toBe(25);
+
+    Http::assertSent(function ($request) {
+        return str_contains($request->url(), '/api/v2/product/update_stock');
+    });
+});
+
+test('it pushes stock to Shopee when recording inbound mutation', function () {
+    $admin = User::firstOrCreate(
+        ['email' => 'admin@medina.com'],
+        ['name' => 'Admin Test', 'username' => 'admintest', 'password' => bcrypt('password'), 'role' => 'superadmin', 'is_active' => true]
+    );
+
+    $product = Product::create([
+        'sku' => 'MUT-INB-SKU',
+        'name' => 'Inbound Mutation Product',
+        'unit' => 'Pcs',
+        'stock' => 10,
+        'purchase_price' => 50000,
+        'selling_price' => 90000,
+        'shopee_item_id' => 999111,
+        'status' => 'active',
+    ]);
+
+    $setting = ShopeeSetting::current();
+    $setting->update([
+        'partner_id' => 123456,
+        'partner_key' => 'secret_key',
+        'shop_id' => 789012,
+        'access_token' => 'valid_token',
+        'token_expires_at' => now()->addHours(3),
+    ]);
+
+    Http::fake([
+        '*/api/v2/product/update_stock*' => Http::response([
+            'error' => '',
+            'message' => 'success',
+            'response' => ['success_list' => [['model_id' => 0, 'location_id' => 'IDZ', 'stock' => 15]]],
+        ], 200),
+    ]);
+
+    $response = $this->actingAs($admin)->post(route('warehouse.mutations.store'), [
+        'product_id' => $product->id,
+        'type' => 'inbound',
+        'qty' => 5,
+        'notes' => 'Restock baru masuk',
+        'actor' => 'Admin Gudang',
+    ]);
+
+    $response->assertRedirect();
+    $fresh = $product->fresh();
+    expect($fresh->stock)->toBe(15);
+    expect($fresh->shopee_stock)->toBe(15);
+
+    Http::assertSent(function ($request) {
+        return str_contains($request->url(), '/api/v2/product/update_stock');
+    });
 });

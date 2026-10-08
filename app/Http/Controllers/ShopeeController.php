@@ -27,9 +27,15 @@ class ShopeeController extends Controller
     /**
      * Shopee Dashboard.
      */
-    public function dashboard()
+    public function dashboard(Request $request)
     {
         $setting = ShopeeSetting::current();
+        if ($setting->isConnected()) {
+            $force = $request->boolean('refresh');
+            $this->shopeeService->syncAllLiveIfStale(20, $this->mutationService, $force);
+            $setting->refresh();
+        }
+
         $connectedProducts = Product::whereNotNull('shopee_item_id')->orderBy('name')->get();
         $unconnectedProducts = Product::whereNull('shopee_item_id')->orderBy('name')->get();
 
@@ -61,6 +67,13 @@ class ShopeeController extends Controller
      */
     public function orders(Request $request)
     {
+        $setting = ShopeeSetting::current();
+        if ($setting->isConnected()) {
+            $force = $request->boolean('refresh');
+            $this->shopeeService->syncLiveOrdersIfStale(20, 15, $this->mutationService, $force);
+            $setting->refresh();
+        }
+
         $query = ShopeeOrder::query();
 
         if ($request->filled('status')) {
@@ -358,6 +371,10 @@ class ShopeeController extends Controller
      */
     public function simulateOrder(Request $request)
     {
+        if (ShopeeSetting::current()->isProduction()) {
+            return redirect()->back()->with('error', 'Fitur simulasi order dinonaktifkan pada mode Production.');
+        }
+
         $validated = $request->validate([
             'product_id' => 'required|exists:products,id',
             'qty' => 'required|integer|min:1',

@@ -30,6 +30,14 @@ class PackingController extends Controller
      */
     public function index()
     {
+        if ($this->shopeeService->getSetting()->isConnected()) {
+            try {
+                $this->shopeeService->syncLiveOrdersIfStale(20, 7, $this->mutationService);
+            } catch (Exception $e) {
+                Log::warning('Packing live sync orders error: '.$e->getMessage());
+            }
+        }
+
         $todayPackedCount = PackingRecord::where('status', 'completed')
             ->whereDate('created_at', today())
             ->count();

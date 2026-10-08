@@ -10,6 +10,6 @@ Artisan::command('inspire', function () {
 use Illuminate\Support\Facades\Schedule;
 
 Schedule::command('shopee:sync')
-    ->everyFiveMinutes()
+    ->everyMinute()
     ->withoutOverlapping()
     ->appendOutputTo(storage_path('logs/shopee_sync.log'));

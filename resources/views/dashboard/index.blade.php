@@ -8,9 +8,11 @@
         <button type="button" class="btn btn-primary btn-sm font-weight-bold" data-toggle="modal" data-target="#quickMutationModal">
             <i class="fas fa-plus mr-1"></i> Catat Mutasi
         </button>
-        <button type="button" class="btn btn-shopee btn-sm ml-1" data-toggle="modal" data-target="#simulatorModal">
-            <i class="fas fa-vial mr-1"></i> Simulasi Order
-        </button>
+        @if($currentShopeeSetting->isSandbox())
+            <button type="button" class="btn btn-shopee btn-sm ml-1" data-toggle="modal" data-target="#simulatorModal">
+                <i class="fas fa-vial mr-1"></i> Simulasi Order
+            </button>
+        @endif
     </div>
 @endsection
 
@@ -212,23 +214,16 @@
                         @if($shopeeSetting->isConnected())
                             <span class="badge badge-success px-2 py-1"><i class="fas fa-check-circle mr-1"></i> Terhubung ({{ ucfirst($shopeeSetting->environment) }})</span>
                         @else
-                            <span class="badge badge-info px-2 py-1"><i class="fas fa-vial mr-1"></i> Sandbox / Simulasi</span>
+                            <span class="badge badge-secondary px-2 py-1"><i class="fas fa-unlink mr-1"></i> Belum Terhubung</span>
                         @endif
                     </div>
                     <div class="text-muted" style="font-size: 11px;">
                         Toko: <strong>{{ $shopeeSetting->shop_name }}</strong> &bull;
-                        Auto-Deduct: <strong class="text-success">Aktif</strong> &bull;
                         Terhubung: <strong>{{ $shopeeConnectedCount }} SKU</strong>
                     </div>
                 </div>
             </div>
             <div class="d-flex align-items-center mt-2 mt-md-0">
-                <form action="{{ route('shopee.sync.all') }}" method="POST" class="mr-2 flex-fill flex-md-grow-0">
-                    @csrf
-                    <button type="submit" class="btn btn-xs btn-outline-secondary btn-block">
-                        <i class="fas fa-sync-alt mr-1"></i> Push Stok
-                    </button>
-                </form>
                 <a href="{{ route('shopee.dashboard') }}" class="btn btn-xs btn-shopee flex-fill flex-md-grow-0">
                     <i class="fas fa-external-link-alt mr-1"></i> Channel Shopee
                 </a>
@@ -286,6 +281,7 @@
                         </div>
                     </a>
 
+                    @if($currentShopeeSetting->isSandbox())
                     <a href="#" class="list-group-item list-group-item-action d-flex align-items-center border-0 px-2 py-2 rounded bg-light" data-toggle="modal" data-target="#simulatorModal">
                         <div class="rounded-circle bg-shopee text-white p-2 mr-3 d-flex align-items-center justify-content-center flex-shrink-0" style="width: 36px; height: 36px;">
                             <i class="fas fa-shopping-cart"></i>
@@ -295,6 +291,7 @@
                             <small class="text-muted">Tes otomatis potong stok gudang</small>
                         </div>
                     </a>
+                    @endif
                 </div>
             </div>
         </div>

@@ -4,25 +4,16 @@
 @section('page_title', 'Integrasi Shopee & Channel Sync')
 
 @section('page_actions')
+    @if($currentShopeeSetting->isSandbox())
     <div class="d-inline-flex align-items-center">
         <button type="button" class="btn btn-shopee btn-sm shadow-sm font-weight-bold" data-toggle="modal" data-target="#simulatorModal">
             <i class="fas fa-vial mr-1"></i> Simulasi Order
         </button>
     </div>
+    @endif
 @endsection
 
 @section('content')
-
-<!-- Sync Status Bar -->
-<div class="alert alert-light border py-2 px-3 mb-3 d-flex flex-column flex-md-row align-items-md-center justify-content-between text-muted" style="font-size: 12.5px; border-left: 3px solid #10b981 !important;">
-    <div class="d-flex align-items-center mb-1 mb-md-0 text-dark">
-        <span class="badge badge-success mr-2 py-1 px-2 font-weight-bold">Status Sinkronisasi Aktif</span>
-        <span>Stok gudang otomatis diselaraskan dengan etalase Shopee saat terjadi mutasi.</span>
-    </div>
-    <div class="text-nowrap" style="font-size: 11.5px;">
-        <i class="fas fa-history mr-1"></i> Terakhir diperbarui: <strong>{{ $setting->last_synced_at ? $setting->last_synced_at->diffForHumans() : '-' }}</strong>
-    </div>
-</div>
 
 <!-- Shopee API Connection Banner -->
 <div class="row">
@@ -136,25 +127,19 @@
     </div>
 </div>
 
-<!-- Products Mapping & Live Sync -->
+<!-- Products Mapping -->
 <div class="card shadow-sm border-0 mb-3">
     <div class="card-header py-2 d-flex justify-content-between align-items-center">
         <span class="font-weight-bold text-dark" style="font-size: 13px;">
-            <i class="fas fa-boxes text-primary mr-1"></i> Sinkronisasi Stok Gudang &rarr; Shopee
+            <i class="fas fa-boxes text-primary mr-1"></i> Produk Terhubung Shopee
         </span>
-        <div>
-            <form action="{{ route('shopee.products.pull') }}" method="POST" class="d-inline mr-1">
-                @csrf
-                <button type="submit" class="btn btn-xs btn-outline-primary" onclick="this.disabled=true; this.innerHTML='<i class=\'fas fa-spinner fa-spin mr-1\'></i> Menarik...'; this.form.submit();">
-                    <i class="fas fa-cloud-download-alt mr-1"></i> Tarik dari Shopee
-                </button>
-            </form>
-            <form action="{{ route('shopee.sync.all') }}" method="POST" class="d-inline">
-                @csrf
-                <button type="submit" class="btn btn-xs btn-outline-secondary">
-                    <i class="fas fa-sync mr-1"></i> Push Semua ke Shopee
-                </button>
-            </form>
+        <div class="d-inline-flex align-items-center">
+            <button type="button" class="btn btn-xs btn-primary font-weight-bold shadow-sm mr-2" data-toggle="modal" data-target="#quickMutationModal">
+                <i class="fas fa-plus mr-1"></i> Tambah / Mutasi Stok
+            </button>
+            <a href="{{ route('shopee.dashboard', ['refresh' => 1]) }}" class="btn btn-xs btn-outline-secondary">
+                <i class="fas fa-sync-alt mr-1"></i> Segarkan
+            </a>
         </div>
     </div>
     <div class="card-body p-0 table-responsive">
@@ -166,7 +151,7 @@
                     <th class="text-center">Stok Gudang</th>
                     <th class="text-center d-none d-sm-table-cell">Stok Shopee</th>
                     <th class="text-center">Status Sync</th>
-                    <th class="text-center" style="width: 100px;">Aksi</th>
+                    <th class="text-center" style="width: 120px;">Aksi</th>
                 </tr>
             </thead>
             <tbody>
@@ -193,17 +178,106 @@
                             {{ $p->shopee_stock ?? $p->stock }}
                         </td>
                         <td class="text-center">
-                            <span class="badge badge-success px-2 py-1 font-weight-normal"><i class="fas fa-check mr-1"></i> Terhubung</span>
+                            <span class="badge badge-success px-2 py-1 font-weight-normal">Terhubung</span>
                         </td>
                         <td class="text-center">
-                            <form action="{{ route('shopee.sync.product', $p) }}" method="POST" class="d-inline">
-                                @csrf
-                                <button type="submit" class="btn btn-xs btn-outline-secondary" title="Sinkronkan Stok Sekarang">
-                                    <i class="fas fa-sync-alt mr-1"></i> Sync
-                                </button>
-                            </form>
+                            <button type="button" class="btn btn-xs btn-outline-primary font-weight-bold shadow-sm" data-toggle="modal" data-target="#shopeeStockModal{{ $p->id }}" title="Ubah atau Tambah Stok Produk Ini">
+                                <i class="fas fa-edit mr-1"></i> Ubah Stok
+                            </button>
                         </td>
                     </tr>
+
+                    <!-- Modal Ubah Stok Produk Shopee -->
+                    <div class="modal fade" id="shopeeStockModal{{ $p->id }}" tabindex="-1" role="dialog" aria-hidden="true">
+                        <div class="modal-dialog modal-dialog-centered" role="document">
+                            <div class="modal-content border-0 shadow">
+                                <form action="{{ route('warehouse.mutations.store') }}" method="POST">
+                                    @csrf
+                                    <input type="hidden" name="product_id" value="{{ $p->id }}">
+                                    <input type="hidden" name="actor" value="{{ auth()->user()->name ?? 'Admin Gudang' }}">
+                                    <div class="modal-header bg-dark text-white py-2">
+                                        <h6 class="modal-title font-weight-bold">
+                                            <i class="fas fa-boxes mr-1"></i> Ubah / Tambah Stok: {{ $p->sku }}
+                                        </h6>
+                                        <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
+                                            <span aria-hidden="true">&times;</span>
+                                        </button>
+                                    </div>
+                                    <div class="modal-body p-3">
+                                        <div class="bg-light p-2 rounded mb-3 border">
+                                            <div class="font-weight-bold text-dark">{{ $p->name }}</div>
+                                            <div class="d-flex justify-content-between text-xs text-muted mt-1">
+                                                <span>Shopee Item ID: <strong>{{ $p->shopee_item_id }}</strong></span>
+                                                <span>Stok Saat Ini: <strong class="text-primary">{{ $p->stock }} {{ $p->unit }}</strong></span>
+                                            </div>
+                                        </div>
+
+                                        <div class="form-group">
+                                            <label class="font-weight-semibold text-sm">Jenis Perubahan Stok <span class="text-danger">*</span></label>
+                                            <select name="type" class="form-control form-control-sm" required id="typeSelect{{ $p->id }}" onchange="updateCalc{{ $p->id }}()">
+                                                <option value="inbound" selected>📦 Tambah Stok / Barang Masuk (+ Tambah)</option>
+                                                <option value="adjustment">⚖️ Set Total Stok Baru (Stok Opname Langsung)</option>
+                                                <option value="outbound">🚚 Kurangi Stok / Barang Keluar (- Kurang)</option>
+                                            </select>
+                                        </div>
+
+                                        <div class="form-group">
+                                            <label class="font-weight-semibold text-sm" id="qtyLabel{{ $p->id }}">Jumlah Unit Tambahan <span class="text-danger">*</span></label>
+                                            <input type="number" name="qty" id="qtyInput{{ $p->id }}" class="form-control form-control-sm font-weight-bold" placeholder="Contoh: 10" required min="1" oninput="updateCalc{{ $p->id }}()">
+                                            <small class="text-muted d-block mt-1" id="calcHelp{{ $p->id }}">
+                                                Stok akhir setelah disimpan: <strong class="text-success" id="calcResult{{ $p->id }}">{{ $p->stock }} {{ $p->unit }}</strong>
+                                            </small>
+                                        </div>
+
+                                        <div class="form-group mb-2">
+                                            <label class="font-weight-semibold text-sm">Keterangan / Catatan (Opsional)</label>
+                                            <input type="text" name="notes" class="form-control form-control-sm" placeholder="Contoh: Restock Supplier / Penyesuaian Fisik">
+                                        </div>
+
+                                        <div class="alert alert-info py-2 px-3 mb-0 text-xs rounded border-0">
+                                            <i class="fas fa-info-circle mr-1"></i> Perubahan stok otomatis tersimpan di gudang & langsung di-push live ke API Shopee.
+                                        </div>
+                                    </div>
+                                    <div class="modal-footer bg-light py-2">
+                                        <button type="button" class="btn btn-secondary btn-sm" data-dismiss="modal">Batal</button>
+                                        <button type="submit" class="btn btn-primary btn-sm font-weight-bold">
+                                            <i class="fas fa-save mr-1"></i> Simpan & Update Shopee
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+
+                    <script>
+                    function updateCalc{{ $p->id }}() {
+                        var currentStock = {{ (int) $p->stock }};
+                        var typeElem = document.getElementById('typeSelect{{ $p->id }}');
+                        var type = typeElem ? typeElem.value : 'inbound';
+                        var inputElem = document.getElementById('qtyInput{{ $p->id }}');
+                        var qty = parseInt(inputElem ? inputElem.value : 0) || 0;
+                        var label = document.getElementById('qtyLabel{{ $p->id }}');
+                        var resultElem = document.getElementById('calcResult{{ $p->id }}');
+
+                        var newStock = currentStock;
+                        if (type === 'inbound') {
+                            if (label) label.innerHTML = 'Jumlah Unit Tambahan (Masuk) <span class="text-danger">*</span>';
+                            if (inputElem) inputElem.min = 1;
+                            newStock = currentStock + qty;
+                        } else if (type === 'outbound') {
+                            if (label) label.innerHTML = 'Jumlah Unit yang Dikurangi (Keluar) <span class="text-danger">*</span>';
+                            if (inputElem) inputElem.min = 1;
+                            newStock = Math.max(0, currentStock - qty);
+                        } else if (type === 'adjustment') {
+                            if (label) label.innerHTML = 'Total Stok Fisik Baru (Opname Langsung) <span class="text-danger">*</span>';
+                            if (inputElem) inputElem.min = 0;
+                            newStock = qty;
+                        }
+                        if (resultElem) {
+                            resultElem.innerText = newStock + ' {{ $p->unit }}';
+                        }
+                    }
+                    </script>
                 @empty
                     <tr>
                         <td colspan="6" class="text-center py-4 text-muted">

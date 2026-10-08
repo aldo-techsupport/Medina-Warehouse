@@ -64,4 +64,14 @@ class ShopeeSetting extends Model
     {
         return empty($this->token_expires_at) || $this->token_expires_at->isPast();
     }
+
+    public function isProduction(): bool
+    {
+        return $this->environment === 'production';
+    }
+
+    public function isSandbox(): bool
+    {
+        return $this->environment === 'sandbox';
+    }
 }
