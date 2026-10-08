@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-    <title>@yield('title', 'Dashboard') - Medina Warehouse & Shopee Sync</title>
+    <title>@yield('title', 'Dashboard') - Medina Warehouse</title>
 
     <!-- Favicon & Icons -->
     <link rel="icon" type="image/png" sizes="32x32" href="{{ asset('favicon-32x32.png') }}">
@@ -292,14 +292,14 @@
             @if(auth()->check() && auth()->user()->hasPermission('shopee_dashboard'))
                 <li class="nav-item d-none d-lg-inline-block">
                     <a href="{{ route('shopee.dashboard') }}" class="nav-link font-weight-bold px-2" style="color: var(--shopee-orange)">
-                        <i class="fas fa-shopping-bag mr-1"></i> Shopee Sync
+                        <i class="fas fa-shopping-bag mr-1"></i> Integrasi Shopee
                     </a>
                 </li>
             @endif
             @if(auth()->check() && auth()->user()->hasPermission('ai_advisor'))
                 <li class="nav-item d-none d-lg-inline-block">
                     <a href="{{ route('ai.index') }}" class="nav-link font-weight-bold text-purple px-2">
-                        <i class="fas fa-robot mr-1"></i> AI Advisor
+                        <i class="fas fa-chart-line mr-1"></i> Analisis Penjualan
                     </a>
                 </li>
             @endif
@@ -333,7 +333,7 @@
             @if(auth()->check() && auth()->user()->hasPermission('shopee_orders'))
                 <li class="nav-item mr-2 d-none d-xl-inline-block">
                     <button type="button" class="btn btn-sm btn-shopee shadow-sm" data-toggle="modal" data-target="#simulatorModal">
-                        <i class="fas fa-bolt mr-1"></i> <span>Simulasi Order</span>
+                        <i class="fas fa-vial mr-1"></i> <span>Simulasi Order</span>
                     </button>
                 </li>
             @endif
@@ -360,6 +360,37 @@
                             <i class="fas fa-bolt mr-2"></i> Simulasi Order Shopee
                         </a>
                     @endif
+                </div>
+            </li>
+
+            <!-- Live Notification Center Dropdown -->
+            <li class="nav-item dropdown mr-1 mr-md-2" id="notificationNavDropdown">
+                <a class="nav-link px-2 position-relative" data-toggle="dropdown" href="#" role="button" aria-expanded="false" title="Pusat Notifikasi Gudang & Shopee">
+                    <i class="far fa-bell text-secondary" style="font-size: 17px;" id="notifBellIcon"></i>
+                    <span class="badge badge-danger navbar-badge font-weight-bold" id="notifBadgeCount" style="display: none; font-size: 10px; top: 4px; right: 2px;">0</span>
+                </a>
+                <div class="dropdown-menu dropdown-menu-lg dropdown-menu-right shadow-lg border-0 p-0" style="min-width: 320px; max-width: 360px; border-radius: 12px; overflow: hidden;">
+                    <div class="p-3 bg-dark text-white d-flex justify-content-between align-items-center">
+                        <span class="font-weight-bold text-sm">
+                            <i class="fas fa-bell mr-1 text-warning"></i> Pusat Notifikasi
+                        </span>
+                        <span class="badge badge-light" id="notifHeaderTotalBadge" style="font-size: 11px;">0 Notifikasi</span>
+                    </div>
+
+                    <div id="notifListContainer" style="max-height: 380px; overflow-y: auto;">
+                        <div class="text-center py-4 text-muted" id="notifLoadingState">
+                            <i class="fas fa-circle-notch fa-spin text-primary mr-1"></i> Memuat notifikasi...
+                        </div>
+                    </div>
+
+                    <div class="p-2 bg-light text-center border-top">
+                        <a href="{{ route('packing.index') }}" class="btn btn-xs btn-outline-danger font-weight-bold mr-1">
+                            <i class="fas fa-barcode mr-1"></i> Buka Packing
+                        </a>
+                        <a href="{{ route('shopee.orders') }}" class="btn btn-xs btn-outline-primary font-weight-bold">
+                            <i class="fas fa-shopping-bag mr-1"></i> Semua Pesanan
+                        </a>
+                    </div>
                 </div>
             </li>
 
@@ -523,13 +554,12 @@
                     @endif
 
                     @if(auth()->user()->hasPermission('ai_advisor'))
-                        <li class="nav-header text-uppercase font-weight-bold text-muted mt-2" style="font-size: 10px;">AI & Pemasaran</li>
+                        <li class="nav-header text-uppercase font-weight-bold text-muted mt-2" style="font-size: 10px;">Analisis & Pemasaran</li>
                         <li class="nav-item">
                             <a href="{{ route('ai.index') }}" class="nav-link {{ request()->routeIs('ai.*') ? 'active bg-purple' : '' }}">
-                                <i class="nav-icon fas fa-robot" style="color: {{ request()->routeIs('ai.*') ? '#fff' : '#8b5cf6' }}"></i>
+                                <i class="nav-icon fas fa-chart-line" style="color: {{ request()->routeIs('ai.*') ? '#fff' : '#8b5cf6' }}"></i>
                                 <p>
-                                    AI Seller & Analisis
-                                    <span class="badge badge-info right" style="font-size: 9px; font-weight: 700;">PRO AI</span>
+                                    Analisis Penjualan & AI
                                 </p>
                             </a>
                         </li>
@@ -780,7 +810,8 @@
         </div>
     </div>
 
-    <!-- Mobile Bottom Navigation -->
+    <!-- Mobile Bottom Navigation (Hidden on Packing Station to give full workspace to camera) -->
+    @if(!request()->routeIs('packing*'))
     <nav class="mobile-bottom-nav">
         @if(auth()->check() && auth()->user()->hasPermission('dashboard'))
             <a href="{{ route('dashboard') }}" class="mobile-bottom-nav-item {{ request()->routeIs('dashboard') ? 'active' : '' }}">
@@ -815,6 +846,7 @@
             </a>
         @endif
     </nav>
+    @endif
 
     <!-- Main Footer (Desktop Only) -->
     <footer class="main-footer text-sm d-none d-md-block">
@@ -895,6 +927,147 @@
                 $('input[name="qty"]').attr('min', '1');
             }
         });
+    });
+
+    // 🔔 REAL-TIME NOTIFICATIONS & AUDIO CHIME
+    let previousNotifCount = null;
+
+    function playNotificationChime() {
+        try {
+            const ctx = new (window.AudioContext || window.webkitAudioContext)();
+            const now = ctx.currentTime;
+            
+            // Note 1 (E5 - 659Hz)
+            const osc1 = ctx.createOscillator();
+            const gain1 = ctx.createGain();
+            osc1.type = 'sine';
+            osc1.frequency.setValueAtTime(659.25, now);
+            gain1.gain.setValueAtTime(0.15, now);
+            gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+            osc1.connect(gain1);
+            gain1.connect(ctx.destination);
+            osc1.start(now);
+            osc1.stop(now + 0.35);
+
+            // Note 2 (A5 - 880Hz)
+            const osc2 = ctx.createOscillator();
+            const gain2 = ctx.createGain();
+            osc2.type = 'sine';
+            osc2.frequency.setValueAtTime(880, now + 0.12);
+            gain2.gain.setValueAtTime(0.18, now + 0.12);
+            gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.55);
+            osc2.connect(gain2);
+            gain2.connect(ctx.destination);
+            osc2.start(now + 0.12);
+            osc2.stop(now + 0.55);
+        } catch(e) {}
+    }
+
+    async function fetchLiveNotifications() {
+        try {
+            const res = await fetch("{{ route('api.notifications') }}");
+            if (!res.ok) return;
+            const data = await res.json();
+            
+            const badgeEl = document.getElementById('notifBadgeCount');
+            const bellIcon = document.getElementById('notifBellIcon');
+            const totalHeader = document.getElementById('notifHeaderTotalBadge');
+            const container = document.getElementById('notifListContainer');
+
+            const total = (data.pending_count || 0) + (data.cancellations_count || 0);
+
+            if (totalHeader) totalHeader.innerText = total + ' Notifikasi';
+
+            if (badgeEl) {
+                if (total > 0) {
+                    badgeEl.innerText = total > 99 ? '99+' : total;
+                    badgeEl.style.display = 'inline-block';
+                    if (bellIcon) {
+                        bellIcon.className = 'fas fa-bell text-warning animate-pulse';
+                    }
+                } else {
+                    badgeEl.style.display = 'none';
+                    if (bellIcon) {
+                        bellIcon.className = 'far fa-bell text-secondary';
+                    }
+                }
+            }
+
+            // Play sound if new notification arrived after initial load
+            if (previousNotifCount !== null && total > previousNotifCount) {
+                playNotificationChime();
+            }
+            previousNotifCount = total;
+
+            // Render list
+            if (container) {
+                let html = '';
+
+                // Pending Orders
+                if (data.pending_orders && data.pending_orders.length > 0) {
+                    html += '<div class="p-2 bg-light border-bottom text-xs font-weight-bold text-dark"><i class="fas fa-box text-warning mr-1"></i> Pesanan Baru Menunggu Packing (' + data.pending_count + ')</div>';
+                    data.pending_orders.forEach(ord => {
+                        html += `
+                            <a href="{{ route('packing.index') }}" class="dropdown-item py-2 px-3 border-bottom d-flex align-items-center">
+                                <div class="rounded-circle bg-warning text-dark p-2 mr-2 d-flex align-items-center justify-content-center" style="width: 32px; height: 32px;">
+                                    <i class="fas fa-barcode"></i>
+                                </div>
+                                <div class="text-truncate" style="flex: 1;">
+                                    <div class="font-weight-bold text-dark text-xs">${ord.order_sn}</div>
+                                    <small class="text-muted">${ord.carrier} • ${ord.buyer} • ${ord.items_count} item</small>
+                                </div>
+                                <small class="text-muted text-xs ml-2">${ord.time_ago}</small>
+                            </a>
+                        `;
+                    });
+                }
+
+                // Cancellations & Returns
+                if (data.cancellations && data.cancellations.length > 0) {
+                    html += '<div class="p-2 bg-danger text-white text-xs font-weight-bold"><i class="fas fa-exclamation-triangle mr-1"></i> Pembatalan / Retur Pembeli (' + data.cancellations_count + ')</div>';
+                    data.cancellations.forEach(ord => {
+                        html += `
+                            <a href="{{ route('shopee.orders') }}" class="dropdown-item py-2 px-3 border-bottom d-flex align-items-center bg-light">
+                                <div class="rounded-circle bg-danger text-white p-2 mr-2 d-flex align-items-center justify-content-center" style="width: 32px; height: 32px;">
+                                    <i class="fas fa-ban"></i>
+                                </div>
+                                <div class="text-truncate" style="flex: 1;">
+                                    <div class="font-weight-bold text-danger text-xs">${ord.order_sn} (${ord.status})</div>
+                                    <small class="text-muted">${ord.tracking_number ? 'Resi: ' + ord.tracking_number : 'Order: ' + ord.order_sn} • ${ord.buyer}</small>
+                                </div>
+                                <small class="text-danger text-xs font-weight-bold ml-2">${ord.time_ago}</small>
+                            </a>
+                        `;
+                    });
+                }
+
+                // Low Stock
+                if (data.low_stock_count > 0) {
+                    html += `
+                        <a href="{{ route('warehouse.products') }}" class="dropdown-item py-2 px-3 border-bottom d-flex align-items-center text-warning">
+                            <i class="fas fa-boxes mr-2 fa-lg"></i>
+                            <div>
+                                <strong class="text-xs text-dark">${data.low_stock_count} Produk Menipis</strong>
+                                <small class="d-block text-muted">Stok berada di bawah safety stock</small>
+                            </div>
+                        </a>
+                    `;
+                }
+
+                if (!html) {
+                    html = '<div class="text-center py-4 text-muted text-xs"><i class="fas fa-check-circle text-success mr-1"></i> Semua pesanan telah dipacking dan tidak ada retur baru.</div>';
+                }
+
+                container.innerHTML = html;
+            }
+        } catch(err) {
+            console.error('Notification poll error:', err);
+        }
+    }
+
+    $(document).ready(function() {
+        fetchLiveNotifications();
+        setInterval(fetchLiveNotifications, 15000); // Poll every 15s
     });
 </script>
 

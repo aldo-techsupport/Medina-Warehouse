@@ -8,6 +8,7 @@ use App\Models\ShopeeOrder;
 use App\Models\ShopeeSetting;
 use App\Models\StockMutation;
 use App\Services\AiService;
+use Illuminate\Http\JsonResponse;
 
 class DashboardController extends Controller
 {
@@ -86,5 +87,66 @@ class DashboardController extends Controller
             'shopeeSetting',
             'latestAiAnalysis'
         ));
+    }
+
+    /**
+     * Real-time notifications API endpoint.
+     */
+    public function notifications(): JsonResponse
+    {
+        // 1. Pending Orders awaiting packing
+        $pendingOrders = ShopeeOrder::where('order_status', 'READY_TO_SHIP')
+            ->whereDoesntHave('packingRecords', function ($q) {
+                $q->where('status', 'completed');
+            })
+            ->latest()
+            ->take(5)
+            ->get();
+
+        $pendingCount = ShopeeOrder::where('order_status', 'READY_TO_SHIP')
+            ->whereDoesntHave('packingRecords', function ($q) {
+                $q->where('status', 'completed');
+            })
+            ->count();
+
+        // 2. Buyer Cancellations & Return requests (last 48 hours)
+        $cancellations = ShopeeOrder::whereIn('order_status', ['CANCELLED', 'IN_CANCEL', 'TO_RETURN', 'RETURNED'])
+            ->latest('updated_at')
+            ->take(5)
+            ->get();
+
+        $cancellationsCount = ShopeeOrder::whereIn('order_status', ['CANCELLED', 'IN_CANCEL', 'TO_RETURN', 'RETURNED'])
+            ->where('updated_at', '>=', now()->subHours(48))
+            ->count();
+
+        // 3. Low stock items
+        $lowStockCount = Product::whereColumn('stock', '<=', 'safety_stock')->count();
+
+        $totalBadge = $pendingCount + $cancellationsCount;
+
+        return response()->json([
+            'status' => 'success',
+            'total_badge' => $totalBadge,
+            'pending_count' => $pendingCount,
+            'pending_orders' => $pendingOrders->map(fn ($o) => [
+                'id' => $o->id,
+                'order_sn' => $o->order_sn,
+                'tracking_number' => $o->tracking_number,
+                'buyer' => $o->buyer_username,
+                'carrier' => $o->shipping_carrier ?? 'Shopee',
+                'time_ago' => $o->created_at->diffForHumans(),
+                'items_count' => count($o->items_data ?? []),
+            ]),
+            'cancellations_count' => $cancellationsCount,
+            'cancellations' => $cancellations->map(fn ($o) => [
+                'id' => $o->id,
+                'order_sn' => $o->order_sn,
+                'tracking_number' => $o->tracking_number,
+                'status' => $o->order_status,
+                'buyer' => $o->buyer_username,
+                'time_ago' => $o->updated_at->diffForHumans(),
+            ]),
+            'low_stock_count' => $lowStockCount,
+        ]);
     }
 }

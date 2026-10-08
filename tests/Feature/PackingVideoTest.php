@@ -132,3 +132,89 @@ test('it renders packing index and history views', function () {
     $this->actingAs($this->user)->get(route('packing.index'))->assertStatus(200);
     $this->actingAs($this->user)->get(route('packing.history'))->assertStatus(200);
 });
+
+test('it returns 404 and does not create orders for invalid or arbitrary tracking numbers', function () {
+    $initialOrderCount = ShopeeOrder::count();
+
+    $response = $this->actingAs($this->user)->postJson(route('packing.check'), [
+        'query' => 'q2wed1q241',
+    ]);
+
+    $response->assertStatus(404);
+    $response->assertJson([
+        'status' => 'error',
+    ]);
+
+    expect(ShopeeOrder::count())->toBe($initialOrderCount);
+});
+
+test('it returns items in checkOrder for return unboxing inspection on cancelled orders', function () {
+    $order = ShopeeOrder::create([
+        'order_sn' => 'ORD-RETURN-TEST-004',
+        'tracking_number' => 'RESI-RETUR-111',
+        'shipping_carrier' => 'SPX Express',
+        'order_status' => 'CANCELLED',
+        'total_amount' => 99000,
+        'buyer_username' => 'buyer_retur_test',
+        'items_data' => [
+            ['item_name' => 'Baju Koko Modern', 'item_sku' => 'SKU-RETUR-1', 'model_quantity_purchased' => 1],
+        ],
+    ]);
+
+    $response = $this->actingAs($this->user)->postJson(route('packing.check'), [
+        'query' => 'RESI-RETUR-111',
+    ]);
+
+    $response->assertStatus(200);
+    $data = $response->json();
+    expect($data['status'])->toBe('blocked_cancelled');
+    expect($data['items'])->toHaveCount(1);
+    expect($data['items'][0]['name'])->toBe('Baju Koko Modern');
+});
+
+test('it can upload and store return unboxing inspection video', function () {
+    Storage::fake('public');
+
+    $order = ShopeeOrder::create([
+        'order_sn' => 'ORD-RETURN-VIDEO-005',
+        'tracking_number' => 'RESI-RETUR-VIDEO-222',
+        'order_status' => 'CANCELLED',
+        'total_amount' => 175000,
+        'buyer_username' => 'buyer_unboxing_test',
+    ]);
+
+    $dummyVideo = UploadedFile::fake()->create('unboxing_video.webm', 1024, 'video/webm');
+
+    $response = $this->actingAs($this->user)->postJson(route('packing.upload'), [
+        'order_sn' => 'ORD-RETURN-VIDEO-005',
+        'tracking_number' => 'RESI-RETUR-VIDEO-222',
+        'video' => $dummyVideo,
+        'duration' => 25,
+        'mode' => 'return_unboxing',
+    ]);
+
+    $response->assertStatus(200);
+    $response->assertJson([
+        'status' => 'success',
+    ]);
+
+    $record = PackingRecord::where('order_sn', 'ORD-RETURN-VIDEO-005')->first();
+    expect($record)->not->toBeNull();
+    expect($record->status)->toBe('completed');
+    expect($record->notes)->toContain('Unboxing');
+});
+
+test('it returns notification data from api notifications endpoint', function () {
+    $response = $this->actingAs($this->user)->getJson(route('api.notifications'));
+
+    $response->assertStatus(200);
+    $response->assertJsonStructure([
+        'status',
+        'total_badge',
+        'pending_count',
+        'pending_orders',
+        'cancellations_count',
+        'cancellations',
+        'low_stock_count',
+    ]);
+});

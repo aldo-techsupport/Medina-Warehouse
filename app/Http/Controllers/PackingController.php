@@ -5,7 +5,6 @@ namespace App\Http\Controllers;
 use App\Models\PackingRecord;
 use App\Models\Product;
 use App\Models\ShopeeOrder;
-use App\Models\ShopeeSetting;
 use App\Services\ShopeeService;
 use App\Services\StockMutationService;
 use Exception;
@@ -13,7 +12,6 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Str;
 
 class PackingController extends Controller
 {
@@ -145,64 +143,11 @@ class PackingController extends Controller
             }
         }
 
-        // Fallback mock order for instant local testing if no Shopee API connected
-        if (! $order) {
-            $isCancelledQuery = str_contains(strtoupper($query), 'CANCEL');
-            $firstProduct = Product::where('status', 'active')->first();
-            if ($firstProduct) {
-                $order = ShopeeOrder::create([
-                    'order_sn' => '26'.date('md').strtoupper(Str::random(6)),
-                    'tracking_number' => $query,
-                    'shipping_carrier' => 'SPX Express',
-                    'shop_id' => ShopeeSetting::current()->shop_id ?? 28491823,
-                    'order_status' => $isCancelledQuery ? 'CANCELLED' : 'READY_TO_SHIP',
-                    'total_amount' => $firstProduct->selling_price,
-                    'buyer_username' => 'shopee_user_'.rand(100, 999),
-                    'items_data' => [
-                        [
-                            'item_id' => $firstProduct->shopee_item_id ?? 184910291,
-                            'item_sku' => $firstProduct->sku,
-                            'item_name' => $firstProduct->name,
-                            'model_quantity_purchased' => 1,
-                            'model_discounted_price' => $firstProduct->selling_price,
-                        ],
-                    ],
-                    'stock_deducted' => ! $isCancelledQuery,
-                    'stock_deducted_at' => $isCancelledQuery ? null : now(),
-                ]);
-            }
-        }
-
         if (! $order) {
             return response()->json([
                 'status' => 'error',
                 'message' => "Data pesanan dengan Resi / Order SN '{$query}' tidak ditemukan.",
             ], 404);
-        }
-
-        // Check if Order is CANCELLED / IN_CANCEL / RETURNED
-        if ($order->isCancelled()) {
-            // Record blocked packing attempt
-            PackingRecord::create([
-                'order_sn' => $order->order_sn,
-                'tracking_number' => $order->tracking_number ?? $query,
-                'shopee_order_id' => $order->id,
-                'status' => 'blocked_cancelled',
-                'packer_name' => $request->input('packer_name', 'Staff Packing'),
-                'notes' => "PERINGATAN: Percobaan packing digagalkan karena pesanan telah DIBATALKAN di Shopee (Status: {$order->order_status}).",
-            ]);
-
-            return response()->json([
-                'status' => 'blocked_cancelled',
-                'order_sn' => $order->order_sn,
-                'tracking_number' => $order->tracking_number ?? $query,
-                'shipping_carrier' => $order->shipping_carrier ?? 'Shopee Shipping',
-                'order_status' => $order->order_status,
-                'buyer_username' => $order->buyer_username,
-                'total_amount' => $order->total_amount,
-                'live_verified' => $liveVerified,
-                'message' => "🚫 PERINGATAN: Pesanan ini sudah BERSTATUS DIBATALKAN ({$order->order_status}) di Shopee! JANGAN DIPACKING ATAU DISERAHKAN KE KURIR!",
-            ]);
         }
 
         // Format items list with product catalog information
@@ -226,6 +171,32 @@ class PackingController extends Controller
                     'checked' => false,
                 ];
             }
+        }
+
+        // Check if Order is CANCELLED / IN_CANCEL / RETURNED
+        if ($order->isCancelled()) {
+            // Record blocked packing attempt
+            PackingRecord::create([
+                'order_sn' => $order->order_sn,
+                'tracking_number' => $order->tracking_number ?? $query,
+                'shopee_order_id' => $order->id,
+                'status' => 'blocked_cancelled',
+                'packer_name' => $request->input('packer_name', 'Staff Packing'),
+                'notes' => "PERINGATAN: Percobaan packing digagalkan karena pesanan telah DIBATALKAN / DIRETUR di Shopee (Status: {$order->order_status}).",
+            ]);
+
+            return response()->json([
+                'status' => 'blocked_cancelled',
+                'order_sn' => $order->order_sn,
+                'tracking_number' => $order->tracking_number ?? $query,
+                'shipping_carrier' => $order->shipping_carrier ?? 'Shopee Shipping',
+                'order_status' => $order->order_status,
+                'buyer_username' => $order->buyer_username,
+                'total_amount' => $order->total_amount,
+                'live_verified' => $liveVerified,
+                'items' => $formattedItems,
+                'message' => "🚫 PERINGATAN: Pesanan ini sudah BERSTATUS DIBATALKAN / RETUR ({$order->order_status}) di Shopee! JANGAN DIPACKING ATAU DISERAHKAN KE KURIR!",
+            ]);
         }
 
         // Check if Order has already been packed previously
@@ -287,6 +258,7 @@ class PackingController extends Controller
             'packer_name' => 'nullable|string',
             'items_checked' => 'nullable|string',
             'notes' => 'nullable|string',
+            'mode' => 'nullable|string',
         ]);
 
         $order = ShopeeOrder::where('order_sn', $validated['order_sn'])->first();
@@ -302,27 +274,43 @@ class PackingController extends Controller
             $itemsChecked = json_decode($validated['items_checked'], true) ?: [];
         }
 
+        $mode = $validated['mode'] ?? 'packing';
+        $isReturn = $mode === 'return_unboxing';
+
         $record = PackingRecord::create([
             'order_sn' => $validated['order_sn'],
             'tracking_number' => $validated['tracking_number'] ?? ($order->tracking_number ?? null),
             'shopee_order_id' => $order?->id,
             'status' => 'completed',
-            'packer_name' => $validated['packer_name'] ?: 'Staff Packing',
+            'packer_name' => ($validated['packer_name'] ?? null) ?: ($isReturn ? 'Staff Pemeriksa Retur' : 'Staff Packing'),
             'items_checked' => $itemsChecked,
             'video_path' => $path,
             'video_duration' => (int) ($validated['duration'] ?? 0),
             'file_size' => $videoFile->getSize(),
-            'notes' => $validated['notes'] ?? 'Video packing berhasil disimpan.',
+            'notes' => $validated['notes'] ?? ($isReturn ? 'Video Unboxing & Pemeriksaan Paket Retur Shopee.' : 'Video packing berhasil disimpan.'),
         ]);
 
         // Update Shopee order status to PROCESSED if ready
         if ($order && $order->order_status === 'READY_TO_SHIP') {
             $order->update(['order_status' => 'PROCESSED']);
+
+            // Jika terhubung ke Shopee Open API dan bukan mock simulasi, kirim sinyal ship_order ke Shopee
+            if ($this->shopeeService->getSetting()->isConnected() && ! str_starts_with($order->order_sn, 'ORD-') && ! str_starts_with($order->order_sn, 'SAMPLE-')) {
+                try {
+                    $this->shopeeService->shipOrder($order->order_sn);
+                } catch (Exception $e) {
+                    Log::info("Shopee shipOrder notice for {$order->order_sn}: ".$e->getMessage());
+                }
+            }
         }
+
+        $message = $isReturn
+            ? "Video Unboxing & Pemeriksaan Retur untuk Resi [{$record->tracking_number}] berhasil disimpan!"
+            : "Video packing untuk Resi [{$record->tracking_number}] berhasil disimpan!";
 
         return response()->json([
             'status' => 'success',
-            'message' => "Video packing untuk Resi [{$record->tracking_number}] berhasil disimpan!",
+            'message' => $message,
             'record_id' => $record->id,
             'video_url' => $record->video_url,
         ]);

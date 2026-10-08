@@ -21,6 +21,7 @@ class ShopeeSetting extends Model
         'is_active',
         'auto_sync_stock',
         'environment',
+        'last_synced_at',
     ];
 
     protected function casts(): array
@@ -29,6 +30,7 @@ class ShopeeSetting extends Model
             'is_active' => 'boolean',
             'auto_sync_stock' => 'boolean',
             'token_expires_at' => 'datetime',
+            'last_synced_at' => 'datetime',
             'partner_id' => 'integer',
             'shop_id' => 'integer',
         ];
@@ -52,6 +54,14 @@ class ShopeeSetting extends Model
 
     public function isConnected(): bool
     {
-        return ! empty($this->partner_id) && ! empty($this->partner_key) && ! empty($this->access_token);
+        return ! empty($this->partner_id)
+            && ! empty($this->partner_key)
+            && ! empty($this->access_token)
+            && ! str_starts_with((string) $this->access_token, 'sample_');
+    }
+
+    public function isTokenExpired(): bool
+    {
+        return empty($this->token_expires_at) || $this->token_expires_at->isPast();
     }
 }

@@ -3,10 +3,13 @@
 namespace App\Http\Controllers;
 
 use App\Models\Product;
+use App\Models\ShopeeSetting;
 use App\Models\StockMutation;
+use App\Services\ShopeeService;
 use App\Services\StockMutationService;
 use Exception;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 
 class WarehouseController extends Controller
 {
@@ -22,6 +25,15 @@ class WarehouseController extends Controller
      */
     public function products(Request $request)
     {
+        $setting = ShopeeSetting::current();
+        if ($setting->isConnected() && Product::count() === 0) {
+            try {
+                app(ShopeeService::class)->pullAndSyncProducts($this->mutationService);
+            } catch (Exception $e) {
+                Log::info('Auto-pull products on load: '.$e->getMessage());
+            }
+        }
+
         $query = Product::query();
 
         if ($request->filled('search')) {

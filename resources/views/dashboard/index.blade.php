@@ -9,7 +9,7 @@
             <i class="fas fa-plus mr-1"></i> Catat Mutasi
         </button>
         <button type="button" class="btn btn-shopee btn-sm ml-1" data-toggle="modal" data-target="#simulatorModal">
-            <i class="fas fa-bolt mr-1"></i> Test Order Shopee
+            <i class="fas fa-vial mr-1"></i> Simulasi Order
         </button>
     </div>
 @endsection
@@ -102,14 +102,14 @@
                 <div>
                     <div class="d-flex align-items-center flex-wrap">
                         <h5 class="font-weight-bold mb-0 mr-2 text-dark" style="font-size: 15px;">
-                            AI Executive Summary & Rekomendasi Hari Ini
+                            Ringkasan & Rekomendasi Penjualan Harian
                         </h5>
                         <span class="badge badge-purple text-white px-2 py-1" style="font-size: 10px;">
-                            <i class="fas fa-robot mr-1"></i> Asisten Penjualan Medina
+                            <i class="fas fa-lightbulb mr-1"></i> Asisten Analisis Medina
                         </span>
                     </div>
                     <div class="text-muted" style="font-size: 11.5px;">
-                        <i class="far fa-clock mr-1"></i> Analisis: <strong>{{ $latestAiAnalysis->created_at->diffForHumans() }}</strong> ({{ $latestAiAnalysis->created_at->translatedFormat('d M Y, H:i') }})
+                        <i class="far fa-clock mr-1"></i> Diperbarui: <strong>{{ $latestAiAnalysis->created_at->diffForHumans() }}</strong> ({{ $latestAiAnalysis->created_at->translatedFormat('d M Y, H:i') }})
                     </div>
                 </div>
             </div>
@@ -117,10 +117,10 @@
             <!-- Action Buttons -->
             <div class="d-flex align-items-center flex-wrap">
                 <button type="button" id="btnQuickRegenerateAi" class="btn btn-xs btn-outline-purple mr-2 font-weight-bold shadow-xs">
-                    <i class="fas fa-sync-alt mr-1" id="dashAiSpinner"></i> Analisis Ulang AI
+                    <i class="fas fa-sync-alt mr-1" id="dashAiSpinner"></i> Perbarui Rekomendasi
                 </button>
                 <a href="{{ route('ai.index') }}" class="btn btn-xs btn-purple font-weight-bold shadow-sm">
-                    <i class="fas fa-comments mr-1"></i> Konsultasi / Chat AI &rarr;
+                    <i class="fas fa-chart-line mr-1"></i> Buka Analisis Lengkap &rarr;
                 </a>
             </div>
         </div>

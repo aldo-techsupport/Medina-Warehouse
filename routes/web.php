@@ -31,6 +31,9 @@ Route::middleware('auth')->group(function () {
         ->middleware('menu:dashboard')
         ->name('dashboard');
 
+    // Live Notifications Feed
+    Route::get('/api/notifications', [DashboardController::class, 'notifications'])->name('api.notifications');
+
     // Warehouse Management (Gudang Utama)
     Route::prefix('warehouse')->name('warehouse.')->group(function () {
         // Products Catalog
@@ -65,6 +68,7 @@ Route::middleware('auth')->group(function () {
     Route::prefix('shopee')->name('shopee.')->group(function () {
         Route::middleware('menu:shopee_dashboard')->group(function () {
             Route::get('/', [ShopeeController::class, 'dashboard'])->name('dashboard');
+            Route::post('/products/pull', [ShopeeController::class, 'pullProducts'])->name('products.pull');
             Route::post('/map/{product}', [ShopeeController::class, 'mapProduct'])->name('map');
             Route::post('/unmap/{product}', [ShopeeController::class, 'unmapProduct'])->name('unmap');
             Route::post('/sync/{product}', [ShopeeController::class, 'syncProductStock'])->name('sync.product');
@@ -81,6 +85,8 @@ Route::middleware('auth')->group(function () {
         Route::middleware('menu:shopee_settings')->group(function () {
             Route::get('/settings', [ShopeeController::class, 'settings'])->name('settings');
             Route::post('/settings', [ShopeeController::class, 'updateSettings'])->name('settings.update');
+            Route::post('/settings/refresh-token', [ShopeeController::class, 'refreshToken'])->name('settings.refresh');
+            Route::post('/settings/disconnect', [ShopeeController::class, 'disconnect'])->name('settings.disconnect');
             Route::get('/callback', [ShopeeController::class, 'handleCallback'])->name('callback');
         });
     });

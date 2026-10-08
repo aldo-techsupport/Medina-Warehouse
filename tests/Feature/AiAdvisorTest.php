@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\AiChatMessage;
+use App\Models\Product;
 use App\Models\User;
 use Illuminate\Support\Facades\Http;
 
@@ -21,7 +22,7 @@ test('super admin can access AI advisor dashboard', function () {
 
     $response = $this->actingAs($admin)->get(route('ai.index'));
     $response->assertStatus(200);
-    $response->assertSee('AI Seller & Analisis Penjualan');
+    $response->assertSee('Analisis Penjualan dan Toko');
     $response->assertSee('Chat Asisten Seller AI');
 });
 
@@ -193,6 +194,19 @@ test('ai test connection endpoint returns connectivity status', function () {
 test('ai chat works with smart local fallback when api key is not configured', function () {
     $admin = User::where('email', 'admin@medina.com')->first();
 
+    Product::create([
+        'sku' => 'MDN-LOW-001',
+        'barcode' => '89999999901',
+        'name' => 'Gamis Test Low Stock',
+        'category' => 'Gamis',
+        'unit' => 'Pcs',
+        'purchase_price' => 50000,
+        'selling_price' => 100000,
+        'stock' => 2,
+        'safety_stock' => 10,
+        'status' => 'active',
+    ]);
+
     config([
         'ai.api_key' => '',
     ]);
@@ -212,7 +226,7 @@ test('super admin sees AI executive summary and actionable steps on main dashboa
 
     $response = $this->actingAs($admin)->get(route('dashboard'));
     $response->assertStatus(200);
-    $response->assertSee('AI Executive Summary', false);
+    $response->assertSee('Ringkasan & Rekomendasi Penjualan Harian', false);
     $response->assertSee('Langkah Prioritas Hari Ini');
     $response->assertSee('Checklist Aksi');
 });

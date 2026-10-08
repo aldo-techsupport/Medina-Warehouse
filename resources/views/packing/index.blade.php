@@ -105,257 +105,176 @@
     }
 
     /* ========================================================
-       📱 MOBILE FULLSCREEN CAMERA STATION STYLING
+       📱 RESPONSIVE CAMERA & PACKING STATION STYLING
        ======================================================== */
-    @media (max-width: 767.98px) {
-        /* Sembunyikan elemen UI luar AdminLTE pada HP */
-        .main-header.navbar,
-        .content-header,
-        .mobile-bottom-nav,
-        .desktop-only-packing,
-        .main-footer {
-            display: none !important;
-        }
+    .video-preview-wrapper {
+        position: relative;
+        width: 100%;
+        height: 380px;
+        background: #000;
+        border-radius: 12px;
+        overflow: hidden;
+    }
 
-        html, body {
-            overflow: hidden !important;
-            height: 100% !important;
-            margin: 0 !important;
-            padding: 0 !important;
-            background: #000 !important;
-        }
+    #cameraPreview {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        display: block;
+    }
 
-        .content-wrapper {
-            margin: 0 !important;
-            padding: 0 !important;
-            background: #000 !important;
-            height: 100vh !important;
-            height: 100dvh !important;
-            overflow: hidden !important;
-        }
+    /* Floating glassmorphism buttons on camera */
+    .btn-cam-glass {
+        width: 38px;
+        height: 38px;
+        border-radius: 50%;
+        background: rgba(0, 0, 0, 0.55);
+        backdrop-filter: blur(8px);
+        -webkit-backdrop-filter: blur(8px);
+        border: 1px solid rgba(255, 255, 255, 0.25);
+        color: #ffffff !important;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 13px;
+        text-decoration: none !important;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+        transition: all 0.2s ease;
+    }
 
-        .content, .container-fluid {
-            padding: 0 !important;
-            margin: 0 !important;
-            height: 100% !important;
-            width: 100% !important;
-        }
+    .btn-cam-glass:active, .btn-cam-glass.active {
+        background: rgba(37, 99, 235, 0.85);
+        border-color: #60a5fa;
+        transform: scale(0.94);
+    }
 
-        .row {
-            margin: 0 !important;
-        }
+    /* Top Camera Floating Header */
+    .mobile-cam-header {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        z-index: 25;
+        padding: 8px 12px;
+        background: linear-gradient(180deg, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.2) 80%, rgba(0,0,0,0) 100%);
+    }
 
-        .col-12, .col-lg-5 {
-            padding: 0 !important;
-            margin: 0 !important;
-        }
+    .mobile-cam-pill {
+        display: inline-flex;
+        align-items: center;
+        padding: 4px 12px;
+        border-radius: 20px;
+        background: rgba(0, 0, 0, 0.65);
+        backdrop-filter: blur(8px);
+        -webkit-backdrop-filter: blur(8px);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        color: #ffffff;
+        font-size: 11px;
+        font-weight: 700;
+    }
 
-        .card {
-            border-radius: 0 !important;
-            border: none !important;
-            background: transparent !important;
-            box-shadow: none !important;
-            margin: 0 !important;
-        }
+    .mobile-cam-pill.pill-rec {
+        background: rgba(220, 38, 38, 0.95);
+        border-color: #ef4444;
+        box-shadow: 0 0 14px rgba(239, 68, 68, 0.7);
+    }
 
-        .card-body {
-            padding: 0 !important;
-        }
+    /* Center Reticle / Viewfinder Targeting Box */
+    .mobile-cam-reticle-box {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 220px;
+        height: 150px;
+        pointer-events: none;
+        z-index: 20;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
 
-        .desktop-cam-card-header,
-        .desktop-cam-card-footer {
-            display: none !important;
-        }
+    .reticle-corner {
+        position: absolute;
+        width: 22px;
+        height: 22px;
+        border-color: #22c55e;
+        border-style: solid;
+    }
 
-        /* Kamera preview fixed 100% satu layar penuh HP */
-        .video-preview-wrapper {
-            position: fixed !important;
-            top: 0 !important;
-            left: 0 !important;
-            width: 100vw !important;
-            height: 100vh !important;
-            height: 100dvh !important;
-            min-height: 100vh !important;
-            border-radius: 0 !important;
-            z-index: 1035 !important;
-            background: #000 !important;
-        }
+    .corner-tl { top: 0; left: 0; border-width: 3.5px 0 0 3.5px; border-top-left-radius: 8px; }
+    .corner-tr { top: 0; right: 0; border-width: 3.5px 3.5px 0 0; border-top-right-radius: 8px; }
+    .corner-bl { bottom: 0; left: 0; border-width: 0 0 3.5px 3.5px; border-bottom-left-radius: 8px; }
+    .reticle-corner.corner-br {
+        bottom: 0;
+        right: 0;
+        border-bottom: 3.5px solid #22c55e;
+        border-right: 3.5px solid #22c55e;
+        border-bottom-right-radius: 8px;
+    }
 
-        #cameraPreview {
-            width: 100vw !important;
-            height: 100vh !important;
-            height: 100dvh !important;
-            object-fit: cover !important;
-            border-radius: 0 !important;
-        }
+    .reticle-laser {
+        width: 85%;
+        height: 2px;
+        background: linear-gradient(90deg, rgba(34, 197, 94, 0) 0%, rgba(34, 197, 94, 0.95) 50%, rgba(34, 197, 94, 0) 100%);
+        box-shadow: 0 0 8px rgba(34, 197, 94, 0.8);
+        animation: scanLaser 2s infinite ease-in-out;
+    }
+    @keyframes scanLaser {
+        0% { transform: translateY(-50px); opacity: 0.2; }
+        50% { transform: translateY(50px); opacity: 1; }
+        100% { transform: translateY(-50px); opacity: 0.2; }
+    }
 
-        .mobile-only-cam-ui {
-            display: block !important;
-        }
+    .btn-action-pack {
+        font-size: 15px;
+        letter-spacing: 0.3px;
+        transition: all 0.2s ease;
+    }
 
-        /* Floating glassmorphism buttons */
-        .btn-cam-glass {
-            width: 42px;
-            height: 42px;
-            border-radius: 50%;
-            background: rgba(0, 0, 0, 0.45);
-            backdrop-filter: blur(10px);
-            -webkit-backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.25);
-            color: #ffffff !important;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 15px;
-            text-decoration: none !important;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
-            transition: all 0.2s ease;
-        }
+    /* Floating sticky action bar for mobile */
+    .mobile-sticky-action-bar {
+        position: fixed;
+        bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+        left: 12px;
+        right: 12px;
+        z-index: 1030;
+        background: rgba(15, 23, 42, 0.95);
+        backdrop-filter: blur(14px);
+        -webkit-backdrop-filter: blur(14px);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        border-radius: 16px;
+        padding: 10px 14px;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+        animation: slideUp 0.25s ease-out;
+    }
 
-        .btn-cam-glass:active, .btn-cam-glass.active {
-            background: rgba(37, 99, 235, 0.85);
-            border-color: #60a5fa;
-            transform: scale(0.94);
-        }
+    @keyframes slideUp {
+        from { transform: translateY(20px); opacity: 0; }
+        to { transform: translateY(0); opacity: 1; }
+    }
 
-        /* Top Header Floating */
-        .mobile-cam-header {
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            z-index: 30;
-            padding: calc(12px + env(safe-area-inset-top, 0px)) 16px 12px 16px;
-            background: linear-gradient(180deg, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0.2) 75%, rgba(0,0,0,0) 100%);
-            pointer-events: auto;
-        }
-
-        .mobile-cam-pill {
-            display: inline-flex;
-            align-items: center;
-            padding: 6px 14px;
-            border-radius: 20px;
-            background: rgba(0, 0, 0, 0.6);
-            backdrop-filter: blur(8px);
-            -webkit-backdrop-filter: blur(8px);
-            border: 1px solid rgba(255, 255, 255, 0.25);
-            color: #ffffff;
-            font-size: 12px;
-            font-weight: 700;
-            letter-spacing: 0.3px;
-        }
-
-        .mobile-cam-pill.pill-rec {
-            background: rgba(220, 38, 38, 0.9);
-            border-color: #ef4444;
-            box-shadow: 0 0 16px rgba(239, 68, 68, 0.7);
-        }
-
-        /* Center Reticle / Viewfinder Targeting Box */
-        .mobile-cam-reticle-box {
-            position: absolute;
-            top: 45%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            width: 250px;
-            height: 180px;
-            pointer-events: none;
-            z-index: 25;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .reticle-corner {
-            position: absolute;
-            width: 26px;
-            height: 26px;
-            border-color: #10b981;
-            border-style: solid;
-        }
-
-        .corner-tl { top: 0; left: 0; border-width: 3.5px 0 0 3.5px; border-top-left-radius: 12px; }
-        .corner-tr { top: 0; right: 0; border-width: 3.5px 3.5px 0 0; border-top-right-radius: 12px; }
-        .corner-bl { bottom: 0; left: 0; border-width: 0 0 3.5px 3.5px; border-bottom-left-radius: 12px; }
-        .reticle-corner.corner-br {
-            bottom: 0;
-            right: 0;
-            border-bottom: 3px solid #22c55e;
-            border-right: 3px solid #22c55e;
-            border-bottom-right-radius: 6px;
-        }
-
-        .reticle-laser {
-            width: 85%;
-            height: 2px;
-            background: linear-gradient(90deg, rgba(34, 197, 94, 0) 0%, rgba(34, 197, 94, 0.9) 50%, rgba(34, 197, 94, 0) 100%);
-            box-shadow: 0 0 8px rgba(34, 197, 94, 0.8);
-            animation: scanLaser 2s infinite ease-in-out;
-        }
-        @keyframes scanLaser {
-            0% { transform: translateY(-65px); opacity: 0.2; }
-            50% { transform: translateY(65px); opacity: 1; }
-            100% { transform: translateY(-65px); opacity: 0.2; }
-        }
-
-        .mobile-cam-reticle-box.reticle-detected .reticle-corner {
-            border-color: #3b82f6 !important;
-            box-shadow: 0 0 16px rgba(59, 130, 246, 1);
-        }
-
-        /* Bottom Controls Floating */
-        .mobile-cam-bottom {
-            position: absolute;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            z-index: 30;
-            padding: 16px 16px calc(14px + env(safe-area-inset-bottom, 0px)) 16px;
-            background: linear-gradient(0deg, rgba(0,0,0,0.88) 0%, rgba(0,0,0,0.4) 65%, rgba(0,0,0,0) 100%);
-            pointer-events: auto;
-        }
-
-        .mobile-standby-pill {
-            background: rgba(15, 23, 42, 0.85);
-            backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
-            border: 1px solid rgba(255, 255, 255, 0.18);
-            border-radius: 25px;
-            padding: 9px 18px;
-            box-shadow: 0 4px 16px rgba(0,0,0,0.4);
-        }
-
-        .mobile-order-sheet {
-            background: rgba(15, 23, 42, 0.94);
-            backdrop-filter: blur(16px);
-            -webkit-backdrop-filter: blur(16px);
-            border: 1.5px solid rgba(255, 255, 255, 0.22);
-            border-radius: 20px;
-            padding: 14px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.6);
-            animation: slideUp 0.25s ease-out;
-        }
-
-        @keyframes slideUp {
-            from { transform: translateY(25px); opacity: 0; }
-            to { transform: translateY(0); opacity: 1; }
-        }
-
-        .mobile-record-btn {
-            height: 52px;
-            font-size: 15px;
-            letter-spacing: 0.5px;
-            transition: all 0.2s ease;
-        }
-
-        .mobile-record-btn:active {
-            transform: scale(0.97);
+    @media (max-width: 991.98px) {
+        .content {
+            padding-bottom: 110px !important;
         }
     }
 
-    @media (min-width: 768px) {
-        .mobile-only-cam-ui {
-            display: none !important;
+    @media (max-width: 767.98px) {
+        .video-preview-wrapper {
+            height: 280px;
+            max-height: 40vh;
+            border-radius: 12px;
+        }
+
+        .item-thumb-img {
+            width: 50px;
+            height: 50px;
+        }
+
+        .btn-action-pack {
+            font-size: 14px;
+            padding: 12px 6px !important;
         }
     }
 </style>
@@ -364,7 +283,7 @@
 @section('content')
 
 <!-- Compact Top Bar: Scanner & Live Info -->
-<div class="card shadow-sm border-0 mb-3 bg-white desktop-only-packing">
+<div class="card shadow-sm border-0 mb-3 bg-white">
     <div class="card-body p-2 p-md-3">
         <div class="row align-items-center">
             <!-- Scan Input -->
@@ -437,12 +356,12 @@
     <!-- LEFT: Camera Video Stream, Auto QR Scanner & Record Controls -->
     <div class="col-lg-5 col-12 mb-3">
         <div class="card shadow-sm border-0 mb-0">
-            <div class="card-header bg-dark text-white py-2 d-flex justify-content-between align-items-center desktop-cam-card-header">
+            <div class="card-header bg-dark text-white py-2 d-flex justify-content-between align-items-center">
                 <span class="font-weight-bold" style="font-size: 13px;">
-                    <i class="fas fa-camera mr-1 text-danger"></i> Kamera Auto-Scan & Video Rekam
+                    <i class="fas fa-camera mr-1 text-danger"></i> Kamera & Rekam Video Packing
                 </span>
                 <div class="d-flex align-items-center">
-                    <span class="badge badge-info mr-1" id="cameraModeBadge"><i class="fas fa-qrcode mr-1"></i> Auto-Scan Aktif</span>
+                    <span class="badge badge-info mr-1" id="cameraModeBadge"><i class="fas fa-barcode mr-1"></i> Scanner Aktif</span>
                     <span class="badge badge-success" id="cameraStatusBadge"><i class="fas fa-circle mr-1" style="font-size: 7px;"></i> Siap</span>
                 </div>
             </div>
@@ -464,21 +383,15 @@
                         <button class="btn btn-primary btn-xs" onclick="startCamera()">Aktifkan Kamera</button>
                     </div>
 
-                    <!-- 📱 MOBILE FULLSCREEN CAMERA OVERLAYS -->
-                    <div class="mobile-cam-header mobile-only-cam-ui">
+                    <!-- Quick Floating Camera Header -->
+                    <div class="mobile-cam-header">
                         <div class="d-flex align-items-center justify-content-between w-100">
-                            <a href="{{ route('dashboard') }}" class="btn-cam-glass" title="Kembali ke Dashboard">
-                                <i class="fas fa-arrow-left"></i>
-                            </a>
-                            
-                            <div class="text-center">
-                                <span class="mobile-cam-pill" id="mobileStatusPill">
-                                    <i class="fas fa-qrcode text-success mr-1"></i> Auto-Scan Resi
-                                </span>
-                                <span class="mobile-cam-pill pill-rec" id="mobileStatusPillRec" style="display: none;">
-                                    <i class="fas fa-circle text-danger mr-1 animate-pulse"></i> <span id="mobileRecTimerText">REC 00:00</span>
-                                </span>
-                            </div>
+                            <span class="mobile-cam-pill" id="mobileStatusPill">
+                                <i class="fas fa-qrcode text-success mr-1"></i> Auto-Scan Resi
+                            </span>
+                            <span class="mobile-cam-pill pill-rec" id="mobileStatusPillRec" style="display: none;">
+                                <i class="fas fa-circle text-danger mr-1 animate-pulse"></i> <span id="mobileRecTimerText">REC 00:00</span>
+                            </span>
 
                             <div class="d-flex align-items-center">
                                 <button type="button" class="btn-cam-glass mr-2 font-weight-bold" id="mobileZoomBtn" onclick="toggleCameraZoom()" title="Zoom Kamera">
@@ -487,99 +400,39 @@
                                 <button type="button" class="btn-cam-glass mr-2" id="mobileTorchBtn" onclick="toggleTorch()" title="Lampu Flash">
                                     <i class="fas fa-bolt" id="torchIcon"></i>
                                 </button>
-                                <button type="button" class="btn-cam-glass mr-2" onclick="toggleCameraDevice()" title="Ganti Kamera">
+                                <button type="button" class="btn-cam-glass" onclick="toggleCameraDevice()" title="Ganti Kamera Depan/Belakang">
                                     <i class="fas fa-camera-rotate"></i>
-                                </button>
-                                <button type="button" class="btn-cam-glass" onclick="openManualInputModal()" title="Ketik Resi Manual / Demo">
-                                    <i class="fas fa-keyboard"></i>
                                 </button>
                             </div>
                         </div>
                     </div>
 
                     <!-- Center Viewfinder Reticle -->
-                    <div class="mobile-cam-reticle-box mobile-only-cam-ui" id="mobileCamReticle">
+                    <div class="mobile-cam-reticle-box" id="mobileCamReticle">
                         <div class="reticle-corner corner-tl"></div>
                         <div class="reticle-corner corner-tr"></div>
                         <div class="reticle-corner corner-bl"></div>
                         <div class="reticle-corner corner-br"></div>
                         <div class="reticle-laser"></div>
                     </div>
-
-                    <!-- Bottom Floating Controls -->
-                    <div class="mobile-cam-bottom mobile-only-cam-ui">
-                        <!-- Standby Info (Shown when no order active) -->
-                        <div id="mobileStandbyInfo">
-                            <div class="mobile-standby-pill d-flex align-items-center justify-content-between">
-                                <span class="text-white text-xs font-weight-bold">
-                                    <i class="fas fa-check-circle text-success mr-1"></i> <span id="mobilePackedCounter">{{ $todayPackedCount }}</span> Di-Pack
-                                </span>
-                                <span class="text-white-50 text-xs" id="mobilePackerNameBadge">
-                                    <i class="fas fa-user mr-1"></i> Staff 1
-                                </span>
-                                <span class="text-white text-xs font-weight-bold">
-                                    <i class="fas fa-ban text-danger mr-1"></i> <span id="mobileBlockedCounter">{{ $todayBlockedCount }}</span> Batal
-                                </span>
-                            </div>
-                            <div class="text-center text-white-50 mt-2" style="font-size: 11px;">
-                                <i class="fas fa-circle-notch fa-spin mr-1 text-primary"></i> Kamera siap otomatis mendeteksi resi
-                            </div>
-                        </div>
-
-                        <!-- Active Order Card (Shown when order scanned & valid) -->
-                        <div id="mobileActiveOrderCard" style="display: none;">
-                            <div class="mobile-order-sheet">
-                                <div class="d-flex justify-content-between align-items-center mb-2">
-                                    <div>
-                                        <span class="badge badge-success px-2 py-1"><i class="fas fa-check mr-1"></i> Valid</span>
-                                        <strong class="text-white ml-1 font-weight-bold" id="mobileOrderCarrier">SPX</strong>
-                                        <span class="text-white-50 ml-1 text-xs" id="mobileOrderTracking">SPXID...</span>
-                                    </div>
-                                    <button type="button" class="btn btn-xs btn-outline-info font-weight-bold" onclick="showProductPhotoModal()">
-                                        <i class="fas fa-images mr-1"></i> Foto Barang
-                                    </button>
-                                </div>
-
-                                <div class="text-white-50 text-xs mb-3 d-flex justify-content-between">
-                                    <span id="mobileOrderBuyer">Pembeli: -</span>
-                                    <span class="text-warning font-weight-bold" id="mobileOrderItemsCount">0 Barang</span>
-                                </div>
-
-                                <!-- Big Shutter Record Button -->
-                                <button type="button" class="btn btn-danger btn-block btn-lg font-weight-bold shadow-lg py-3 rounded-pill mobile-record-btn" id="mobileBtnStartRecord" onclick="startPackingRecording()">
-                                    <i class="fas fa-circle mr-2"></i> MULAI REKAM PACKING
-                                </button>
-
-                                <button type="button" class="btn btn-success btn-block btn-lg font-weight-bold shadow-lg py-3 rounded-pill mobile-record-btn" id="mobileBtnStopRecord" onclick="stopPackingRecording()" style="display: none;">
-                                    <i class="fas fa-check-circle mr-2"></i> SELESAI & SIMPAN (<span id="mobileRecBtnTimer">00:00</span>)
-                                </button>
-
-                                <div class="text-center mt-2">
-                                    <button type="button" class="btn btn-link text-white-50 text-xs p-0" onclick="resetPackingState()">
-                                        <i class="fas fa-arrow-rotate-left mr-1"></i> Batal / Scan Paket Lain
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
                 </div>
             </div>
-            <div class="card-footer bg-white p-2 desktop-cam-card-footer">
+            <div class="card-footer bg-white p-2 p-md-3">
                 <div class="row no-gutters">
                     <div class="col-6 pr-1">
-                        <button type="button" class="btn btn-danger btn-block font-weight-bold py-2 shadow-sm" id="btnStartRecord" onclick="startPackingRecording()" disabled>
+                        <button type="button" class="btn btn-danger btn-block font-weight-bold py-2 py-md-3 shadow-sm btn-action-pack" id="btnStartRecord" onclick="startPackingRecording()" disabled>
                             <i class="fas fa-circle mr-1"></i> Mulai Rekam
                         </button>
                     </div>
                     <div class="col-6 pl-1">
-                        <button type="button" class="btn btn-success btn-block font-weight-bold py-2 shadow-sm" id="btnStopRecord" onclick="stopPackingRecording()" disabled>
+                        <button type="button" class="btn btn-success btn-block font-weight-bold py-2 py-md-3 shadow-sm btn-action-pack" id="btnStopRecord" onclick="stopPackingRecording()" disabled>
                             <i class="fas fa-check mr-1"></i> Selesai & Simpan
                         </button>
                     </div>
                 </div>
                 <div class="text-center mt-2">
                     <small class="text-muted" style="font-size: 11px;">
-                        <i class="fas fa-info-circle text-primary mr-1"></i> Arahkan barcode / QR resi kertas ke kamera HP/laptop untuk scan otomatis.
+                        <i class="fas fa-info-circle text-primary mr-1"></i> Arahkan barcode / QR resi kertas ke kamera untuk scan otomatis, atau ketik No. Resi di atas.
                     </small>
                 </div>
             </div>
@@ -587,7 +440,7 @@
     </div>
 
     <!-- RIGHT: Order Details & Product Checklist -->
-    <div class="col-lg-7 col-12 mb-3 desktop-only-packing">
+    <div class="col-lg-7 col-12 mb-3">
         
         <!-- INITIAL EMPTY STATE -->
         <div id="emptyOrderState" class="card shadow-sm border-0 d-flex align-items-center justify-content-center text-center p-4" style="min-height: 380px;">
@@ -667,6 +520,40 @@
     </div>
 </div>
 
+<!-- 📱 FLOATING STICKY ACTION BAR FOR MOBILE -->
+<div class="mobile-sticky-action-bar d-lg-none" id="mobileActiveOrderCard" style="display: none;">
+    <div class="d-flex align-items-center justify-content-between mb-2">
+        <div class="text-truncate mr-2">
+            <span class="badge badge-success px-2 py-1 mr-1" id="mobileOrderCarrier">SPX</span>
+            <strong class="text-white text-xs" id="mobileOrderTracking">SPXID...</strong>
+        </div>
+        <div class="d-flex align-items-center">
+            <span class="text-warning text-xs font-weight-bold mr-2" id="mobileOrderItemsCount">0 Barang</span>
+            <button type="button" class="btn btn-xs btn-outline-info font-weight-bold" onclick="showProductPhotoModal()">
+                <i class="fas fa-images mr-1"></i> Foto
+            </button>
+        </div>
+    </div>
+
+    <!-- Big Action Button on Mobile -->
+    <button type="button" class="btn btn-danger btn-block font-weight-bold py-3 rounded-pill shadow-lg mobile-record-btn" id="mobileBtnStartRecord" onclick="startPackingRecording()">
+        <i class="fas fa-circle mr-2"></i> MULAI REKAM PACKING
+    </button>
+
+    <button type="button" class="btn btn-success btn-block font-weight-bold py-3 rounded-pill shadow-lg mobile-record-btn mt-0" id="mobileBtnStopRecord" onclick="stopPackingRecording()" style="display: none;">
+        <i class="fas fa-check-circle mr-2"></i> SELESAI & SIMPAN (<span id="mobileRecBtnTimer">00:00</span>)
+    </button>
+
+    <div class="text-center mt-2">
+        <button type="button" class="btn btn-link text-white-50 text-xs p-0" onclick="resetPackingState()">
+            <i class="fas fa-arrow-rotate-left mr-1"></i> Batal / Scan Paket Lain
+        </button>
+    </div>
+</div>
+
+<!-- Standby info placeholder so JS doesn't break -->
+<div id="mobileStandbyInfo" style="display: none;"></div>
+
 <!-- 🚫 MODAL POPUP: PERINGATAN PESANAN DIBATALKAN DI SHOPEE -->
 <div class="modal fade" id="cancelledOrderModal" tabindex="-1" role="dialog" aria-labelledby="cancelledModalLabel" aria-hidden="true" data-backdrop="static" data-keyboard="false">
     <div class="modal-dialog modal-dialog-centered" role="document">
@@ -711,8 +598,11 @@
                     <i class="fas fa-exclamation-triangle mr-1"></i> Kembalikan barang ke rak Gudang Utama untuk mencegah kerugian toko.
                 </div>
             </div>
-            <div class="modal-footer bg-light py-2">
-                <button type="button" class="btn btn-secondary btn-block font-weight-bold py-2 shadow-sm" data-dismiss="modal" onclick="resetPackingState()">
+            <div class="modal-footer bg-light p-3">
+                <button type="button" class="btn btn-warning btn-block font-weight-bold py-2 shadow-sm text-dark mb-2" onclick="startReturnUnboxingMode()">
+                    <i class="fas fa-box-open mr-1"></i> Paket Retur Tiba: Buka & Rekam Video Unboxing Pengecekan
+                </button>
+                <button type="button" class="btn btn-secondary btn-block font-weight-bold py-2 shadow-sm m-0" data-dismiss="modal" onclick="resetPackingState()">
                     <i class="fas fa-arrow-left mr-1"></i> Mengerti, Scan Paket Berikutnya
                 </button>
             </div>
@@ -925,6 +815,8 @@
 
 <script>
     let currentOrderData = null;
+    let currentCancelledData = null;
+    let currentPackingMode = 'packing'; // 'packing' or 'return_unboxing'
     let mediaStream = null;
     let mediaRecorder = null;
     let recordedChunks = [];
@@ -1437,6 +1329,7 @@
     }
 
     function showCancelledOrder(data) {
+        currentCancelledData = data;
         $('#productPhotoPopupModal').modal('hide');
         document.getElementById('emptyOrderState').style.display = 'flex';
         document.getElementById('activeOrderSection').style.display = 'none';
@@ -1469,6 +1362,42 @@
 
         // Pop up the Cancelled Alert Modal
         $('#cancelledOrderModal').modal('show');
+    }
+
+    function startReturnUnboxingMode() {
+        if (!currentCancelledData) return;
+        currentPackingMode = 'return_unboxing';
+        $('#cancelledOrderModal').modal('hide');
+        showActiveOrder(currentCancelledData);
+
+        // Customize UI for Return Unboxing
+        const statusBadge = document.getElementById('orderStatusBadge');
+        if (statusBadge) {
+            statusBadge.className = 'badge badge-danger font-weight-bold px-2 py-1';
+            statusBadge.innerHTML = '<i class="fas fa-box-open mr-1"></i> MODE UNBOXING RETUR';
+        }
+
+        const btnStart = document.getElementById('btnStartRecord');
+        if (btnStart) {
+            btnStart.className = 'btn btn-warning btn-block font-weight-bold py-2 py-md-3 shadow-sm btn-action-pack text-dark';
+            btnStart.innerHTML = '<i class="fas fa-video mr-1"></i> Rekam Unboxing Retur';
+            btnStart.disabled = false;
+        }
+
+        const mBtnStart = document.getElementById('mobileBtnStartRecord');
+        if (mBtnStart) {
+            mBtnStart.className = 'btn btn-warning btn-block font-weight-bold py-3 rounded-pill shadow-lg mobile-record-btn text-dark';
+            mBtnStart.innerHTML = '<i class="fas fa-video mr-2"></i> REKAM UNBOXING RETUR';
+            mBtnStart.disabled = false;
+        }
+
+        Swal.fire({
+            icon: 'info',
+            title: 'Mode Unboxing Retur Aktif',
+            text: 'Silakan posisikan paket retur di depan kamera, lalu tekan tombol Rekam untuk mendokumentasikan pembongkaran paket.',
+            timer: 3500,
+            showConfirmButton: true
+        });
     }
 
     function showActiveOrder(data) {
@@ -1643,6 +1572,8 @@
 
     function resetPackingState() {
         currentOrderData = null;
+        currentCancelledData = null;
+        currentPackingMode = 'packing';
         $('#cancelledOrderModal').modal('hide');
         $('#alreadyPackedModal').modal('hide');
         $('#productPhotoPopupModal').modal('hide');
@@ -1653,8 +1584,15 @@
         if (repackBanner) repackBanner.style.display = 'none';
         document.getElementById('emptyOrderState').style.display = 'flex';
         document.getElementById('activeOrderSection').style.display = 'none';
-        document.getElementById('btnStartRecord').disabled = true;
+
+        const btnStart = document.getElementById('btnStartRecord');
+        if (btnStart) {
+            btnStart.className = 'btn btn-danger btn-block font-weight-bold py-2 py-md-3 shadow-sm btn-action-pack';
+            btnStart.innerHTML = '<i class="fas fa-circle mr-1"></i> Mulai Rekam';
+            btnStart.disabled = true;
+        }
         document.getElementById('btnStopRecord').disabled = true;
+
         const bInput = document.getElementById('barcodeInput');
         if (bInput) bInput.value = '';
 
@@ -1681,7 +1619,12 @@
         if (mPillStandby) mPillStandby.style.display = 'inline-flex';
         if (mPillRec) mPillRec.style.display = 'none';
         if (mReticle) mReticle.style.display = 'flex';
-        if (mBtnStart) { mBtnStart.style.display = 'block'; mBtnStart.disabled = false; }
+        if (mBtnStart) {
+            mBtnStart.className = 'btn btn-danger btn-block font-weight-bold py-3 rounded-pill shadow-lg mobile-record-btn';
+            mBtnStart.innerHTML = '<i class="fas fa-circle mr-2"></i> MULAI REKAM PACKING';
+            mBtnStart.style.display = 'block';
+            mBtnStart.disabled = false;
+        }
         if (mBtnStop) {
             mBtnStop.style.display = 'none';
             mBtnStop.disabled = false;
@@ -1921,6 +1864,7 @@
         formData.append('duration', recordDuration);
         formData.append('packer_name', document.getElementById('packerNameInput').value);
         formData.append('items_checked', JSON.stringify(currentOrderData.items));
+        formData.append('mode', currentPackingMode);
 
         try {
             const response = await fetch("{{ route('packing.upload') }}", {
@@ -1936,11 +1880,17 @@
 
             if (result.status === 'success') {
                 playSuccessSound();
+                const isReturn = currentPackingMode === 'return_unboxing';
+                const successTitle = isReturn ? 'Unboxing Retur Selesai!' : 'Packing Selesai!';
+                const successText = isReturn
+                    ? `Video pemeriksaan unboxing retur untuk <strong>[${currentOrderData.tracking_number || currentOrderData.order_sn}]</strong> berhasil disimpan sebagai bukti klaim/inspeksi.<br><small class="text-muted">Durasi: ${recordDuration} detik</small>`
+                    : `Video packing untuk <strong>[${currentOrderData.tracking_number || currentOrderData.order_sn}]</strong> berhasil disimpan.<br><small class="text-muted">Durasi: ${recordDuration} detik</small>`;
+
                 Swal.fire({
                     icon: 'success',
-                    title: 'Packing Selesai!',
-                    html: `Video packing untuk <strong>[${currentOrderData.tracking_number || currentOrderData.order_sn}]</strong> berhasil disimpan.<br><small class="text-muted">Durasi: ${recordDuration} detik</small>`,
-                    timer: 3000,
+                    title: successTitle,
+                    html: successText,
+                    timer: 3500,
                     showConfirmButton: true
                 });
 

@@ -45,8 +45,8 @@
                     <div class="form-group">
                         <label class="font-weight-bold">Environment / Lingkungan API</label>
                         <select name="environment" class="form-control">
-                            <option value="sandbox" {{ $setting->environment === 'sandbox' ? 'selected' : '' }}>🧪 Sandbox (Test & Development)</option>
-                            <option value="production" {{ $setting->environment === 'production' ? 'selected' : '' }}>🚀 Production (Live Toko Asli)</option>
+                            <option value="sandbox" {{ $setting->environment === 'sandbox' ? 'selected' : '' }}>Sandbox (Development / Uji Coba)</option>
+                            <option value="production" {{ $setting->environment === 'production' ? 'selected' : '' }}>Production (Toko Live Shopee)</option>
                         </select>
                     </div>
 
@@ -80,6 +80,39 @@
                 </h6>
             </div>
             <div class="card-body">
+                @if($setting->isConnected())
+                    <div class="alert alert-{{ $setting->isTokenExpired() ? 'warning' : 'success' }} d-flex justify-content-between align-items-center mb-3 py-2 px-3">
+                        <div>
+                            <strong><i class="fas fa-{{ $setting->isTokenExpired() ? 'exclamation-circle' : 'check-circle' }} mr-1"></i> {{ $setting->isTokenExpired() ? 'Token Kedaluwarsa' : 'Toko Terhubung' }}</strong>
+                            <div class="text-xs mt-1">
+                                @if($setting->token_expires_at)
+                                    Berlaku hingga: {{ $setting->token_expires_at->timezone('Asia/Jakarta')->format('d M Y H:i:s') }}
+                                @else
+                                    Token aktif
+                                @endif
+                            </div>
+                        </div>
+                        <div class="d-flex">
+                            <form action="{{ route('shopee.settings.refresh') }}" method="POST" class="mr-1">
+                                @csrf
+                                <button type="submit" class="btn btn-sm btn-outline-dark" title="Perbarui Token">
+                                    <i class="fas fa-sync-alt"></i> Refresh
+                                </button>
+                            </form>
+                            <form action="{{ route('shopee.settings.disconnect') }}" method="POST" onsubmit="return confirm('Yakin ingin memutuskan koneksi Shopee ini?')">
+                                @csrf
+                                <button type="submit" class="btn btn-sm btn-outline-danger" title="Putuskan Koneksi">
+                                    <i class="fas fa-unlink"></i> Putus
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                @else
+                    <div class="alert alert-warning py-2 px-3 mb-3 text-sm">
+                        <i class="fas fa-info-circle mr-1"></i> <strong>Toko Belum Terhubung:</strong> Kredensial telah disimpan. Silakan klik tombol <strong>"Buka Otorisasi Shopee"</strong> di bawah untuk menghubungkan akun toko sandbox/live Anda.
+                    </div>
+                @endif
+
                 <p class="text-muted text-sm mb-3">
                     Shopee Open API v2 menggunakan OAuth untuk menghubungkan akun toko ke sistem warehouse ini.
                 </p>

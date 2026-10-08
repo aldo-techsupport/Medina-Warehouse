@@ -4,9 +4,11 @@
 @section('page_title', 'Katalog Produk & Stok Gudang')
 
 @section('page_actions')
-    <button type="button" class="btn btn-primary btn-sm font-weight-bold" data-toggle="modal" data-target="#addProductModal">
-        <i class="fas fa-plus mr-1"></i> Tambah Produk
-    </button>
+    <div class="d-inline-flex align-items-center">
+        <button type="button" class="btn btn-primary btn-sm font-weight-bold shadow-sm" data-toggle="modal" data-target="#addProductModal">
+            <i class="fas fa-plus mr-1"></i> Tambah Produk
+        </button>
+    </div>
 @endsection
 
 @section('content')

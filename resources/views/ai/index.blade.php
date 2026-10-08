@@ -1,15 +1,15 @@
 @extends('layouts.adminlte')
 
-@section('title', 'AI Seller & Analisis Penjualan')
+@section('title', 'Analisis Penjualan dan Rekomendasi Toko')
 
 @section('page_title')
     <div class="d-flex align-items-center">
         <div class="rounded-circle bg-purple text-white d-flex align-items-center justify-content-center mr-2 shadow-sm" style="width: 38px; height: 38px; font-size: 18px;">
-            <i class="fas fa-robot"></i>
+            <i class="fas fa-chart-line"></i>
         </div>
         <div>
-            <span class="d-block font-weight-bold" style="font-size: 1.25rem;">AI Seller & Analisis Penjualan</span>
-            <span class="text-muted font-weight-normal" style="font-size: 12px;">Pakar strategi e-commerce, rekomendasi pemasaran, inventaris, & asisten chat interaktif</span>
+            <span class="d-block font-weight-bold" style="font-size: 1.25rem;">Analisis Penjualan dan Toko</span>
+            <span class="text-muted font-weight-normal" style="font-size: 12px;">Evaluasi performa penjualan, pergerakan stok, dan rekomendasi operasional toko</span>
         </div>
     </div>
 @endsection
@@ -19,8 +19,8 @@
         <button type="button" class="btn btn-sm btn-outline-secondary" data-toggle="modal" data-target="#aiConfigModal">
             <i class="fas fa-sliders-h text-purple mr-1"></i> <span class="d-none d-sm-inline">Status Router AI</span>
         </button>
-        <button type="button" id="btnRefreshAnalysis" class="btn btn-sm btn-purple shadow-sm">
-            <i class="fas fa-sync-alt mr-1" id="refreshSpinner"></i> <span>Analisis Ulang AI</span>
+        <button type="button" id="btnRefreshAnalysis" class="btn btn-sm btn-purple shadow-sm font-weight-bold">
+            <i class="fas fa-sync-alt mr-1" id="refreshSpinner"></i> <span>Perbarui Analisis</span>
         </button>
     </div>
 @endsection

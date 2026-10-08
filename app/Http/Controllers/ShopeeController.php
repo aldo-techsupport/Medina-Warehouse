@@ -113,16 +113,30 @@ class ShopeeController extends Controller
         ]);
 
         $setting = ShopeeSetting::current();
-        $setting->update([
+
+        $partnerIdChanged = (int) $setting->partner_id !== (int) ($validated['partner_id'] ?? null);
+        $partnerKeyChanged = $setting->partner_key !== ($validated['partner_key'] ?? null);
+        $envChanged = $setting->environment !== $validated['environment'];
+
+        $updateData = [
             'partner_id' => $validated['partner_id'] ?? null,
             'partner_key' => $validated['partner_key'] ?? null,
             'shop_id' => $validated['shop_id'] ?? null,
             'shop_name' => $validated['shop_name'] ?: 'Medina Official Store',
             'environment' => $validated['environment'],
             'auto_sync_stock' => $request->boolean('auto_sync_stock'),
-        ]);
+        ];
 
-        return redirect()->route('shopee.settings')->with('success', 'Konfigurasi Shopee Open API berhasil disimpan!');
+        if ($partnerIdChanged || $partnerKeyChanged || $envChanged) {
+            $updateData['access_token'] = null;
+            $updateData['refresh_token'] = null;
+            $updateData['expire_in'] = null;
+            $updateData['token_expires_at'] = null;
+        }
+
+        $setting->update($updateData);
+
+        return redirect()->route('shopee.settings')->with('success', 'Konfigurasi Shopee Open API berhasil disimpan! Silakan klik tombol "Buka Otorisasi Shopee" untuk menghubungkan toko.');
     }
 
     /**
@@ -144,6 +158,36 @@ class ShopeeController extends Controller
         }
 
         return redirect()->route('shopee.settings')->with('error', 'Gagal menukar token: '.($result['error'] ?? 'Unknown error'));
+    }
+
+    /**
+     * Manually Refresh Access Token.
+     */
+    public function refreshToken()
+    {
+        $result = $this->shopeeService->refreshAccessToken();
+
+        if ($result['success']) {
+            return redirect()->back()->with('success', 'Access token Shopee berhasil diperbarui!');
+        }
+
+        return redirect()->back()->with('error', 'Gagal memperbarui token: '.($result['error'] ?? 'Unknown error'));
+    }
+
+    /**
+     * Disconnect Shopee Account.
+     */
+    public function disconnect()
+    {
+        $setting = ShopeeSetting::current();
+        $setting->update([
+            'access_token' => null,
+            'refresh_token' => null,
+            'expire_in' => null,
+            'token_expires_at' => null,
+        ]);
+
+        return redirect()->back()->with('success', 'Koneksi akun Shopee berhasil diputuskan.');
     }
 
     /**
@@ -245,26 +289,66 @@ class ShopeeController extends Controller
         }
 
         $data = $request->json()->all();
-        $code = $data['code'] ?? null; // e.g. 3 = order status update
+        $code = $data['code'] ?? null; // e.g. 3 = order update, 4 = order created, 10/11 = item update
         $dataContent = $data['data'] ?? [];
-        $orderSn = $dataContent['order_sn'] ?? 'N/A';
+        $orderSn = $dataContent['order_sn'] ?? ($dataContent['ordersn'] ?? null);
         Log::info("Shopee Webhook Received: code {$code}, order {$orderSn}");
 
-        if (isset($dataContent['order_sn'])) {
-            $orderSn = $dataContent['order_sn'];
+        if ($orderSn) {
             $status = $dataContent['status'] ?? 'READY_TO_SHIP';
-
-            // Items can be passed in webhook or fetched
             $items = $dataContent['items'] ?? [];
+            $buyerUsername = $dataContent['buyer_username'] ?? 'Shopee Customer';
+            $totalAmount = $dataContent['total_amount'] ?? 0;
+            $trackingNumber = null;
+            $shippingCarrier = null;
 
-            $this->mutationService->processShopeeOrder([
+            // Jika Shopee webhook hanya mengirimkan order_sn tanpa rincian item, ambil langsung dari Shopee API
+            if (empty($items)) {
+                $detailResult = $this->shopeeService->getOrderDetail([$orderSn]);
+                if ($detailResult['success'] && ! empty($detailResult['data']['order_list'])) {
+                    $orderDetail = $detailResult['data']['order_list'][0];
+                    $status = $orderDetail['order_status'] ?? $status;
+                    $buyerUsername = $orderDetail['buyer_username'] ?? $buyerUsername;
+                    $totalAmount = $orderDetail['total_amount'] ?? $totalAmount;
+                    $shippingCarrier = $orderDetail['shipping_carrier'] ?? null;
+                    $trackingNumber = $orderDetail['tracking_number'] ?? ($orderDetail['package_list'][0]['tracking_number'] ?? null);
+
+                    $rawItemList = $orderDetail['item_list'] ?? [];
+                    foreach ($rawItemList as $rawItem) {
+                        $items[] = [
+                            'item_id' => $rawItem['item_id'] ?? null,
+                            'item_sku' => $rawItem['item_sku'] ?? null,
+                            'item_name' => $rawItem['item_name'] ?? 'Shopee Item',
+                            'model_id' => $rawItem['model_id'] ?? null,
+                            'model_quantity_purchased' => $rawItem['model_quantity_purchased'] ?? 1,
+                            'model_discounted_price' => $rawItem['model_discounted_price'] ?? 0,
+                        ];
+                    }
+                }
+            }
+
+            $order = $this->mutationService->processShopeeOrder([
                 'order_sn' => $orderSn,
                 'order_status' => $status,
-                'total_amount' => $dataContent['total_amount'] ?? 0,
-                'buyer_username' => $dataContent['buyer_username'] ?? 'Shopee Customer',
+                'total_amount' => $totalAmount,
+                'buyer_username' => $buyerUsername,
                 'items' => $items,
             ]);
+
+            if ($trackingNumber && empty($order->tracking_number)) {
+                $order->update([
+                    'tracking_number' => $trackingNumber,
+                    'shipping_carrier' => $shippingCarrier ?? $order->shipping_carrier,
+                ]);
+            }
         }
+
+        // Jika ada perubahan item/stok di Shopee, trigger sync produk otomatis
+        if (in_array((int) $code, [10, 11])) {
+            $this->shopeeService->pullAndSyncProducts($this->mutationService);
+        }
+
+        ShopeeSetting::current()->update(['last_synced_at' => now()]);
 
         return response()->json(['code' => 0, 'message' => 'success']);
     }
@@ -306,7 +390,12 @@ class ShopeeController extends Controller
         try {
             $order = $this->mutationService->processShopeeOrder($orderData);
 
-            return redirect()->back()->with('success', "Simulasi Berhasil! Pesanan Shopee #{$orderSn} diterima. Stok [{$product->sku}] {$product->name} otomatis berkurang {$qty} {$product->unit} di Gudang Utama.");
+            if ($product->isConnectedToShopee()) {
+                $product->refresh();
+                $this->shopeeService->updateStock((int) $product->shopee_item_id, $product->stock);
+            }
+
+            return redirect()->back()->with('success', "Simulasi Berhasil! Pesanan Shopee #{$orderSn} diterima. Stok [{$product->sku}] {$product->name} berkurang {$qty} {$product->unit} di Gudang Utama dan stok live Shopee disinkronkan menjadi {$product->stock} unit.");
         } catch (Exception $e) {
             return redirect()->back()->with('error', 'Gagal memproses simulasi: '.$e->getMessage());
         }
@@ -362,5 +451,24 @@ class ShopeeController extends Controller
             'has_next_page' => $result['data']['has_next_page'] ?? false,
             'total_count' => $result['data']['total_count'] ?? count($items),
         ]);
+    }
+
+    /**
+     * Pull all products and stock directly from Shopee Open API v2.
+     */
+    public function pullProducts(Request $request)
+    {
+        $result = $this->shopeeService->pullAndSyncProducts($this->mutationService);
+
+        if ($result['success']) {
+            $count = $result['synced_count'] ?? 0;
+            $msg = $count > 0
+                ? "Berhasil menarik & mensinkronkan {$count} produk beserta stok dari Shopee!"
+                : 'Pengecekan selesai: Belum ada produk aktif yang ditemukan di toko Shopee Anda.';
+
+            return redirect()->back()->with('success', $msg);
+        }
+
+        return redirect()->back()->with('error', 'Gagal menarik produk dari Shopee: '.($result['error'] ?? 'Terjadi kesalahan sistem'));
     }
 }

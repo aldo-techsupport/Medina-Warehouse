@@ -247,3 +247,147 @@ test('it gets tracking info and tracking number from Shopee Logistics API', func
     expect($trackingNum['success'])->toBeTrue();
     expect($trackingNum['data']['tracking_number'])->toBe('SPXID1234567890');
 });
+
+test('shopee:sync command synchronizes products and orders and updates last_synced_at', function () {
+    $setting = ShopeeSetting::current();
+    $setting->update([
+        'partner_id' => 123456,
+        'partner_key' => 'secret_partner_key',
+        'shop_id' => 789012,
+        'access_token' => 'valid_token',
+        'token_expires_at' => now()->addHours(3),
+        'last_synced_at' => null,
+    ]);
+
+    Http::fake([
+        '*/api/v2/product/get_item_list*' => Http::response([
+            'response' => [
+                'item' => [
+                    ['item_id' => 777666, 'item_status' => 'NORMAL', 'update_time' => time()],
+                ],
+                'has_next_page' => false,
+                'total_count' => 1,
+            ],
+            'error' => '',
+        ], 200),
+        '*/api/v2/product/get_item_base_info*' => Http::response([
+            'response' => [
+                'item_list' => [
+                    [
+                        'item_id' => 777666,
+                        'item_name' => 'Auto Synced Product',
+                        'item_sku' => 'AUTO-777666',
+                        'price_info' => [
+                            ['currency' => 'IDR', 'original_price' => 50000, 'current_price' => 50000],
+                        ],
+                        'stock_info_v2' => [
+                            'summary_info' => [
+                                'total_available_stock' => 12,
+                            ],
+                        ],
+                    ],
+                ],
+            ],
+            'error' => '',
+        ], 200),
+        '*/api/v2/order/get_order_list*' => Http::response([
+            'response' => [
+                'order_list' => [],
+                'more' => false,
+            ],
+            'error' => '',
+        ], 200),
+    ]);
+
+    $this->artisan('shopee:sync')
+        ->assertExitCode(0);
+
+    $setting->refresh();
+    expect($setting->last_synced_at)->not->toBeNull();
+
+    $product = Product::where('shopee_item_id', 777666)->first();
+    expect($product)->not->toBeNull();
+    expect($product->stock)->toBe(12);
+});
+
+test('it handles Shopee webhook and fetches order detail when items are not in payload', function () {
+    $product = Product::create([
+        'sku' => 'WEBHOOK-SKU-99',
+        'name' => 'Webhook Product Test',
+        'unit' => 'Pcs',
+        'stock' => 20,
+        'purchase_price' => 50000,
+        'selling_price' => 90000,
+        'shopee_item_id' => 991122,
+    ]);
+
+    $setting = ShopeeSetting::current();
+    $setting->update([
+        'partner_id' => 123456,
+        'partner_key' => 'secret_partner_key',
+        'shop_id' => 789012,
+        'access_token' => 'valid_token',
+        'token_expires_at' => now()->addHours(3),
+    ]);
+
+    Http::fake([
+        '*/api/v2/order/get_order_detail*' => Http::response([
+            'response' => [
+                'order_list' => [
+                    [
+                        'order_sn' => 'WEBHOOK_ORD_7711',
+                        'order_status' => 'READY_TO_SHIP',
+                        'buyer_username' => 'webhook_buyer',
+                        'total_amount' => 180000,
+                        'shipping_carrier' => 'J&T Express',
+                        'item_list' => [
+                            [
+                                'item_id' => 991122,
+                                'item_sku' => 'WEBHOOK-SKU-99',
+                                'item_name' => 'Webhook Product Test',
+                                'model_quantity_purchased' => 2,
+                                'model_discounted_price' => 90000,
+                            ],
+                        ],
+                    ],
+                ],
+            ],
+            'error' => '',
+        ], 200),
+    ]);
+
+    $payload = [
+        'code' => 3,
+        'data' => [
+            'order_sn' => 'WEBHOOK_ORD_7711',
+            'status' => 'READY_TO_SHIP',
+        ],
+    ];
+
+    $rawContent = json_encode($payload);
+    $url = url('/shopee/webhook');
+    $signature = hash_hmac('sha256', $url.'|'.$rawContent, 'secret_partner_key');
+
+    $response = $this->call(
+        'POST',
+        '/shopee/webhook',
+        [],
+        [],
+        [],
+        [
+            'CONTENT_TYPE' => 'application/json',
+            'HTTP_AUTHORIZATION' => $signature,
+        ],
+        $rawContent
+    );
+
+    $response->assertStatus(200);
+    $response->assertJson(['code' => 0, 'message' => 'success']);
+
+    $product->refresh();
+    expect($product->stock)->toBe(18); // 20 - 2
+
+    $mutation = StockMutation::where('reference_no', 'SHP-WEBHOOK_ORD_7711')->first();
+    expect($mutation)->not->toBeNull();
+    expect($mutation->qty)->toBe(-2);
+});

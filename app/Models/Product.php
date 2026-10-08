@@ -14,6 +14,7 @@ class Product extends Model
         'sku',
         'barcode',
         'name',
+        'image',
         'category',
         'unit',
         'purchase_price',
@@ -57,6 +58,10 @@ class Product extends Model
     public function getImageUrlAttribute(): string
     {
         if (! empty($this->attributes['image'])) {
+            if (str_starts_with($this->attributes['image'], 'http://') || str_starts_with($this->attributes['image'], 'https://')) {
+                return $this->attributes['image'];
+            }
+
             return asset('storage/'.$this->attributes['image']);
         }
 
