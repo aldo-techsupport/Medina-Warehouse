@@ -41,6 +41,7 @@ Route::middleware('auth')->group(function () {
             Route::get('/products', [WarehouseController::class, 'products'])->name('products');
             Route::post('/products', [WarehouseController::class, 'storeProduct'])->name('products.store');
             Route::put('/products/{product}', [WarehouseController::class, 'updateProduct'])->name('products.update');
+            Route::patch('/products/{product}/toggle-status', [WarehouseController::class, 'toggleProductStatus'])->name('products.toggle-status');
             Route::delete('/products/{product}', [WarehouseController::class, 'destroyProduct'])->name('products.destroy');
         });
 

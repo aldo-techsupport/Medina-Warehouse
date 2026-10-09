@@ -37,7 +37,19 @@ class WarehouseController extends Controller
             }
         }
 
+        $statusTab = $request->input('status', 'all');
+
+        $countAll = Product::count();
+        $countActive = Product::where('status', 'active')->count();
+        $countInactive = Product::where('status', 'inactive')->count();
+
         $query = Product::query();
+
+        if ($statusTab === 'active') {
+            $query->where('status', 'active');
+        } elseif ($statusTab === 'inactive') {
+            $query->where('status', 'inactive');
+        }
 
         if ($request->filled('search')) {
             $search = $request->input('search');
@@ -63,7 +75,14 @@ class WarehouseController extends Controller
         $products = $query->orderBy('name')->paginate(15)->withQueryString();
         $categories = Product::select('category')->distinct()->pluck('category');
 
-        return view('warehouse.products.index', compact('products', 'categories'));
+        return view('warehouse.products.index', compact(
+            'products',
+            'categories',
+            'statusTab',
+            'countAll',
+            'countActive',
+            'countInactive'
+        ));
     }
 
     /**
@@ -107,8 +126,9 @@ class WarehouseController extends Controller
         if ($product->isConnectedToShopee()) {
             try {
                 $this->shopeeService->updateStock((int) $product->shopee_item_id, $product->stock);
+                $this->shopeeService->updatePrice((int) $product->shopee_item_id, (float) $product->selling_price);
             } catch (Exception $e) {
-                Log::warning('Live push stock on product create failed: '.$e->getMessage());
+                Log::warning('Live push to Shopee on product create failed: '.$e->getMessage());
             }
         }
 
@@ -138,36 +158,75 @@ class WarehouseController extends Controller
         unset($validated['stock']);
 
         $oldStock = $product->stock;
+        $oldPrice = (float) $product->selling_price;
+        $oldName = $product->name;
+        $oldStatus = $product->status;
+
         $product->update($validated);
 
-        $shopeeMsg = '';
+        $shopeeSyncNotes = [];
 
-        // Jika user mengubah stok fisik di form edit produk
-        if ($newStock !== null && $newStock !== $oldStock) {
-            $this->mutationService->recordAdjustment(
-                $product,
-                $newStock,
-                'Penyesuaian stok dari Edit Produk',
-                auth()->user()?->name ?? 'Admin'
-            );
-            $product->refresh();
-            if ($product->isConnectedToShopee()) {
-                $shopeeMsg = " (Stok live di Shopee terupdate: {$product->stock} unit)";
-            }
-        } elseif ($product->isConnectedToShopee()) {
-            $res = $this->shopeeService->updateStock(
-                (int) $product->shopee_item_id,
-                $product->stock,
-                $product->shopee_model_id ? (int) $product->shopee_model_id : null
-            );
-
-            if ($res['success']) {
-                $product->update(['shopee_stock' => $product->stock]);
-                $shopeeMsg = " (Stok live di Shopee terupdate: {$product->stock} unit)";
+        if ($product->isConnectedToShopee()) {
+            // 1. Live Sync Stok jika diedit
+            if ($newStock !== null && $newStock !== $oldStock) {
+                $this->mutationService->recordAdjustment(
+                    $product,
+                    $newStock,
+                    'Penyesuaian stok dari Edit Produk',
+                    auth()->user()?->name ?? 'Admin'
+                );
+                $product->refresh();
+                $shopeeSyncNotes[] = "Stok: {$product->stock} unit";
             } else {
-                $shopeeMsg = ' (Peringatan Shopee: '.($res['error'] ?? 'Gagal update').')';
+                $resStock = $this->shopeeService->updateStock(
+                    (int) $product->shopee_item_id,
+                    $product->stock,
+                    $product->shopee_model_id ? (int) $product->shopee_model_id : null
+                );
+                if ($resStock['success']) {
+                    $product->update(['shopee_stock' => $product->stock]);
+                    $shopeeSyncNotes[] = "Stok: {$product->stock} unit";
+                }
+            }
+
+            // 2. Live Sync Harga ke Shopee API
+            $newPrice = (float) $validated['selling_price'];
+            if ($newPrice !== $oldPrice || true) {
+                $resPrice = $this->shopeeService->updatePrice(
+                    (int) $product->shopee_item_id,
+                    $newPrice,
+                    $product->shopee_model_id ? (int) $product->shopee_model_id : null
+                );
+                if ($resPrice['success']) {
+                    $shopeeSyncNotes[] = 'Harga Shopee: Rp '.number_format($newPrice, 0, ',', '.');
+                } else {
+                    Log::warning("Shopee live update price warning for {$product->sku}: ".($resPrice['error'] ?? ''));
+                }
+            }
+
+            // 3. Live Sync Nama Produk ke Shopee API jika diedit
+            if ($validated['name'] !== $oldName) {
+                $resName = $this->shopeeService->updateItem((int) $product->shopee_item_id, [
+                    'item_name' => $validated['name'],
+                ]);
+                if ($resName['success']) {
+                    $shopeeSyncNotes[] = 'Nama di Shopee diperbarui';
+                }
+            }
+
+            // 4. Live Sync Status Tampil (Active / Inactive -> Unlist di Shopee)
+            if ($validated['status'] !== $oldStatus) {
+                $isInactive = $validated['status'] === 'inactive';
+                $resUnlist = $this->shopeeService->unlistProduct((int) $product->shopee_item_id, $isInactive);
+                if ($resUnlist['success']) {
+                    $shopeeSyncNotes[] = $isInactive ? 'Status: Diarsipkan di Shopee' : 'Status: Aktif di Shopee';
+                }
             }
         }
+
+        $shopeeMsg = ! empty($shopeeSyncNotes)
+            ? ' (Live Shopee: '.implode(', ', $shopeeSyncNotes).')'
+            : '';
 
         return redirect()->back()->with('success', "Produk {$product->name} berhasil diperbarui{$shopeeMsg}!");
     }
@@ -178,9 +237,41 @@ class WarehouseController extends Controller
     public function destroyProduct(Product $product)
     {
         $name = $product->name;
+
+        // Jika terhubung ke Shopee, hapus produk di Shopee
+        if ($product->isConnectedToShopee()) {
+            try {
+                $this->shopeeService->deleteProduct((int) $product->shopee_item_id);
+            } catch (Exception $e) {
+                Log::warning("Shopee live delete product warning for {$product->sku}: ".$e->getMessage());
+            }
+        }
+
         $product->delete();
 
-        return redirect()->back()->with('success', "Produk {$name} berhasil dihapus!");
+        return redirect()->back()->with('success', "Produk {$name} berhasil dihapus dari gudang & Shopee!");
+    }
+
+    /**
+     * Toggle product status (active <-> inactive) and sync to Shopee.
+     */
+    public function toggleProductStatus(Product $product)
+    {
+        $newStatus = $product->status === 'active' ? 'inactive' : 'active';
+        $product->update(['status' => $newStatus]);
+
+        $shopeeMsg = '';
+        if ($product->isConnectedToShopee()) {
+            $isInactive = $newStatus === 'inactive';
+            $res = $this->shopeeService->unlistProduct((int) $product->shopee_item_id, $isInactive);
+            if ($res['success']) {
+                $shopeeMsg = $isInactive ? ' (Diarsipkan di Shopee)' : ' (Diaktifkan kembali di Shopee)';
+            }
+        }
+
+        $label = $newStatus === 'active' ? 'diaktifkan kembali' : 'dinonaktifkan';
+
+        return redirect()->back()->with('success', "Produk [{$product->sku}] {$product->name} berhasil {$label}{$shopeeMsg}!");
     }
 
     /**

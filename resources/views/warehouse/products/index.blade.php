@@ -20,6 +20,7 @@
 <div class="card shadow-sm border-0 mb-3">
     <div class="card-body p-2 p-md-3">
         <form action="{{ route('warehouse.products') }}" method="GET">
+            <input type="hidden" name="status" value="{{ $statusTab }}">
             <div class="row no-gutters">
                 <div class="col-12 col-md-5 pr-md-2 mb-2 mb-md-0">
                     <div class="input-group input-group-sm">
@@ -52,6 +53,40 @@
     </div>
 </div>
 
+<!-- Sub-Tabs: Semua Produk / Aktif / Tidak Aktif (Nonaktif) -->
+<div class="card shadow-sm border-0 mb-3">
+    <div class="card-body p-2 d-flex flex-wrap align-items-center justify-content-between">
+        <ul class="nav nav-pills custom-status-tabs mb-0">
+            <li class="nav-item mr-2 mb-1 mb-md-0">
+                <a class="nav-link font-weight-bold px-3 py-2 {{ $statusTab === 'all' ? 'active shadow-sm' : 'text-dark bg-light' }}" 
+                   href="{{ route('warehouse.products', array_merge(request()->except(['page', 'status']), ['status' => 'all'])) }}">
+                    <i class="fas fa-boxes mr-1 {{ $statusTab === 'all' ? '' : 'text-primary' }}"></i> Semua Produk 
+                    <span class="badge {{ $statusTab === 'all' ? 'badge-light text-primary' : 'badge-secondary' }} ml-1 font-weight-bold">{{ $countAll }}</span>
+                </a>
+            </li>
+            <li class="nav-item mr-2 mb-1 mb-md-0">
+                <a class="nav-link font-weight-bold px-3 py-2 {{ $statusTab === 'active' ? 'active shadow-sm bg-success text-white' : 'text-dark bg-light' }}" 
+                   href="{{ route('warehouse.products', array_merge(request()->except(['page', 'status']), ['status' => 'active'])) }}">
+                    <i class="fas fa-check-circle mr-1 {{ $statusTab === 'active' ? 'text-white' : 'text-success' }}"></i> Produk Aktif 
+                    <span class="badge {{ $statusTab === 'active' ? 'badge-light text-success' : 'badge-success' }} ml-1 font-weight-bold">{{ $countActive }}</span>
+                </a>
+            </li>
+            <li class="nav-item mb-1 mb-md-0">
+                <a class="nav-link font-weight-bold px-3 py-2 {{ $statusTab === 'inactive' ? 'active shadow-sm bg-secondary text-white' : 'text-dark bg-light' }}" 
+                   href="{{ route('warehouse.products', array_merge(request()->except(['page', 'status']), ['status' => 'inactive'])) }}">
+                    <i class="fas fa-eye-slash mr-1 {{ $statusTab === 'inactive' ? 'text-white' : 'text-danger' }}"></i> Tidak Aktif (Nonaktif) 
+                    <span class="badge {{ $statusTab === 'inactive' ? 'badge-light text-dark' : 'badge-danger' }} ml-1 font-weight-bold">{{ $countInactive }}</span>
+                </a>
+            </li>
+        </ul>
+        <div class="text-muted text-xs font-weight-semibold mt-2 mt-md-0">
+            @if($statusTab === 'inactive')
+                <span class="badge badge-warning px-2 py-1"><i class="fas fa-info-circle mr-1"></i> Produk tidak aktif otomatis disembunyikan & diarsipkan di Shopee</span>
+            @endif
+        </div>
+    </div>
+</div>
+
 <!-- Products Table Card -->
 <div class="card shadow-sm border-0 mb-3">
     <div class="card-header py-2 d-flex justify-content-between align-items-center">
@@ -63,8 +98,16 @@
         @if($products->isEmpty())
             <div class="text-center py-5 text-muted">
                 <i class="fas fa-box-open fa-3x mb-2 text-secondary"></i>
-                <h6>Belum ada produk yang ditemukan</h6>
-                <p class="mb-3 text-sm">Silakan tambahkan produk baru atau ubah kata kunci pencarian.</p>
+                @if($statusTab === 'inactive')
+                    <h6>Tidak ada produk yang Tidak Aktif</h6>
+                    <p class="mb-3 text-sm">Semua produk saat ini berstatus aktif.</p>
+                @elseif($statusTab === 'active')
+                    <h6>Tidak ada produk aktif</h6>
+                    <p class="mb-3 text-sm">Silakan tambahkan produk baru atau aktifkan produk dari tab Tidak Aktif.</p>
+                @else
+                    <h6>Belum ada produk yang ditemukan</h6>
+                    <p class="mb-3 text-sm">Silakan tambahkan produk baru atau ubah kata kunci pencarian.</p>
+                @endif
                 <button type="button" class="btn btn-primary btn-sm" data-toggle="modal" data-target="#addProductModal">
                     <i class="fas fa-plus mr-1"></i> Tambah Produk
                 </button>
@@ -75,23 +118,37 @@
                     <tr>
                         <th>SKU & Info</th>
                         <th>Nama Produk</th>
+                        <th class="text-center">Status</th>
                         <th class="text-right d-none d-sm-table-cell">Harga Jual</th>
                         <th class="text-center">Stok Gudang</th>
                         <th class="text-center">Shopee</th>
-                        <th class="text-center" style="width: 110px;">Aksi</th>
+                        <th class="text-center" style="width: 130px;">Aksi</th>
                     </tr>
                 </thead>
                 <tbody>
                     @foreach($products as $product)
-                        <tr>
+                        <tr class="{{ $product->status === 'inactive' ? 'table-secondary opacity-75' : '' }}">
                             <td>
                                 <span class="font-weight-bold text-dark">{{ $product->sku }}</span>
                                 <br><span class="badge badge-light border">{{ $product->category }}</span>
                             </td>
                             <td>
-                                <div class="font-weight-bold text-dark">{{ $product->name }}</div>
+                                <div class="font-weight-bold text-dark {{ $product->status === 'inactive' ? 'text-muted' : '' }}">
+                                    {{ $product->name }}
+                                </div>
                                 <small class="text-muted d-sm-none">Rp {{ number_format($product->selling_price, 0, ',', '.') }} &bull; </small>
                                 <small class="text-muted">Min: {{ $product->safety_stock }} {{ $product->unit }}</small>
+                            </td>
+                            <td class="text-center">
+                                @if($product->status === 'inactive')
+                                    <span class="badge badge-secondary px-2 py-1 font-weight-bold shadow-sm" title="Produk Nonaktif & Diarsipkan di Shopee">
+                                        <i class="fas fa-eye-slash mr-1 text-warning"></i> Tidak Aktif
+                                    </span>
+                                @else
+                                    <span class="badge badge-success px-2 py-1 font-weight-bold shadow-sm" title="Produk Aktif & Tampil">
+                                        <i class="fas fa-check-circle mr-1"></i> Aktif
+                                    </span>
+                                @endif
                             </td>
                             <td class="text-right d-none d-sm-table-cell">
                                 <span class="font-weight-semibold">Rp {{ number_format($product->selling_price, 0, ',', '.') }}</span>
@@ -111,6 +168,9 @@
                                     <span class="badge badge-shopee px-2 py-1" style="font-size: 11px;">
                                         ID: {{ $product->shopee_item_id }}
                                     </span>
+                                    @if($product->status === 'inactive')
+                                        <br><small class="badge badge-light border text-danger" style="font-size: 10px;">Diarsipkan Shopee</small>
+                                    @endif
                                 @else
                                     <button type="button" class="btn btn-xs btn-outline-secondary" data-toggle="modal" data-target="#mapShopeeModal{{ $product->id }}">
                                         <i class="fas fa-link mr-1"></i> Hubungkan
@@ -119,7 +179,22 @@
                             </td>
                             <td class="text-center">
                                 <div class="btn-group">
-                                    <button type="button" class="btn btn-xs btn-outline-info" data-toggle="modal" data-target="#editProductModal{{ $product->id }}" title="Edit">
+                                    <!-- Quick Toggle Active / Inactive Button -->
+                                    <form action="{{ route('warehouse.products.toggle-status', $product) }}" method="POST" class="d-inline" onsubmit="return confirm('{{ $product->status === 'active' ? 'Nonaktifkan dan sembunyikan produk ini dari Shopee?' : 'Aktifkan kembali dan tampilkan produk ini di Shopee?' }}')">
+                                        @csrf
+                                        @method('PATCH')
+                                        @if($product->status === 'inactive')
+                                            <button type="submit" class="btn btn-xs btn-outline-success mr-1" title="Aktifkan Kembali Produk (Tampilkan di Shopee)">
+                                                <i class="fas fa-eye"></i>
+                                            </button>
+                                        @else
+                                            <button type="submit" class="btn btn-xs btn-outline-secondary mr-1" title="Nonaktifkan Produk (Arsipkan di Shopee)">
+                                                <i class="fas fa-eye-slash"></i>
+                                            </button>
+                                        @endif
+                                    </form>
+
+                                    <button type="button" class="btn btn-xs btn-outline-info mr-1" data-toggle="modal" data-target="#editProductModal{{ $product->id }}" title="Edit">
                                         <i class="fas fa-edit"></i>
                                     </button>
                                     <form action="{{ route('warehouse.products.destroy', $product) }}" method="POST" class="d-inline" onsubmit="return confirm('Hapus produk {{ $product->name }}?')">

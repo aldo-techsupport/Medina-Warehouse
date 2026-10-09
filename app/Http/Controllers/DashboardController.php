@@ -107,7 +107,7 @@ class DashboardController extends Controller
         $shopeeSetting = ShopeeSetting::current();
         if ($shopeeSetting->isConnected()) {
             try {
-                app(ShopeeService::class)->syncLiveOrdersIfStale(45, 3, app(StockMutationService::class));
+                app(ShopeeService::class)->syncLiveOrdersIfStale(25, 7, app(StockMutationService::class));
             } catch (\Throwable) {
             }
         }

@@ -320,6 +320,174 @@ class ShopeeService
     }
 
     /**
+     * Update product price in Shopee Open API v2.
+     */
+    public function updatePrice(int $itemId, float $price, ?int $modelId = null): array
+    {
+        if (! $this->setting->isConnected()) {
+            return ['success' => false, 'error' => 'Toko Shopee belum terhubung'];
+        }
+
+        $this->ensureValidToken();
+
+        $path = '/api/v2/product/update_price';
+        $url = $this->buildShopUrl($path);
+
+        $priceList = [
+            [
+                'model_id' => $modelId ?? 0,
+                'original_price' => (float) $price,
+            ],
+        ];
+
+        try {
+            $response = Http::timeout(15)->post($url, [
+                'item_id' => $itemId,
+                'price_list' => $priceList,
+            ]);
+
+            $data = $response->json();
+
+            // Auto retry on auth error
+            if (($data['error'] ?? '') === 'error_auth' && ! empty($this->setting->refresh_token)) {
+                Log::warning('Shopee update_price returned error_auth. Refreshing token and retrying...');
+                $this->refreshAccessToken();
+                $this->setting->refresh();
+                $retryUrl = $this->buildShopUrl($path);
+                $response = Http::timeout(15)->post($retryUrl, [
+                    'item_id' => $itemId,
+                    'price_list' => $priceList,
+                ]);
+                $data = $response->json();
+            }
+
+            if ($response->successful() && empty($data['error']) && empty($data['response']['failure_list'])) {
+                return ['success' => true, 'data' => $data];
+            }
+
+            $errorMessage = $data['message'] ?? $data['error'] ?? '';
+            if (! empty($data['response']['failure_list'][0]['failed_reason'])) {
+                $errorMessage .= ' ('.$data['response']['failure_list'][0]['failed_reason'].')';
+            }
+
+            return ['success' => false, 'error' => $errorMessage ?: 'Gagal update harga ke Shopee'];
+        } catch (Exception $e) {
+            Log::error('Shopee update price error: '.$e->getMessage());
+
+            return ['success' => false, 'error' => $e->getMessage()];
+        }
+    }
+
+    /**
+     * Update product basic info (item_name, description, weight, dimensions) in Shopee Open API v2.
+     */
+    public function updateItem(int $itemId, array $data): array
+    {
+        if (! $this->setting->isConnected()) {
+            return ['success' => false, 'error' => 'Toko Shopee belum terhubung'];
+        }
+
+        $this->ensureValidToken();
+
+        $path = '/api/v2/product/update_item';
+        $url = $this->buildShopUrl($path);
+
+        $payload = array_merge(['item_id' => $itemId], $data);
+
+        try {
+            $response = Http::timeout(15)->post($url, $payload);
+            $resData = $response->json();
+
+            if (($resData['error'] ?? '') === 'error_auth' && ! empty($this->setting->refresh_token)) {
+                $this->refreshAccessToken();
+                $this->setting->refresh();
+                $retryUrl = $this->buildShopUrl($path);
+                $response = Http::timeout(15)->post($retryUrl, $payload);
+                $resData = $response->json();
+            }
+
+            if ($response->successful() && empty($resData['error'])) {
+                return ['success' => true, 'data' => $resData];
+            }
+
+            return ['success' => false, 'error' => $resData['message'] ?? $resData['error'] ?? 'Gagal update info produk ke Shopee'];
+        } catch (Exception $e) {
+            Log::error('Shopee update item error: '.$e->getMessage());
+
+            return ['success' => false, 'error' => $e->getMessage()];
+        }
+    }
+
+    /**
+     * Unlist (hide) or Re-list product in Shopee Open API v2.
+     */
+    public function unlistProduct(int $itemId, bool $unlist = true): array
+    {
+        if (! $this->setting->isConnected()) {
+            return ['success' => false, 'error' => 'Toko Shopee belum terhubung'];
+        }
+
+        $this->ensureValidToken();
+
+        $path = '/api/v2/product/unlist_item';
+        $url = $this->buildShopUrl($path);
+
+        $payload = [
+            'item_list' => [
+                [
+                    'item_id' => $itemId,
+                    'unlist' => $unlist,
+                ],
+            ],
+        ];
+
+        try {
+            $response = Http::timeout(15)->post($url, $payload);
+            $resData = $response->json();
+
+            if ($response->successful() && empty($resData['error']) && empty($resData['response']['failure_list'])) {
+                return ['success' => true, 'data' => $resData];
+            }
+
+            return ['success' => false, 'error' => $resData['message'] ?? $resData['error'] ?? 'Gagal mengubah status tampil produk di Shopee'];
+        } catch (Exception $e) {
+            Log::error('Shopee unlist product error: '.$e->getMessage());
+
+            return ['success' => false, 'error' => $e->getMessage()];
+        }
+    }
+
+    /**
+     * Delete product in Shopee Open API v2.
+     */
+    public function deleteProduct(int $itemId): array
+    {
+        if (! $this->setting->isConnected()) {
+            return ['success' => false, 'error' => 'Toko Shopee belum terhubung'];
+        }
+
+        $this->ensureValidToken();
+
+        $path = '/api/v2/product/delete_item';
+        $url = $this->buildShopUrl($path);
+
+        try {
+            $response = Http::timeout(15)->post($url, ['item_id' => $itemId]);
+            $resData = $response->json();
+
+            if ($response->successful() && empty($resData['error'])) {
+                return ['success' => true, 'data' => $resData];
+            }
+
+            return ['success' => false, 'error' => $resData['message'] ?? $resData['error'] ?? 'Gagal menghapus produk di Shopee'];
+        } catch (Exception $e) {
+            Log::error('Shopee delete product error: '.$e->getMessage());
+
+            return ['success' => false, 'error' => $e->getMessage()];
+        }
+    }
+
+    /**
      * Get order list from Shopee Open API v2.
      */
     public function getOrderList(int $timeFrom, int $timeTo, int $pageSize = 50, ?string $cursor = null): array

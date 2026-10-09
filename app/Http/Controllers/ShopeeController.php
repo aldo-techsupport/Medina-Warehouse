@@ -219,14 +219,19 @@ class ShopeeController extends Controller
             'shopee_stock' => $product->stock,
         ]);
 
-        // Push current stock to Shopee
+        // Push current stock and price to Shopee
         $this->shopeeService->updateStock(
             (int) $product->shopee_item_id,
             $product->stock,
             $product->shopee_model_id ? (int) $product->shopee_model_id : null
         );
+        $this->shopeeService->updatePrice(
+            (int) $product->shopee_item_id,
+            (float) $product->selling_price,
+            $product->shopee_model_id ? (int) $product->shopee_model_id : null
+        );
 
-        return redirect()->back()->with('success', "Produk [{$product->sku}] {$product->name} berhasil dipetakan ke Shopee Item ID #{$product->shopee_item_id}!");
+        return redirect()->back()->with('success', "Produk [{$product->sku}] {$product->name} berhasil dipetakan ke Shopee Item ID #{$product->shopee_item_id} (Stok & Harga disinkronkan)!");
     }
 
     /**
@@ -244,7 +249,7 @@ class ShopeeController extends Controller
     }
 
     /**
-     * Sync single product stock to Shopee.
+     * Sync single product stock and price to Shopee.
      */
     public function syncProductStock(Product $product)
     {
@@ -252,19 +257,25 @@ class ShopeeController extends Controller
             return redirect()->back()->with('error', "Produk {$product->name} belum terhubung ke Shopee.");
         }
 
-        $result = $this->shopeeService->updateStock(
+        $resultStock = $this->shopeeService->updateStock(
             (int) $product->shopee_item_id,
             $product->stock,
             $product->shopee_model_id ? (int) $product->shopee_model_id : null
         );
 
+        $resultPrice = $this->shopeeService->updatePrice(
+            (int) $product->shopee_item_id,
+            (float) $product->selling_price,
+            $product->shopee_model_id ? (int) $product->shopee_model_id : null
+        );
+
         $product->update(['shopee_stock' => $product->stock]);
 
-        return redirect()->back()->with('success', "Stok produk {$product->name} ({$product->stock} unit) berhasil disinkronkan ke Shopee!");
+        return redirect()->back()->with('success', "Stok ({$product->stock} unit) & harga (Rp ".number_format($product->selling_price, 0, ',', '.').") produk {$product->name} berhasil disinkronkan ke Shopee!");
     }
 
     /**
-     * Sync all connected products stock to Shopee.
+     * Sync all connected products stock and price to Shopee.
      */
     public function syncAllStock()
     {
@@ -277,11 +288,16 @@ class ShopeeController extends Controller
                 $product->stock,
                 $product->shopee_model_id ? (int) $product->shopee_model_id : null
             );
+            $this->shopeeService->updatePrice(
+                (int) $product->shopee_item_id,
+                (float) $product->selling_price,
+                $product->shopee_model_id ? (int) $product->shopee_model_id : null
+            );
             $product->update(['shopee_stock' => $product->stock]);
             $synced++;
         }
 
-        return redirect()->back()->with('success', "Berhasil mensinkronkan {$synced} produk ke Shopee!");
+        return redirect()->back()->with('success', "Berhasil mensinkronkan stok & harga {$synced} produk ke Shopee!");
     }
 
     /**

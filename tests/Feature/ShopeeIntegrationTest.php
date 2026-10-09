@@ -723,3 +723,112 @@ test('it pushes stock to Shopee when recording inbound mutation', function () {
         return str_contains($request->url(), '/api/v2/product/update_stock');
     });
 });
+
+test('warehouse product catalog sub-tabs filter by status and calculate counts', function () {
+    $admin = User::firstOrCreate(
+        ['email' => 'admin@medina.com'],
+        ['name' => 'Admin Test', 'username' => 'admintest', 'password' => bcrypt('password'), 'role' => 'superadmin', 'is_active' => true]
+    );
+
+    Cache::put('shopee_live_products_sync_lock', time(), now()->addHours(1));
+
+    $uniq = uniqid();
+    $pActive = Product::create([
+        'sku' => 'ACT-'.$uniq,
+        'name' => 'Active Item '.$uniq,
+        'unit' => 'Pcs',
+        'stock' => 10,
+        'purchase_price' => 10000,
+        'selling_price' => 20000,
+        'status' => 'active',
+    ]);
+
+    $pInactive = Product::create([
+        'sku' => 'INA-'.$uniq,
+        'name' => 'Inactive Item '.$uniq,
+        'unit' => 'Pcs',
+        'stock' => 5,
+        'purchase_price' => 15000,
+        'selling_price' => 25000,
+        'status' => 'inactive',
+    ]);
+
+    // Test 'all' tab
+    $resAll = $this->actingAs($admin)->get(route('warehouse.products', ['status' => 'all', 'search' => $uniq]));
+    $resAll->assertStatus(200);
+    $resAll->assertSee('Semua Produk');
+    $resAll->assertSee('Produk Aktif');
+    $resAll->assertSee('Tidak Aktif (Nonaktif)');
+    expect($resAll->viewData('products')->pluck('name'))->toContain('Active Item '.$uniq);
+    expect($resAll->viewData('products')->pluck('name'))->toContain('Inactive Item '.$uniq);
+    expect($resAll->viewData('countActive'))->toBeGreaterThanOrEqual(1);
+    expect($resAll->viewData('countInactive'))->toBeGreaterThanOrEqual(1);
+
+    // Test 'active' tab
+    $resAct = $this->actingAs($admin)->get(route('warehouse.products', ['status' => 'active', 'search' => $uniq]));
+    $resAct->assertStatus(200);
+    expect($resAct->viewData('products')->pluck('name'))->toContain('Active Item '.$uniq);
+    expect($resAct->viewData('products')->pluck('name'))->not->toContain('Inactive Item '.$uniq);
+
+    // Test 'inactive' tab
+    $resIna = $this->actingAs($admin)->get(route('warehouse.products', ['status' => 'inactive', 'search' => $uniq]));
+    $resIna->assertStatus(200);
+    expect($resIna->viewData('products')->pluck('name'))->not->toContain('Active Item '.$uniq);
+    expect($resIna->viewData('products')->pluck('name'))->toContain('Inactive Item '.$uniq);
+    $resIna->assertSee('Produk tidak aktif otomatis disembunyikan');
+});
+
+test('warehouse product toggle-status unlists and relists on Shopee API', function () {
+    $admin = User::firstOrCreate(
+        ['email' => 'admin@medina.com'],
+        ['name' => 'Admin Test', 'username' => 'admintest', 'password' => bcrypt('password'), 'role' => 'superadmin', 'is_active' => true]
+    );
+
+    $product = Product::create([
+        'sku' => 'TOGGLE-SKU-1',
+        'name' => 'Toggle Status Product',
+        'unit' => 'Pcs',
+        'stock' => 10,
+        'purchase_price' => 20000,
+        'selling_price' => 40000,
+        'shopee_item_id' => 999888,
+        'status' => 'active',
+    ]);
+
+    $setting = ShopeeSetting::current();
+    $setting->update([
+        'partner_id' => 123456,
+        'partner_key' => 'secret_key',
+        'shop_id' => 789012,
+        'access_token' => 'valid_token',
+        'token_expires_at' => now()->addHours(3),
+    ]);
+
+    Http::fake([
+        '*/api/v2/product/unlist_item*' => Http::response([
+            'error' => '',
+            'message' => 'success',
+            'response' => ['failure_list' => [], 'success_list' => [999888]],
+        ], 200),
+    ]);
+
+    // 1. Toggle from active to inactive (unlist on Shopee)
+    $response = $this->actingAs($admin)->patch(route('warehouse.products.toggle-status', $product));
+    $response->assertRedirect();
+    expect($product->fresh()->status)->toBe('inactive');
+
+    Http::assertSent(function ($request) {
+        return str_contains($request->url(), '/api/v2/product/unlist_item') &&
+               $request['item_list'][0]['unlist'] === true;
+    });
+
+    // 2. Toggle from inactive back to active (relist on Shopee)
+    $response2 = $this->actingAs($admin)->patch(route('warehouse.products.toggle-status', $product));
+    $response2->assertRedirect();
+    expect($product->fresh()->status)->toBe('active');
+
+    Http::assertSent(function ($request) {
+        return str_contains($request->url(), '/api/v2/product/unlist_item') &&
+               $request['item_list'][0]['unlist'] === false;
+    });
+});
