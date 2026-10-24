@@ -114,6 +114,13 @@ class ShopeeService
             return ['success' => true, 'data' => $data];
         }
 
+        Log::error('Shopee getAccessToken failed', [
+            'status' => $response->status(),
+            'response' => $data,
+            'partner_id' => $this->setting->partner_id,
+            'environment' => $this->setting->environment,
+        ]);
+
         return [
             'success' => false,
             'error' => $data['message'] ?? $data['error'] ?? 'Gagal mendapatkan access token dari Shopee',
