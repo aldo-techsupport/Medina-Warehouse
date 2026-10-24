@@ -29,11 +29,11 @@ class WarehouseController extends Controller
     public function products(Request $request)
     {
         $setting = ShopeeSetting::current();
-        if ($setting->isConnected()) {
+        if ($setting->isConnected() && $request->boolean('refresh')) {
             try {
-                $this->shopeeService->syncLiveProductsIfStale(180, $this->mutationService, $request->boolean('refresh'));
+                $this->shopeeService->syncLiveProductsIfStale(0, $this->mutationService, true);
             } catch (Exception $e) {
-                Log::warning('Auto live sync products on load: '.$e->getMessage());
+                Log::warning('Manual live sync products: '.$e->getMessage());
             }
         }
 
