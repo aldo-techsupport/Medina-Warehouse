@@ -68,19 +68,23 @@ class AiService
         ])->values()->all();
 
         // 2. Shopee Sales & Orders Metrics
-        $shopeeOrders = ShopeeOrder::latest()->get();
-        $totalOrdersCount = $shopeeOrders->count();
-        $totalShopeeRevenue = (float) $shopeeOrders->whereNotIn('order_status', ['CANCELLED', 'IN_CANCEL', 'TO_RETURN'])->sum('total_amount');
-        $cancelledOrdersCount = $shopeeOrders->whereIn('order_status', ['CANCELLED', 'IN_CANCEL', 'TO_RETURN'])->count();
-        $completedOrdersCount = $shopeeOrders->where('order_status', 'COMPLETED')->count();
-        $readyOrdersCount = $shopeeOrders->where('order_status', 'READY_TO_SHIP')->count();
+        $totalOrdersCount = ShopeeOrder::count();
+        $totalShopeeRevenue = (float) ShopeeOrder::whereNotIn('order_status', ['CANCELLED', 'IN_CANCEL', 'TO_RETURN'])->sum('total_amount');
+        $cancelledOrdersCount = ShopeeOrder::whereIn('order_status', ['CANCELLED', 'IN_CANCEL', 'TO_RETURN'])->count();
+        $completedOrdersCount = ShopeeOrder::where('order_status', 'COMPLETED')->count();
+        $readyOrdersCount = ShopeeOrder::where('order_status', 'READY_TO_SHIP')->count();
 
-        $todayOrders = $shopeeOrders->filter(fn ($o) => $o->created_at && $o->created_at->isToday());
-        $todayRevenue = (float) $todayOrders->whereNotIn('order_status', ['CANCELLED', 'IN_CANCEL'])->sum('total_amount');
+        $todayStart = today()->startOfDay();
+        $todayEnd = today()->endOfDay();
+        $todayRevenue = (float) ShopeeOrder::whereBetween('created_at', [$todayStart, $todayEnd])
+            ->whereNotIn('order_status', ['CANCELLED', 'IN_CANCEL'])
+            ->sum('total_amount');
+        $todayOrdersCount = ShopeeOrder::whereBetween('created_at', [$todayStart, $todayEnd])->count();
 
-        // Extract sold items frequency
+        // Extract sold items frequency from recent orders (up to 300 orders) to conserve memory
+        $recentShopeeOrders = ShopeeOrder::latest()->take(300)->get(['items_data', 'order_status']);
         $itemSalesCount = [];
-        foreach ($shopeeOrders as $order) {
+        foreach ($recentShopeeOrders as $order) {
             if ($order->isCancelled() || empty($order->items_data)) {
                 continue;
             }
@@ -92,12 +96,17 @@ class AiService
         }
         arsort($itemSalesCount);
 
-        // 3. Stock Mutation Trends (Last 30 Days)
+        // 3. Stock Mutation Trends (Last 30 Days via Database Aggregates)
         $thirtyDaysAgo = now()->subDays(30);
-        $recentMutations = StockMutation::where('created_at', '>=', $thirtyDaysAgo)->get();
-        $inboundTotal = (int) $recentMutations->where('type', 'inbound')->sum('qty');
-        $outboundTotal = abs((int) $recentMutations->where('type', 'outbound')->sum('qty'));
-        $shopeeSaleTotal = abs((int) $recentMutations->where('type', 'shopee_sale')->sum('qty'));
+        $mutationTotals = StockMutation::where('created_at', '>=', $thirtyDaysAgo)
+            ->whereIn('type', ['inbound', 'outbound', 'shopee_sale'])
+            ->selectRaw('type, SUM(qty) as total_qty')
+            ->groupBy('type')
+            ->pluck('total_qty', 'type');
+
+        $inboundTotal = (int) ($mutationTotals['inbound'] ?? 0);
+        $outboundTotal = abs((int) ($mutationTotals['outbound'] ?? 0));
+        $shopeeSaleTotal = abs((int) ($mutationTotals['shopee_sale'] ?? 0));
 
         // Identify Slow Moving Items (active items with 0 sales in itemSalesCount)
         $slowMovingProducts = $products->filter(function ($p) use ($itemSalesCount) {
@@ -130,7 +139,7 @@ class AiService
                 'ready_to_ship_orders' => $readyOrdersCount,
                 'completed_orders' => $completedOrdersCount,
                 'cancelled_orders' => $cancelledOrdersCount,
-                'today_orders_count' => $todayOrders->count(),
+                'today_orders_count' => $todayOrdersCount,
                 'today_revenue' => $todayRevenue,
                 'top_selling_skus' => array_slice($itemSalesCount, 0, 5, true),
             ],

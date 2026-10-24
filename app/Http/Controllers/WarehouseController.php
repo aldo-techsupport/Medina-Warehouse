@@ -31,7 +31,7 @@ class WarehouseController extends Controller
         $setting = ShopeeSetting::current();
         if ($setting->isConnected()) {
             try {
-                $this->shopeeService->syncLiveProductsIfStale(20, $this->mutationService, $request->boolean('refresh'));
+                $this->shopeeService->syncLiveProductsIfStale(180, $this->mutationService, $request->boolean('refresh'));
             } catch (Exception $e) {
                 Log::warning('Auto live sync products on load: '.$e->getMessage());
             }

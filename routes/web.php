@@ -67,6 +67,8 @@ Route::middleware('auth')->group(function () {
 
     // Shopee Open API & Channel Integration
     Route::prefix('shopee')->name('shopee.')->group(function () {
+        Route::get('/bg-sync', [ShopeeController::class, 'backgroundSync'])->name('bg-sync');
+
         Route::middleware('menu:shopee_dashboard')->group(function () {
             Route::get('/', [ShopeeController::class, 'dashboard'])->name('dashboard');
             Route::post('/products/pull', [ShopeeController::class, 'pullProducts'])->name('products.pull');

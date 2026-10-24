@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Product;
+use App\Models\ShopeeOrder;
 use App\Models\ShopeeSetting;
 use App\Models\StockMutation;
 use Exception;
@@ -572,7 +573,7 @@ class ShopeeService
         $path = '/api/v2/order/get_order_detail';
         $queryParams = [
             'order_sn_list' => implode(',', array_slice($orderSns, 0, 50)),
-            'response_optional_fields' => 'item_list,buyer_username,total_amount,recipient_address,shipping_carrier,pay_time',
+            'response_optional_fields' => 'item_list,buyer_username,total_amount,recipient_address,shipping_carrier,pay_time,package_list',
         ];
 
         $url = $this->buildShopUrl($path, $queryParams);
@@ -981,13 +982,31 @@ class ShopeeService
         $timeTo = time();
         $timeFrom = $timeTo - ($days * 86400);
 
-        // Fetch Order List
-        $listResult = $this->getOrderList($timeFrom, $timeTo, 50);
-        if (! $listResult['success']) {
-            return $listResult;
-        }
+        // Fetch Order List with cursor pagination to cover all order pages
+        $cursor = null;
+        $orderEntries = [];
+        do {
+            $listResult = $this->getOrderList($timeFrom, $timeTo, 100, $cursor);
+            if (! $listResult['success']) {
+                if (empty($orderEntries)) {
+                    return $listResult;
+                }
+                break;
+            }
 
-        $orderEntries = $listResult['data']['order_list'] ?? [];
+            $entries = $listResult['data']['order_list'] ?? [];
+            if (empty($entries)) {
+                break;
+            }
+
+            foreach ($entries as $e) {
+                $orderEntries[] = $e;
+            }
+
+            $hasMore = ! empty($listResult['data']['more']);
+            $cursor = $listResult['data']['next_cursor'] ?? null;
+        } while ($hasMore && count($orderEntries) < 1000);
+
         if (empty($orderEntries)) {
             return [
                 'success' => true,
@@ -997,15 +1016,18 @@ class ShopeeService
             ];
         }
 
-        $orderSns = array_column($orderEntries, 'order_sn');
+        $orderSns = array_values(array_unique(array_column($orderEntries, 'order_sn')));
 
-        // Fetch Details for these orders
-        $detailResult = $this->getOrderDetail($orderSns);
-        if (! $detailResult['success']) {
-            return $detailResult;
+        // Fetch Details for these orders in chunks of 50 (Shopee API limit)
+        $detailedOrders = [];
+        foreach (array_chunk($orderSns, 50) as $chunkSns) {
+            $detailResult = $this->getOrderDetail($chunkSns);
+            if ($detailResult['success'] && ! empty($detailResult['data']['order_list'])) {
+                foreach ($detailResult['data']['order_list'] as $det) {
+                    $detailedOrders[] = $det;
+                }
+            }
         }
-
-        $detailedOrders = $detailResult['data']['order_list'] ?? [];
         $syncedOrders = [];
 
         foreach ($detailedOrders as $orderDetail) {
@@ -1023,8 +1045,10 @@ class ShopeeService
                     'item_sku' => $rawItem['item_sku'] ?? null,
                     'item_name' => $rawItem['item_name'] ?? 'Shopee Item',
                     'model_id' => $rawItem['model_id'] ?? null,
+                    'model_name' => $rawItem['model_name'] ?? null,
                     'model_quantity_purchased' => $rawItem['model_quantity_purchased'] ?? 1,
                     'model_discounted_price' => $rawItem['model_discounted_price'] ?? 0,
+                    'image_url' => $rawItem['image_info']['image_url'] ?? null,
                 ];
             }
 
@@ -1039,11 +1063,20 @@ class ShopeeService
                 'items' => $items,
             ];
 
-            // If tracking_number not in order_detail, try to fetch it if needed
+            // If tracking_number not in order_detail, check local database first before hitting Shopee API
             if (empty($orderData['tracking_number'])) {
-                $trackingResult = $this->getTrackingNumber($orderSn);
-                if ($trackingResult['success'] && ! empty($trackingResult['data']['tracking_number'])) {
-                    $orderData['tracking_number'] = $trackingResult['data']['tracking_number'];
+                $existingOrder = ShopeeOrder::where('order_sn', $orderSn)->first(['id', 'tracking_number', 'shipping_carrier']);
+                if ($existingOrder && ! empty($existingOrder->tracking_number)) {
+                    $orderData['tracking_number'] = $existingOrder->tracking_number;
+                    if (empty($orderData['shipping_carrier']) && ! empty($existingOrder->shipping_carrier)) {
+                        $orderData['shipping_carrier'] = $existingOrder->shipping_carrier;
+                    }
+                } elseif (in_array($orderData['order_status'], ['PROCESSED', 'COMPLETED']) || (! empty($orderDetail['package_list'][0]['logistics_status']) && in_array($orderDetail['package_list'][0]['logistics_status'], ['LOGISTICS_REQUEST_CREATED', 'LOGISTICS_PICKUP_DONE', 'LOGISTICS_DELIVERY_DONE']))) {
+                    // Only query Shopee Logistics API if tracking number is missing locally and shipment was actually booked/processed
+                    $trackingResult = $this->getTrackingNumber($orderSn);
+                    if ($trackingResult['success'] && ! empty($trackingResult['data']['tracking_number'])) {
+                        $orderData['tracking_number'] = $trackingResult['data']['tracking_number'];
+                    }
                 }
             }
 
@@ -1069,6 +1102,215 @@ class ShopeeService
     }
 
     /**
+     * Pull missing active orders (READY_TO_SHIP & PROCESSED) incrementally in batches.
+     * Designed for safe background execution with cooldown to avoid Shopee API rate limits.
+     */
+    public function syncActiveOrdersIncremental(int $batchLimit = 50, ?StockMutationService $mutationService = null, int $daysWindow = 3): array
+    {
+        if (! $this->setting->isConnected()) {
+            return ['success' => false, 'error' => 'Toko Shopee belum terhubung'];
+        }
+
+        $this->ensureValidToken();
+        $mutationService = $mutationService ?? new StockMutationService($this);
+
+        $timeTo = time();
+        $timeFrom = $timeTo - (max(1, $daysWindow) * 86400);
+
+        $allEntries = [];
+
+        // 1. Capture recent updates across ALL statuses (SHIPPED, COMPLETED, CANCELLED, etc.) in last 2 hours
+        $recentUpdateFrom = $timeTo - 7200;
+        $updateCursor = null;
+        do {
+            $params = [
+                'time_range_field' => 'update_time',
+                'time_from' => $recentUpdateFrom,
+                'time_to' => $timeTo,
+                'page_size' => 100,
+            ];
+            if ($updateCursor) {
+                $params['cursor'] = $updateCursor;
+            }
+
+            $url = $this->buildShopUrl('/api/v2/order/get_order_list', $params);
+            $res = Http::timeout(15)->get($url)->json();
+
+            $entries = $res['response']['order_list'] ?? [];
+            foreach ($entries as $e) {
+                if (! empty($e['order_sn'])) {
+                    $allEntries[$e['order_sn']] = $e;
+                }
+            }
+            $updateCursor = $res['response']['next_cursor'] ?? null;
+            $more = ! empty($res['response']['more']);
+        } while ($more);
+
+        // 2. Capture active orders (READY_TO_SHIP & PROCESSED) across $daysWindow days
+        foreach (['READY_TO_SHIP', 'PROCESSED'] as $status) {
+            $cursor = null;
+            do {
+                $params = [
+                    'time_range_field' => 'create_time',
+                    'time_from' => $timeFrom,
+                    'time_to' => $timeTo,
+                    'page_size' => 100,
+                    'order_status' => $status,
+                ];
+                if ($cursor) {
+                    $params['cursor'] = $cursor;
+                }
+
+                $url = $this->buildShopUrl('/api/v2/order/get_order_list', $params);
+                $res = Http::timeout(15)->get($url)->json();
+
+                $entries = $res['response']['order_list'] ?? [];
+                foreach ($entries as $e) {
+                    if (! empty($e['order_sn'])) {
+                        $allEntries[$e['order_sn']] = $e;
+                    }
+                }
+                $cursor = $res['response']['next_cursor'] ?? null;
+                $more = ! empty($res['response']['more']);
+            } while ($more);
+        }
+
+        $allSns = array_keys($allEntries);
+
+        if (empty($allSns)) {
+            return [
+                'success' => true,
+                'total_active' => 0,
+                'synced_this_batch' => 0,
+                'missing_remaining' => 0,
+                'message' => 'Tidak ada pesanan aktif Shopee yang ditemukan.',
+            ];
+        }
+
+        // Find which orders already exist in local DB with tracking numbers and items (chunked to keep SQL small)
+        $completeSns = [];
+        foreach (array_chunk($allSns, 500) as $snChunk) {
+            $chunkComplete = ShopeeOrder::whereIn('order_sn', $snChunk)
+                ->whereNotNull('items_data')
+                ->where(function ($q) {
+                    $q->where(function ($sub) {
+                        $sub->whereNotNull('tracking_number')->where('tracking_number', '!=', '');
+                    })->orWhere('updated_at', '>=', now()->subMinutes(15));
+                })
+                ->pluck('order_sn')
+                ->toArray();
+            $completeSns = array_merge($completeSns, $chunkComplete);
+        }
+
+        $missingSns = array_values(array_diff($allSns, $completeSns));
+
+        if (empty($missingSns)) {
+            return [
+                'success' => true,
+                'total_active' => count($allSns),
+                'synced_this_batch' => 0,
+                'missing_remaining' => 0,
+                'message' => 'Semua pesanan aktif Shopee sudah 100% tersinkronisasi di database.',
+            ];
+        }
+
+        // Process missing orders in chunks of 50 up to $batchLimit (default: 1000 orders)
+        $targetLimit = max(50, $batchLimit);
+        $ordersToSync = array_slice($missingSns, 0, $targetLimit);
+        $chunks = array_chunk($ordersToSync, 50);
+
+        $syncedCount = 0;
+        foreach ($chunks as $chunk) {
+            $detailResult = $this->getOrderDetail($chunk);
+
+            if (! $detailResult['success'] || empty($detailResult['data']['order_list'])) {
+                continue;
+            }
+
+            foreach ($detailResult['data']['order_list'] as $orderDetail) {
+                $orderSn = $orderDetail['order_sn'] ?? null;
+                if (! $orderSn) {
+                    continue;
+                }
+
+                $rawItemList = $orderDetail['item_list'] ?? [];
+                $items = [];
+                foreach ($rawItemList as $rawItem) {
+                    $items[] = [
+                        'item_id' => $rawItem['item_id'] ?? null,
+                        'item_sku' => $rawItem['item_sku'] ?? null,
+                        'item_name' => $rawItem['item_name'] ?? 'Shopee Item',
+                        'model_id' => $rawItem['model_id'] ?? null,
+                        'model_name' => $rawItem['model_name'] ?? null,
+                        'model_quantity_purchased' => $rawItem['model_quantity_purchased'] ?? 1,
+                        'model_discounted_price' => $rawItem['model_discounted_price'] ?? 0,
+                        'image_url' => $rawItem['image_info']['image_url'] ?? null,
+                    ];
+                }
+
+                $tracking = $orderDetail['tracking_number'] ?? ($orderDetail['package_list'][0]['tracking_number'] ?? null);
+
+                $orderData = [
+                    'order_sn' => $orderSn,
+                    'shop_id' => (int) $this->setting->shop_id,
+                    'order_status' => $orderDetail['order_status'] ?? 'READY_TO_SHIP',
+                    'total_amount' => $orderDetail['total_amount'] ?? 0,
+                    'buyer_username' => $orderDetail['buyer_username'] ?? 'Shopee Customer',
+                    'tracking_number' => $tracking,
+                    'shipping_carrier' => $orderDetail['shipping_carrier'] ?? ($orderDetail['package_list'][0]['shipping_carrier'] ?? null),
+                    'items' => $items,
+                ];
+
+                if (empty($orderData['tracking_number'])) {
+                    $existing = ShopeeOrder::where('order_sn', $orderSn)->first(['tracking_number', 'shipping_carrier']);
+                    if ($existing && ! empty($existing->tracking_number)) {
+                        $orderData['tracking_number'] = $existing->tracking_number;
+                        $orderData['shipping_carrier'] = $existing->shipping_carrier ?? $orderData['shipping_carrier'];
+                    } elseif (in_array($orderData['order_status'], ['PROCESSED', 'COMPLETED'])) {
+                        $trackRes = $this->getTrackingNumber($orderSn);
+                        if ($trackRes['success'] && ! empty($trackRes['data']['tracking_number'])) {
+                            $orderData['tracking_number'] = $trackRes['data']['tracking_number'];
+                        }
+                    }
+                }
+
+                try {
+                    $processed = $mutationService->processShopeeOrder($orderData);
+                    if (! empty($orderData['tracking_number']) && empty($processed->tracking_number)) {
+                        $processed->update([
+                            'tracking_number' => $orderData['tracking_number'],
+                            'shipping_carrier' => $orderData['shipping_carrier'] ?? $processed->shipping_carrier,
+                        ]);
+                    }
+                    $syncedCount++;
+                } catch (\Throwable $e) {
+                    $existing = ShopeeOrder::where('order_sn', $orderSn)->first();
+                    if ($existing) {
+                        $existing->update([
+                            'order_status' => $orderData['order_status'] ?? $existing->order_status,
+                            'tracking_number' => $orderData['tracking_number'] ?? $existing->tracking_number,
+                            'shipping_carrier' => $orderData['shipping_carrier'] ?? $existing->shipping_carrier,
+                        ]);
+                        $syncedCount++;
+                    } else {
+                        Log::warning("Could not sync order {$orderSn}: ".$e->getMessage());
+                    }
+                }
+            }
+        }
+
+        $remaining = count($missingSns) - $syncedCount;
+
+        return [
+            'success' => true,
+            'total_active' => count($allSns),
+            'synced_this_batch' => $syncedCount,
+            'missing_remaining' => max(0, $remaining),
+            'message' => "Berhasil mensinkronkan {$syncedCount} pesanan aktif. Sisa belum ditarik: {$remaining} pesanan.",
+        ];
+    }
+
+    /**
      * Verify Webhook Push Notification Signature from Shopee.
      */
     public function verifyWebhookSignature(string $fullUrl, string $rawBody, string $receivedSignature): bool
@@ -1077,9 +1319,38 @@ class ShopeeService
             return true; // Bypass in demo mode if no key configured
         }
 
-        $calculatedSign = hash_hmac('sha256', $fullUrl.'|'.$rawBody, (string) $this->setting->partner_key);
+        $partnerKey = (string) $this->setting->partner_key;
+        $calculatedSign = hash_hmac('sha256', $fullUrl.'|'.$rawBody, $partnerKey);
 
-        return hash_equals($calculatedSign, $receivedSignature);
+        if (hash_equals($calculatedSign, $receivedSignature)) {
+            return true;
+        }
+
+        // Check if scheme mismatch (http vs https behind reverse proxy/tunnel)
+        if (str_starts_with($fullUrl, 'http://')) {
+            $httpsUrl = 'https://'.substr($fullUrl, 7);
+            if (hash_equals(hash_hmac('sha256', $httpsUrl.'|'.$rawBody, $partnerKey), $receivedSignature)) {
+                return true;
+            }
+        } elseif (str_starts_with($fullUrl, 'https://')) {
+            $httpUrl = 'http://'.substr($fullUrl, 8);
+            if (hash_equals(hash_hmac('sha256', $httpUrl.'|'.$rawBody, $partnerKey), $receivedSignature)) {
+                return true;
+            }
+        }
+
+        // Also check against configured route webhook URL
+        try {
+            $configuredWebhookUrl = route('shopee.webhook');
+            if ($configuredWebhookUrl !== $fullUrl) {
+                if (hash_equals(hash_hmac('sha256', $configuredWebhookUrl.'|'.$rawBody, $partnerKey), $receivedSignature)) {
+                    return true;
+                }
+            }
+        } catch (\Throwable) {
+        }
+
+        return false;
     }
 
     /**

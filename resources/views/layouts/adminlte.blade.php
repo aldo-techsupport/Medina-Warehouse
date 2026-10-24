@@ -704,7 +704,7 @@
                             <select name="product_id" class="form-control" required>
                                 <option value="">-- Pilih Produk --</option>
                                 @php
-                                    $modalProducts = \App\Models\Product::where('status', 'active')->orderBy('name')->get();
+                                    $modalProducts = $allProducts ?? \App\Models\Product::where('status', 'active')->select(['id', 'sku', 'name', 'stock', 'unit'])->orderBy('name')->get();
                                 @endphp
                                 @foreach($modalProducts as $p)
                                     <option value="{{ $p->id }}">[{{ $p->sku }}] {{ $p->name }} (Stok: {{ $p->stock }} {{ $p->unit }})</option>
@@ -933,6 +933,8 @@
 
     // 🔔 REAL-TIME NOTIFICATIONS & AUDIO CHIME
     let previousNotifCount = null;
+    let previousLatestPendingId = null;
+    let isFetchingNotif = false;
 
     function playNotificationChime() {
         try {
@@ -965,10 +967,29 @@
         } catch(e) {}
     }
 
-    async function fetchLiveNotifications() {
+    async function fetchLiveNotifications(isForce = false) {
+        if (isFetchingNotif) return;
+        if (!isForce && document.hidden) return;
+        isFetchingNotif = true;
+
         try {
-            const res = await fetch("{{ route('api.notifications') }}");
-            if (!res.ok) return;
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 8000);
+
+            const res = await fetch("{{ route('api.notifications') }}", {
+                headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                signal: controller.signal
+            });
+            clearTimeout(timeoutId);
+
+            if (!res.ok) {
+                const loadingEl = document.getElementById('notifLoadingState');
+                if (loadingEl) {
+                    loadingEl.innerHTML = '<div class="text-center py-3 text-muted text-xs"><i class="fas fa-exclamation-triangle text-warning mr-1"></i> Sedang menghubungkan notifikasi...</div>';
+                }
+                return;
+            }
+
             const data = await res.json();
             
             const badgeEl = document.getElementById('notifBadgeCount');
@@ -978,7 +999,7 @@
 
             const total = (data.pending_count || 0) + (data.cancellations_count || 0);
 
-            if (totalHeader) totalHeader.innerText = total + ' Notifikasi';
+            if (totalHeader) totalHeader.innerText = total.toLocaleString('id-ID') + ' Notifikasi';
 
             if (badgeEl) {
                 if (total > 0) {
@@ -995,11 +1016,19 @@
                 }
             }
 
-            // Play sound if new notification arrived after initial load
-            if (previousNotifCount !== null && total > previousNotifCount) {
-                playNotificationChime();
+            // Real-time Audio chime when new order arrives or total increases
+            const currentLatestId = (data.pending_orders && data.pending_orders.length > 0) ? data.pending_orders[0].id : null;
+            if (previousNotifCount !== null) {
+                const countIncreased = total > previousNotifCount;
+                const newOrderArrived = currentLatestId && previousLatestPendingId && (currentLatestId > previousLatestPendingId);
+                if (countIncreased || newOrderArrived) {
+                    playNotificationChime();
+                }
             }
             previousNotifCount = total;
+            if (currentLatestId) {
+                previousLatestPendingId = currentLatestId;
+            }
 
             // Render list
             if (container) {
@@ -1007,18 +1036,21 @@
 
                 // Pending Orders
                 if (data.pending_orders && data.pending_orders.length > 0) {
-                    html += '<div class="p-2 bg-light border-bottom text-xs font-weight-bold text-dark"><i class="fas fa-box text-warning mr-1"></i> Pesanan Baru Menunggu Packing (' + data.pending_count + ')</div>';
+                    html += '<div class="p-2 bg-light border-bottom text-xs font-weight-bold text-dark d-flex justify-content-between align-items-center"><span><i class="fas fa-box text-warning mr-1"></i> Pesanan Siap Packing (' + (data.pending_count || 0).toLocaleString('id-ID') + ')</span><span class="badge badge-success text-xxs font-weight-bold">Live</span></div>';
                     data.pending_orders.forEach(ord => {
+                        const statusBadge = ord.status === 'PROCESSED' 
+                            ? '<span class="badge badge-primary text-xxs ml-1">PROCESSED</span>' 
+                            : '<span class="badge badge-warning text-xxs ml-1">READY_TO_SHIP</span>';
                         html += `
                             <a href="{{ route('packing.index') }}" class="dropdown-item py-2 px-3 border-bottom d-flex align-items-center">
-                                <div class="rounded-circle bg-warning text-dark p-2 mr-2 d-flex align-items-center justify-content-center" style="width: 32px; height: 32px;">
+                                <div class="rounded-circle bg-warning text-dark p-2 mr-2 d-flex align-items-center justify-content-center" style="width: 32px; height: 32px; flex-shrink: 0;">
                                     <i class="fas fa-barcode"></i>
                                 </div>
                                 <div class="text-truncate" style="flex: 1;">
-                                    <div class="font-weight-bold text-dark text-xs">${ord.order_sn}</div>
+                                    <div class="font-weight-bold text-dark text-xs">${ord.order_sn} ${statusBadge}</div>
                                     <small class="text-muted">${ord.carrier} • ${ord.buyer} • ${ord.items_count} item</small>
                                 </div>
-                                <small class="text-muted text-xs ml-2">${ord.time_ago}</small>
+                                <small class="text-primary text-xs font-weight-bold ml-2 text-nowrap">${ord.time_ago}</small>
                             </a>
                         `;
                     });
@@ -1030,14 +1062,14 @@
                     data.cancellations.forEach(ord => {
                         html += `
                             <a href="{{ route('shopee.orders') }}" class="dropdown-item py-2 px-3 border-bottom d-flex align-items-center bg-light">
-                                <div class="rounded-circle bg-danger text-white p-2 mr-2 d-flex align-items-center justify-content-center" style="width: 32px; height: 32px;">
+                                <div class="rounded-circle bg-danger text-white p-2 mr-2 d-flex align-items-center justify-content-center" style="width: 32px; height: 32px; flex-shrink: 0;">
                                     <i class="fas fa-ban"></i>
                                 </div>
                                 <div class="text-truncate" style="flex: 1;">
                                     <div class="font-weight-bold text-danger text-xs">${ord.order_sn} (${ord.status})</div>
                                     <small class="text-muted">${ord.tracking_number ? 'Resi: ' + ord.tracking_number : 'Order: ' + ord.order_sn} • ${ord.buyer}</small>
                                 </div>
-                                <small class="text-danger text-xs font-weight-bold ml-2">${ord.time_ago}</small>
+                                <small class="text-danger text-xs font-weight-bold ml-2 text-nowrap">${ord.time_ago}</small>
                             </a>
                         `;
                     });
@@ -1064,12 +1096,45 @@
             }
         } catch(err) {
             console.error('Notification poll error:', err);
+            const loadingEl = document.getElementById('notifLoadingState');
+            if (loadingEl) {
+                loadingEl.innerHTML = '<div class="text-center py-3 text-muted text-xs"><i class="fas fa-exclamation-triangle text-warning mr-1"></i> Sedang menghubungkan notifikasi...</div>';
+            }
+        } finally {
+            isFetchingNotif = false;
         }
     }
 
     $(document).ready(function() {
-        fetchLiveNotifications();
-        setInterval(fetchLiveNotifications, 15000); // Poll every 15s
+        fetchLiveNotifications(true);
+        
+        // Smart real-time notification polling: every 10 seconds (immediate on focus/click)
+        setInterval(fetchLiveNotifications, 10000);
+
+        // Immediate fetch upon clicking notification dropdown
+        $('#notificationNavDropdown').on('show.bs.dropdown', function () {
+            fetchLiveNotifications(true);
+        });
+
+        // Immediate fetch when user refocuses or switches to tab
+        document.addEventListener('visibilitychange', function() {
+            if (!document.hidden) {
+                fetchLiveNotifications(true);
+            }
+        });
+
+        // Shopee Background Active Orders Auto-Sync (Runs quietly every 60s / 1 minute)
+        @auth
+        function triggerBackgroundShopeeSync() {
+            if (document.visibilityState === 'visible') {
+                fetch('{{ route("shopee.bg-sync") }}', { 
+                    headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                    credentials: 'same-origin'
+                }).catch(() => {});
+            }
+        }
+        setInterval(triggerBackgroundShopeeSync, 60000); // Every 60 seconds (1 minute delay)
+        @endauth
     });
 </script>
 

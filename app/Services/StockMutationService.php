@@ -7,6 +7,8 @@ use App\Models\ShopeeOrder;
 use App\Models\ShopeeSetting;
 use App\Models\StockMutation;
 use Exception;
+use Illuminate\Database\QueryException;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -240,7 +242,27 @@ class StockMutationService
                 $order->stock_deducted_at = null;
             }
 
-            $order->save();
+            try {
+                $order->save();
+            } catch (UniqueConstraintViolationException|QueryException $e) {
+                // If a concurrent webhook or background sync already inserted this order_sn simultaneously, update the existing row gracefully
+                if (str_contains($e->getMessage(), 'Duplicate entry') || $e->getCode() == 23000) {
+                    $existing = ShopeeOrder::where('order_sn', $orderSn)->first();
+                    if ($existing) {
+                        $existing->update([
+                            'shop_id' => $shopId,
+                            'order_status' => $status,
+                            'total_amount' => $totalAmount,
+                            'buyer_username' => $buyer,
+                            'items_data' => $items,
+                        ]);
+
+                        return $existing;
+                    }
+                }
+
+                throw $e;
+            }
 
             return $order;
         });

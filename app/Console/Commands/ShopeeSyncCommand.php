@@ -46,9 +46,9 @@ class ShopeeSyncCommand extends Command
         $this->info('Menarik dan menyelaraskan produk & stok Shopee...');
         $productResult = $shopeeService->pullAndSyncProducts($mutationService);
         if ($productResult['success']) {
-            $this->line("✓ Produk: {$productResult['message']}");
+            $this->line("[OK] Produk: {$productResult['message']}");
         } else {
-            $this->error("✗ Produk: {$productResult['error']}");
+            $this->error("[FAIL] Produk: {$productResult['error']}");
         }
 
         // 3. Sinkronkan Pesanan Terbaru dari Shopee
@@ -56,9 +56,9 @@ class ShopeeSyncCommand extends Command
         $this->info("Menarik pesanan Shopee {$days} hari terakhir...");
         $orderResult = $shopeeService->pullAndSyncOrders($days, $mutationService);
         if ($orderResult['success']) {
-            $this->line("✓ Pesanan: {$orderResult['message']}");
+            $this->line("[OK] Pesanan: {$orderResult['message']}");
         } else {
-            $this->error("✗ Pesanan: {$orderResult['error']}");
+            $this->error("[FAIL] Pesanan: {$orderResult['error']}");
         }
 
         // 4. Catat waktu sinkronisasi terakhir
@@ -66,7 +66,7 @@ class ShopeeSyncCommand extends Command
             'last_synced_at' => now(),
         ]);
 
-        Log::info('Shopee Auto-Sync Scheduler completed successfully', [
+        Log::debug('Shopee Auto-Sync Scheduler completed successfully', [
             'products_synced' => $productResult['synced_count'] ?? 0,
             'orders_synced' => $orderResult['synced_count'] ?? 0,
         ]);

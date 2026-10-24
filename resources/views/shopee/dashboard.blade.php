@@ -181,103 +181,21 @@
                             <span class="badge badge-success px-2 py-1 font-weight-normal">Terhubung</span>
                         </td>
                         <td class="text-center">
-                            <button type="button" class="btn btn-xs btn-outline-primary font-weight-bold shadow-sm" data-toggle="modal" data-target="#shopeeStockModal{{ $p->id }}" title="Ubah atau Tambah Stok Produk Ini">
+                            <button type="button" 
+                                class="btn btn-xs btn-outline-primary font-weight-bold shadow-sm btn-open-stock-modal" 
+                                data-toggle="modal" 
+                                data-target="#shopeeStockModal" 
+                                data-id="{{ $p->id }}"
+                                data-sku="{{ $p->sku }}"
+                                data-name="{{ $p->name }}"
+                                data-shopee-item-id="{{ $p->shopee_item_id }}"
+                                data-stock="{{ (int) $p->stock }}"
+                                data-unit="{{ $p->unit }}"
+                                title="Ubah atau Tambah Stok Produk Ini">
                                 <i class="fas fa-edit mr-1"></i> Ubah Stok
                             </button>
                         </td>
                     </tr>
-
-                    <!-- Modal Ubah Stok Produk Shopee -->
-                    <div class="modal fade" id="shopeeStockModal{{ $p->id }}" tabindex="-1" role="dialog" aria-hidden="true">
-                        <div class="modal-dialog modal-dialog-centered" role="document">
-                            <div class="modal-content border-0 shadow">
-                                <form action="{{ route('warehouse.mutations.store') }}" method="POST">
-                                    @csrf
-                                    <input type="hidden" name="product_id" value="{{ $p->id }}">
-                                    <input type="hidden" name="actor" value="{{ auth()->user()->name ?? 'Admin Gudang' }}">
-                                    <div class="modal-header bg-dark text-white py-2">
-                                        <h6 class="modal-title font-weight-bold">
-                                            <i class="fas fa-boxes mr-1"></i> Ubah / Tambah Stok: {{ $p->sku }}
-                                        </h6>
-                                        <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
-                                            <span aria-hidden="true">&times;</span>
-                                        </button>
-                                    </div>
-                                    <div class="modal-body p-3">
-                                        <div class="bg-light p-2 rounded mb-3 border">
-                                            <div class="font-weight-bold text-dark">{{ $p->name }}</div>
-                                            <div class="d-flex justify-content-between text-xs text-muted mt-1">
-                                                <span>Shopee Item ID: <strong>{{ $p->shopee_item_id }}</strong></span>
-                                                <span>Stok Saat Ini: <strong class="text-primary">{{ $p->stock }} {{ $p->unit }}</strong></span>
-                                            </div>
-                                        </div>
-
-                                        <div class="form-group">
-                                            <label class="font-weight-semibold text-sm">Jenis Perubahan Stok <span class="text-danger">*</span></label>
-                                            <select name="type" class="form-control form-control-sm" required id="typeSelect{{ $p->id }}" onchange="updateCalc{{ $p->id }}()">
-                                                <option value="inbound" selected>📦 Tambah Stok / Barang Masuk (+ Tambah)</option>
-                                                <option value="adjustment">⚖️ Set Total Stok Baru (Stok Opname Langsung)</option>
-                                                <option value="outbound">🚚 Kurangi Stok / Barang Keluar (- Kurang)</option>
-                                            </select>
-                                        </div>
-
-                                        <div class="form-group">
-                                            <label class="font-weight-semibold text-sm" id="qtyLabel{{ $p->id }}">Jumlah Unit Tambahan <span class="text-danger">*</span></label>
-                                            <input type="number" name="qty" id="qtyInput{{ $p->id }}" class="form-control form-control-sm font-weight-bold" placeholder="Contoh: 10" required min="1" oninput="updateCalc{{ $p->id }}()">
-                                            <small class="text-muted d-block mt-1" id="calcHelp{{ $p->id }}">
-                                                Stok akhir setelah disimpan: <strong class="text-success" id="calcResult{{ $p->id }}">{{ $p->stock }} {{ $p->unit }}</strong>
-                                            </small>
-                                        </div>
-
-                                        <div class="form-group mb-2">
-                                            <label class="font-weight-semibold text-sm">Keterangan / Catatan (Opsional)</label>
-                                            <input type="text" name="notes" class="form-control form-control-sm" placeholder="Contoh: Restock Supplier / Penyesuaian Fisik">
-                                        </div>
-
-                                        <div class="alert alert-info py-2 px-3 mb-0 text-xs rounded border-0">
-                                            <i class="fas fa-info-circle mr-1"></i> Perubahan stok otomatis tersimpan di gudang & langsung di-push live ke API Shopee.
-                                        </div>
-                                    </div>
-                                    <div class="modal-footer bg-light py-2">
-                                        <button type="button" class="btn btn-secondary btn-sm" data-dismiss="modal">Batal</button>
-                                        <button type="submit" class="btn btn-primary btn-sm font-weight-bold">
-                                            <i class="fas fa-save mr-1"></i> Simpan & Update Shopee
-                                        </button>
-                                    </div>
-                                </form>
-                            </div>
-                        </div>
-                    </div>
-
-                    <script>
-                    function updateCalc{{ $p->id }}() {
-                        var currentStock = {{ (int) $p->stock }};
-                        var typeElem = document.getElementById('typeSelect{{ $p->id }}');
-                        var type = typeElem ? typeElem.value : 'inbound';
-                        var inputElem = document.getElementById('qtyInput{{ $p->id }}');
-                        var qty = parseInt(inputElem ? inputElem.value : 0) || 0;
-                        var label = document.getElementById('qtyLabel{{ $p->id }}');
-                        var resultElem = document.getElementById('calcResult{{ $p->id }}');
-
-                        var newStock = currentStock;
-                        if (type === 'inbound') {
-                            if (label) label.innerHTML = 'Jumlah Unit Tambahan (Masuk) <span class="text-danger">*</span>';
-                            if (inputElem) inputElem.min = 1;
-                            newStock = currentStock + qty;
-                        } else if (type === 'outbound') {
-                            if (label) label.innerHTML = 'Jumlah Unit yang Dikurangi (Keluar) <span class="text-danger">*</span>';
-                            if (inputElem) inputElem.min = 1;
-                            newStock = Math.max(0, currentStock - qty);
-                        } else if (type === 'adjustment') {
-                            if (label) label.innerHTML = 'Total Stok Fisik Baru (Opname Langsung) <span class="text-danger">*</span>';
-                            if (inputElem) inputElem.min = 0;
-                            newStock = qty;
-                        }
-                        if (resultElem) {
-                            resultElem.innerText = newStock + ' {{ $p->unit }}';
-                        }
-                    }
-                    </script>
                 @empty
                     <tr>
                         <td colspan="6" class="text-center py-4 text-muted">
@@ -292,4 +210,120 @@
     </div>
 </div>
 
+<!-- Modal Ubah Stok Produk Shopee (Single Reusable Dynamic Modal) -->
+<div class="modal fade" id="shopeeStockModal" tabindex="-1" role="dialog" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" role="document">
+        <div class="modal-content border-0 shadow">
+            <form action="{{ route('warehouse.mutations.store') }}" method="POST">
+                @csrf
+                <input type="hidden" name="product_id" id="modalProductId" value="">
+                <input type="hidden" name="actor" value="{{ auth()->user()->name ?? 'Admin Gudang' }}">
+                <div class="modal-header bg-dark text-white py-2">
+                    <h6 class="modal-title font-weight-bold">
+                        <i class="fas fa-boxes mr-1"></i> Ubah / Tambah Stok: <span id="modalSkuTitle"></span>
+                    </h6>
+                    <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body p-3">
+                    <div class="bg-light p-2 rounded mb-3 border">
+                        <div class="font-weight-bold text-dark" id="modalProductName"></div>
+                        <div class="d-flex justify-content-between text-xs text-muted mt-1">
+                            <span>Shopee Item ID: <strong id="modalShopeeItemId"></strong></span>
+                            <span>Stok Saat Ini: <strong class="text-primary" id="modalCurrentStockText"></strong></span>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="font-weight-semibold text-sm">Jenis Perubahan Stok <span class="text-danger">*</span></label>
+                        <select name="type" class="form-control form-control-sm" required id="modalTypeSelect">
+                            <option value="inbound" selected>📦 Tambah Stok / Barang Masuk (+ Tambah)</option>
+                            <option value="adjustment">⚖️ Set Total Stok Baru (Stok Opname Langsung)</option>
+                            <option value="outbound">🚚 Kurangi Stok / Barang Keluar (- Kurang)</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="font-weight-semibold text-sm" id="modalQtyLabel">Jumlah Unit Tambahan <span class="text-danger">*</span></label>
+                        <input type="number" name="qty" id="modalQtyInput" class="form-control form-control-sm font-weight-bold" placeholder="Contoh: 10" required min="1">
+                        <small class="text-muted d-block mt-1">
+                            Stok akhir setelah disimpan: <strong class="text-success" id="modalCalcResult">0</strong>
+                        </small>
+                    </div>
+
+                    <div class="form-group mb-2">
+                        <label class="font-weight-semibold text-sm">Keterangan / Catatan (Opsional)</label>
+                        <input type="text" name="notes" id="modalNotesInput" class="form-control form-control-sm" placeholder="Contoh: Restock Supplier / Penyesuaian Fisik">
+                    </div>
+
+                    <div class="alert alert-info py-2 px-3 mb-0 text-xs rounded border-0">
+                        <i class="fas fa-info-circle mr-1"></i> Perubahan stok otomatis tersimpan di gudang & langsung di-push live ke API Shopee.
+                    </div>
+                </div>
+                <div class="modal-footer bg-light py-2">
+                    <button type="button" class="btn btn-secondary btn-sm" data-dismiss="modal">Batal</button>
+                    <button type="submit" class="btn btn-primary btn-sm font-weight-bold">
+                        <i class="fas fa-save mr-1"></i> Simpan & Update Shopee
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
 @endsection
+
+@push('scripts')
+<script>
+$(document).ready(function() {
+    var modalCurrentStock = 0;
+    var modalUnit = 'unit';
+
+    $(document).on('click', '.btn-open-stock-modal', function() {
+        var btn = $(this);
+        var id = btn.data('id');
+        var sku = btn.data('sku');
+        var name = btn.data('name');
+        var shopeeItemId = btn.data('shopee-item-id') || '-';
+        modalCurrentStock = parseInt(btn.data('stock')) || 0;
+        modalUnit = btn.data('unit') || 'unit';
+
+        $('#modalProductId').val(id);
+        $('#modalSkuTitle').text(sku);
+        $('#modalProductName').text(name);
+        $('#modalShopeeItemId').text(shopeeItemId);
+        $('#modalCurrentStockText').text(modalCurrentStock + ' ' + modalUnit);
+        $('#modalTypeSelect').val('inbound');
+        $('#modalQtyInput').val('');
+        $('#modalNotesInput').val('');
+        updateModalStockCalc();
+    });
+
+    $('#modalTypeSelect, #modalQtyInput').on('input change', function() {
+        updateModalStockCalc();
+    });
+
+    function updateModalStockCalc() {
+        var type = $('#modalTypeSelect').val() || 'inbound';
+        var qty = parseInt($('#modalQtyInput').val()) || 0;
+        var label = $('#modalQtyLabel');
+        var newStock = modalCurrentStock;
+
+        if (type === 'inbound') {
+            label.html('Jumlah Unit Tambahan (Masuk) <span class="text-danger">*</span>');
+            $('#modalQtyInput').attr('min', 1);
+            newStock = modalCurrentStock + qty;
+        } else if (type === 'outbound') {
+            label.html('Jumlah Unit yang Dikurangi (Keluar) <span class="text-danger">*</span>');
+            $('#modalQtyInput').attr('min', 1);
+            newStock = Math.max(0, modalCurrentStock - qty);
+        } else if (type === 'adjustment') {
+            label.html('Total Stok Fisik Baru (Opname Langsung) <span class="text-danger">*</span>');
+            $('#modalQtyInput').attr('min', 0);
+            newStock = qty;
+        }
+        $('#modalCalcResult').text(newStock + ' ' + modalUnit);
+    }
+});
+</script>
+@endpush

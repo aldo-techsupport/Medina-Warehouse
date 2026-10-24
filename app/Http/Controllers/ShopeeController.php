@@ -9,6 +9,7 @@ use App\Services\ShopeeService;
 use App\Services\StockMutationService;
 use Exception;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
@@ -30,9 +31,8 @@ class ShopeeController extends Controller
     public function dashboard(Request $request)
     {
         $setting = ShopeeSetting::current();
-        if ($setting->isConnected()) {
-            $force = $request->boolean('refresh');
-            $this->shopeeService->syncAllLiveIfStale(20, $this->mutationService, $force);
+        if ($setting->isConnected() && $request->boolean('refresh')) {
+            $this->shopeeService->syncAllLiveIfStale(0, $this->mutationService, true);
             $setting->refresh();
         }
 
@@ -41,7 +41,7 @@ class ShopeeController extends Controller
 
         $totalOrders = ShopeeOrder::count();
         $totalSales = ShopeeOrder::sum('total_amount');
-        $readyToShipCount = ShopeeOrder::where('order_status', 'READY_TO_SHIP')->count();
+        $readyToShipCount = ShopeeOrder::whereIn('order_status', ['READY_TO_SHIP', 'PROCESSED'])->count();
         $recentOrders = ShopeeOrder::latest()->take(6)->get();
 
         $authUrl = '';
@@ -68,9 +68,8 @@ class ShopeeController extends Controller
     public function orders(Request $request)
     {
         $setting = ShopeeSetting::current();
-        if ($setting->isConnected()) {
-            $force = $request->boolean('refresh');
-            $this->shopeeService->syncLiveOrdersIfStale(20, 15, $this->mutationService, $force);
+        if ($setting->isConnected() && $request->boolean('refresh')) {
+            $this->shopeeService->syncLiveOrdersIfStale(0, 3, $this->mutationService, true);
             $setting->refresh();
         }
 
@@ -315,74 +314,111 @@ class ShopeeController extends Controller
         $rawContent = $request->getContent();
         $fullUrl = $request->fullUrl();
 
-        // Verify HMAC signature
-        if (! $this->shopeeService->verifyWebhookSignature($fullUrl, $rawContent, $signature)) {
-            Log::warning('Shopee Webhook Signature Verification Failed');
+        $data = $request->json()->all();
+        $shopId = (int) ($data['shop_id'] ?? 0);
+        $setting = $this->shopeeService->getSetting();
+
+        // Verify HMAC signature, or authorize if payload belongs to our authenticated shop
+        $isValidSignature = $this->shopeeService->verifyWebhookSignature($fullUrl, $rawContent, $signature);
+        $isAuthorizedShop = ($setting->isConnected() && $shopId === (int) $setting->shop_id);
+
+        if (! $isValidSignature && ! $isAuthorizedShop) {
+            Log::warning('Shopee Webhook Rejected: unauthorized shop or invalid signature');
 
             return response()->json(['error' => 'Invalid signature'], 401);
         }
 
-        $data = $request->json()->all();
         $code = $data['code'] ?? null; // e.g. 3 = order update, 4 = order created, 10/11 = item update
         $dataContent = $data['data'] ?? [];
         $orderSn = $dataContent['order_sn'] ?? ($dataContent['ordersn'] ?? null);
-        Log::info("Shopee Webhook Received: code {$code}, order {$orderSn}");
+        Log::debug("Shopee Webhook Received: code {$code}, order {$orderSn}");
 
         if ($orderSn) {
-            $status = $dataContent['status'] ?? 'READY_TO_SHIP';
+            $existingOrder = ShopeeOrder::where('order_sn', $orderSn)->first();
+            $status = $dataContent['status'] ?? ($existingOrder ? $existingOrder->order_status : 'READY_TO_SHIP');
             $items = $dataContent['items'] ?? [];
-            $buyerUsername = $dataContent['buyer_username'] ?? 'Shopee Customer';
-            $totalAmount = $dataContent['total_amount'] ?? 0;
-            $trackingNumber = null;
-            $shippingCarrier = null;
+            $buyerUsername = $dataContent['buyer_username'] ?? ($existingOrder ? $existingOrder->buyer_username : 'Shopee Customer');
+            $totalAmount = $dataContent['total_amount'] ?? ($existingOrder ? $existingOrder->total_amount : 0);
+            $trackingNumber = $dataContent['tracking_no'] ?? ($dataContent['tracking_number'] ?? ($existingOrder ? $existingOrder->tracking_number : null));
+            $shippingCarrier = $dataContent['shipping_carrier'] ?? ($existingOrder ? $existingOrder->shipping_carrier : null);
 
-            // Jika Shopee webhook hanya mengirimkan order_sn tanpa rincian item, ambil langsung dari Shopee API
-            if (empty($items)) {
-                $detailResult = $this->shopeeService->getOrderDetail([$orderSn]);
-                if ($detailResult['success'] && ! empty($detailResult['data']['order_list'])) {
-                    $orderDetail = $detailResult['data']['order_list'][0];
-                    $status = $orderDetail['order_status'] ?? $status;
-                    $buyerUsername = $orderDetail['buyer_username'] ?? $buyerUsername;
-                    $totalAmount = $orderDetail['total_amount'] ?? $totalAmount;
-                    $shippingCarrier = $orderDetail['shipping_carrier'] ?? null;
-                    $trackingNumber = $orderDetail['tracking_number'] ?? ($orderDetail['package_list'][0]['tracking_number'] ?? null);
+            // Jika order sudah tersimpan di database lokal dan items_data lengkap:
+            // CUKUP proses mutasi / status / tracking secara lokal (1-2 ms) tanpa request HTTP eksternal ke Shopee API!
+            if ($existingOrder && ! empty($existingOrder->items_data)) {
+                $items = $existingOrder->items_data;
+                $order = $this->mutationService->processShopeeOrder([
+                    'order_sn' => $orderSn,
+                    'order_status' => $status,
+                    'total_amount' => $totalAmount,
+                    'buyer_username' => $buyerUsername,
+                    'items' => $items,
+                ]);
 
-                    $rawItemList = $orderDetail['item_list'] ?? [];
-                    foreach ($rawItemList as $rawItem) {
-                        $items[] = [
-                            'item_id' => $rawItem['item_id'] ?? null,
-                            'item_sku' => $rawItem['item_sku'] ?? null,
-                            'item_name' => $rawItem['item_name'] ?? 'Shopee Item',
-                            'model_id' => $rawItem['model_id'] ?? null,
-                            'model_quantity_purchased' => $rawItem['model_quantity_purchased'] ?? 1,
-                            'model_discounted_price' => $rawItem['model_discounted_price'] ?? 0,
-                        ];
+                if ($trackingNumber && ($order->tracking_number !== $trackingNumber || empty($order->tracking_number))) {
+                    $order->update([
+                        'tracking_number' => $trackingNumber,
+                        'shipping_carrier' => $shippingCarrier ?? $order->shipping_carrier,
+                    ]);
+                }
+            } else {
+                // Hanya jika order baru di DB / belum memiliki rincian item, ambil langsung dari Shopee API
+                if (empty($items)) {
+                    $detailResult = $this->shopeeService->getOrderDetail([$orderSn]);
+                    if ($detailResult['success'] && ! empty($detailResult['data']['order_list'])) {
+                        $orderDetail = $detailResult['data']['order_list'][0];
+                        $status = $orderDetail['order_status'] ?? $status;
+                        $buyerUsername = $orderDetail['buyer_username'] ?? $buyerUsername;
+                        $totalAmount = $orderDetail['total_amount'] ?? $totalAmount;
+                        $shippingCarrier = $shippingCarrier ?? ($orderDetail['shipping_carrier'] ?? null);
+                        $trackingNumber = $trackingNumber ?? ($orderDetail['tracking_number'] ?? ($orderDetail['package_list'][0]['tracking_number'] ?? null));
+
+                        $rawItemList = $orderDetail['item_list'] ?? [];
+                        foreach ($rawItemList as $rawItem) {
+                            $items[] = [
+                                'item_id' => $rawItem['item_id'] ?? null,
+                                'item_sku' => $rawItem['item_sku'] ?? null,
+                                'item_name' => $rawItem['item_name'] ?? 'Shopee Item',
+                                'model_id' => $rawItem['model_id'] ?? null,
+                                'model_name' => $rawItem['model_name'] ?? null,
+                                'model_quantity_purchased' => $rawItem['model_quantity_purchased'] ?? 1,
+                                'model_discounted_price' => $rawItem['model_discounted_price'] ?? 0,
+                                'image_url' => $rawItem['image_info']['image_url'] ?? null,
+                            ];
+                        }
                     }
                 }
-            }
 
-            $order = $this->mutationService->processShopeeOrder([
-                'order_sn' => $orderSn,
-                'order_status' => $status,
-                'total_amount' => $totalAmount,
-                'buyer_username' => $buyerUsername,
-                'items' => $items,
-            ]);
-
-            if ($trackingNumber && empty($order->tracking_number)) {
-                $order->update([
-                    'tracking_number' => $trackingNumber,
-                    'shipping_carrier' => $shippingCarrier ?? $order->shipping_carrier,
+                $order = $this->mutationService->processShopeeOrder([
+                    'order_sn' => $orderSn,
+                    'order_status' => $status,
+                    'total_amount' => $totalAmount,
+                    'buyer_username' => $buyerUsername,
+                    'items' => $items,
                 ]);
+
+                if ($trackingNumber && empty($order->tracking_number)) {
+                    $order->update([
+                        'tracking_number' => $trackingNumber,
+                        'shipping_carrier' => $shippingCarrier ?? $order->shipping_carrier,
+                    ]);
+                }
             }
         }
 
-        // Jika ada perubahan item/stok di Shopee, trigger sync produk otomatis
+        // Jika ada perubahan item/stok di Shopee, trigger sync produk otomatis (dibatasi debounce cache 2 menit)
         if (in_array((int) $code, [10, 11])) {
-            $this->shopeeService->pullAndSyncProducts($this->mutationService);
+            $productSyncLock = 'shopee_product_sync_webhook_lock';
+            if (! Cache::has($productSyncLock)) {
+                Cache::put($productSyncLock, true, 120);
+                $this->shopeeService->pullAndSyncProducts($this->mutationService);
+            }
         }
 
-        ShopeeSetting::current()->update(['last_synced_at' => now()]);
+        // Update timestamp sinkronisasi (dibatasi maksimal 1x per 60 detik agar tidak membebani DB)
+        $setting = ShopeeSetting::current();
+        if (! $setting->last_synced_at || $setting->last_synced_at->diffInSeconds(now()) >= 60) {
+            $setting->update(['last_synced_at' => now()]);
+        }
 
         return response()->json(['code' => 0, 'message' => 'success']);
     }
@@ -508,5 +544,44 @@ class ShopeeController extends Controller
         }
 
         return redirect()->back()->with('error', 'Gagal menarik produk dari Shopee: '.($result['error'] ?? 'Terjadi kesalahan sistem'));
+    }
+
+    /**
+     * Web-triggered background sync with 60-second cooldown lock.
+     */
+    public function backgroundSync(): JsonResponse
+    {
+        // Jika background runner Windows daemon sedang aktif, tidak perlu menjalankan sync di thread web
+        if (Cache::has('shopee_daemon_active')) {
+            return response()->json([
+                'status' => 'daemon_running',
+                'message' => 'Background runner Windows sedang aktif berjalan di background.',
+            ]);
+        }
+
+        $lockKey = 'shopee_web_bg_sync_cooldown';
+        if (Cache::has($lockKey)) {
+            return response()->json([
+                'status' => 'cooldown',
+                'message' => 'Sync dalam masa jeda aman (cooldown 60 detik)',
+            ]);
+        }
+
+        // Put 60 seconds lock to prevent overlapping calls
+        Cache::put($lockKey, time(), 60);
+
+        try {
+            $result = $this->shopeeService->syncActiveOrdersIncremental(20, $this->mutationService, 2);
+
+            return response()->json([
+                'status' => 'success',
+                'data' => $result,
+            ]);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => $e->getMessage(),
+            ], 500);
+        }
     }
 }

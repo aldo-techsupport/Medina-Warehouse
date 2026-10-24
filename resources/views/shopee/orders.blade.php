@@ -98,6 +98,9 @@
                                     @foreach($order->items_data as $it)
                                         <div class="mb-1" style="font-size: 12px;">
                                             <span class="font-weight-bold text-dark">{{ $it['item_name'] ?? ($it['item_sku'] ?? 'Item') }}</span>
+                                            @if(!empty($it['model_name']))
+                                                <span class="badge badge-info ml-1">{{ $it['model_name'] }}</span>
+                                            @endif
                                             <span class="badge badge-light border ml-1 font-weight-bold">x{{ $it['model_quantity_purchased'] ?? ($it['qty'] ?? 1) }}</span>
                                         </div>
                                     @endforeach

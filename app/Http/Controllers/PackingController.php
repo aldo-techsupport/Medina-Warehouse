@@ -30,20 +30,15 @@ class PackingController extends Controller
      */
     public function index()
     {
-        if ($this->shopeeService->getSetting()->isConnected()) {
-            try {
-                $this->shopeeService->syncLiveOrdersIfStale(20, 7, $this->mutationService);
-            } catch (Exception $e) {
-                Log::warning('Packing live sync orders error: '.$e->getMessage());
-            }
-        }
+        $todayStart = today()->startOfDay();
+        $todayEnd = today()->endOfDay();
 
         $todayPackedCount = PackingRecord::where('status', 'completed')
-            ->whereDate('created_at', today())
+            ->whereBetween('created_at', [$todayStart, $todayEnd])
             ->count();
 
         $todayBlockedCount = PackingRecord::where('status', 'blocked_cancelled')
-            ->whereDate('created_at', today())
+            ->whereBetween('created_at', [$todayStart, $todayEnd])
             ->count();
 
         $recentPacked = PackingRecord::with('shopeeOrder')
@@ -52,7 +47,7 @@ class PackingController extends Controller
             ->take(5)
             ->get();
 
-        $allOrders = ShopeeOrder::where('order_status', 'READY_TO_SHIP')->latest()->take(5)->get();
+        $allOrders = ShopeeOrder::whereIn('order_status', ['READY_TO_SHIP', 'PROCESSED'])->latest()->take(5)->get();
 
         return view('packing.index', compact(
             'todayPackedCount',
@@ -82,6 +77,15 @@ class PackingController extends Controller
             ->orWhere('order_sn', $query)
             ->first();
 
+        // Autocorrect common year typo (e.g. 251024 instead of 261024)
+        if (! $order && str_starts_with($query, '251024')) {
+            $corrected = '261024'.substr($query, 6);
+            $order = ShopeeOrder::where('order_sn', $corrected)->orWhere('tracking_number', $corrected)->first();
+            if ($order) {
+                $query = $corrected;
+            }
+        }
+
         $liveVerified = false;
         $liveTrackingInfo = null;
 
@@ -95,11 +99,36 @@ class PackingController extends Controller
                         $liveStatus = $liveOrder['order_status'] ?? $order->order_status;
                         $liveTracking = $liveOrder['tracking_number'] ?? ($liveOrder['package_list'][0]['tracking_number'] ?? null);
 
-                        if ($liveStatus !== $order->order_status || ($liveTracking && empty($order->tracking_number))) {
+                        $orderUpdated = false;
+                        if ($liveStatus !== $order->order_status) {
                             $order->order_status = $liveStatus;
-                            if ($liveTracking) {
-                                $order->tracking_number = $liveTracking;
+                            $orderUpdated = true;
+                        }
+                        if ($liveTracking && empty($order->tracking_number)) {
+                            $order->tracking_number = $liveTracking;
+                            $orderUpdated = true;
+                        }
+
+                        // Enrich items_data with Shopee's model_name and image_url if available
+                        if (! empty($liveOrder['item_list'])) {
+                            $enrichedItems = [];
+                            foreach ($liveOrder['item_list'] as $rawItem) {
+                                $enrichedItems[] = [
+                                    'item_id' => $rawItem['item_id'] ?? null,
+                                    'item_sku' => $rawItem['item_sku'] ?? null,
+                                    'item_name' => $rawItem['item_name'] ?? 'Shopee Item',
+                                    'model_id' => $rawItem['model_id'] ?? null,
+                                    'model_name' => $rawItem['model_name'] ?? null,
+                                    'model_quantity_purchased' => $rawItem['model_quantity_purchased'] ?? 1,
+                                    'model_discounted_price' => $rawItem['model_discounted_price'] ?? 0,
+                                    'image_url' => $rawItem['image_info']['image_url'] ?? null,
+                                ];
                             }
+                            $order->items_data = $enrichedItems;
+                            $orderUpdated = true;
+                        }
+
+                        if ($orderUpdated) {
                             $order->save();
                         }
                         $liveVerified = true;
@@ -111,7 +140,12 @@ class PackingController extends Controller
                     }
                 } else {
                     // Order not yet in local DB: attempt to fetch directly from Shopee API
-                    $detailResult = $this->shopeeService->getOrderDetail([$query]);
+                    $lookupSn = $query;
+                    if (str_starts_with($lookupSn, '251024')) {
+                        $lookupSn = '261024'.substr($lookupSn, 6);
+                    }
+
+                    $detailResult = $this->shopeeService->getOrderDetail([$lookupSn]);
                     if ($detailResult['success'] && ! empty($detailResult['data']['order_list'][0])) {
                         $liveOrder = $detailResult['data']['order_list'][0];
                         $rawItemList = $liveOrder['item_list'] ?? [];
@@ -122,9 +156,20 @@ class PackingController extends Controller
                                 'item_sku' => $rawItem['item_sku'] ?? null,
                                 'item_name' => $rawItem['item_name'] ?? 'Shopee Item',
                                 'model_id' => $rawItem['model_id'] ?? null,
+                                'model_name' => $rawItem['model_name'] ?? null,
                                 'model_quantity_purchased' => $rawItem['model_quantity_purchased'] ?? 1,
                                 'model_discounted_price' => $rawItem['model_discounted_price'] ?? 0,
+                                'image_url' => $rawItem['image_info']['image_url'] ?? null,
                             ];
+                        }
+
+                        // Try to get tracking number from Shopee logistics API
+                        $liveTracking = $liveOrder['tracking_number'] ?? ($liveOrder['package_list'][0]['tracking_number'] ?? null);
+                        if (empty($liveTracking)) {
+                            $trackRes = $this->shopeeService->getTrackingNumber($liveOrder['order_sn']);
+                            if ($trackRes['success'] && ! empty($trackRes['data']['tracking_number'])) {
+                                $liveTracking = $trackRes['data']['tracking_number'];
+                            }
                         }
 
                         $orderData = [
@@ -133,8 +178,8 @@ class PackingController extends Controller
                             'order_status' => $liveOrder['order_status'] ?? 'READY_TO_SHIP',
                             'total_amount' => $liveOrder['total_amount'] ?? 0,
                             'buyer_username' => $liveOrder['buyer_username'] ?? 'Shopee Customer',
-                            'tracking_number' => $liveOrder['tracking_number'] ?? $query,
-                            'shipping_carrier' => $liveOrder['shipping_carrier'] ?? 'Shopee Logistics',
+                            'tracking_number' => $liveTracking ?? $query,
+                            'shipping_carrier' => $liveOrder['shipping_carrier'] ?? ($liveOrder['package_list'][0]['shipping_carrier'] ?? 'Shopee Logistics'),
                             'items' => $items,
                         ];
 
@@ -144,6 +189,17 @@ class PackingController extends Controller
                             'shipping_carrier' => $orderData['shipping_carrier'],
                         ]);
                         $liveVerified = true;
+                    } elseif (empty($order)) {
+                        // If query was a tracking number (e.g. SPXID...), pull latest orders from Shopee to see if it matches
+                        $syncRes = $this->shopeeService->pullAndSyncOrders(1, $this->mutationService);
+                        if (! empty($syncRes['success'])) {
+                            $order = ShopeeOrder::where('tracking_number', $query)
+                                ->orWhere('order_sn', $query)
+                                ->first();
+                            if ($order) {
+                                $liveVerified = true;
+                            }
+                        }
                     }
                 }
             } catch (Exception $e) {
@@ -162,8 +218,40 @@ class PackingController extends Controller
         $formattedItems = [];
         if (! empty($order->items_data) && is_array($order->items_data)) {
             foreach ($order->items_data as $index => $item) {
-                $sku = $item['item_sku'] ?? null;
-                $product = $sku ? Product::where('sku', $sku)->first() : null;
+                $sku = ! empty($item['item_sku']) ? $item['item_sku'] : null;
+                $itemId = $item['item_id'] ?? null;
+                $modelId = $item['model_id'] ?? null;
+
+                $product = null;
+                if ($sku) {
+                    $product = Product::where('sku', $sku)->first();
+                }
+                if (! $product && $modelId) {
+                    $product = Product::where('shopee_model_id', $modelId)->first();
+                }
+                if (! $product && $itemId) {
+                    $product = Product::where('shopee_item_id', $itemId)->first();
+                }
+
+                // Determine image url:
+                // 1. Direct variation image url from Shopee order
+                // 2. Product image url from local database
+                // 3. Fallback placeholder
+                $imageUrl = ! empty($item['image_url']) ? $item['image_url'] : null;
+                if (empty($imageUrl) && $product) {
+                    $imageUrl = $product->image_url;
+                }
+                if (empty($imageUrl)) {
+                    $search = strtolower(($item['item_name'] ?? '').' '.($item['model_name'] ?? ''));
+                    $imageUrl = match (true) {
+                        str_contains($search, 'gms') || str_contains($search, 'gamis') || str_contains($search, 'dress') => 'https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?auto=format&fit=crop&w=400&q=80',
+                        str_contains($search, 'koko') || str_contains($search, 'kurta') || str_contains($search, 'kemeja') => 'https://images.unsplash.com/photo-1602810318383-e386cc2a3ccf?auto=format&fit=crop&w=400&q=80',
+                        str_contains($search, 'hjb') || str_contains($search, 'hijab') || str_contains($search, 'pashmina') || str_contains($search, 'kerudung') => 'https://images.unsplash.com/photo-1596704017254-9b121068fb31?auto=format&fit=crop&w=400&q=80',
+                        str_contains($search, 'srg') || str_contains($search, 'sarung') => 'https://images.unsplash.com/photo-1607344645866-009c320c5ab8?auto=format&fit=crop&w=400&q=80',
+                        str_contains($search, 'mkn') || str_contains($search, 'mukena') => 'https://images.unsplash.com/photo-1584917865442-de89df76afd3?auto=format&fit=crop&w=400&q=80',
+                        default => 'https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?auto=format&fit=crop&w=400&q=80',
+                    };
+                }
 
                 $formattedItems[] = [
                     'index' => $index,
@@ -175,7 +263,7 @@ class PackingController extends Controller
                     'unit' => $product->unit ?? 'Pcs',
                     'barcode' => $product->barcode ?? null,
                     'current_stock' => $product->stock ?? 0,
-                    'image_url' => $product ? $product->image_url : 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=400&q=80',
+                    'image_url' => $imageUrl,
                     'checked' => false,
                 ];
             }

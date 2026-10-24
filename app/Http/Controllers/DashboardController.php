@@ -8,27 +8,20 @@ use App\Models\ShopeeOrder;
 use App\Models\ShopeeSetting;
 use App\Models\StockMutation;
 use App\Services\AiService;
-use App\Services\ShopeeService;
-use App\Services\StockMutationService;
 use Illuminate\Http\JsonResponse;
 
 class DashboardController extends Controller
 {
     public function index()
     {
-        $shopeeSetting = ShopeeSetting::current();
-        if ($shopeeSetting->isConnected()) {
-            try {
-                app(ShopeeService::class)->syncAllLiveIfStale(25, app(StockMutationService::class));
-            } catch (\Throwable) {
-            }
-        }
+        $todayStart = today()->startOfDay();
+        $todayEnd = today()->endOfDay();
 
         $totalProducts = Product::count();
         $totalStock = (int) Product::sum('stock');
         $totalAssetValue = Product::selectRaw('SUM(stock * purchase_price) as total_val')->value('total_val') ?? 0;
         $lowStockCount = Product::whereColumn('stock', '<=', 'safety_stock')->count();
-        $todayMutationsCount = StockMutation::whereDate('created_at', today())->count();
+        $todayMutationsCount = StockMutation::whereBetween('created_at', [$todayStart, $todayEnd])->count();
 
         // AI Daily Intelligence
         $latestAiAnalysis = null;
@@ -43,16 +36,40 @@ class DashboardController extends Controller
             }
         }
 
-        // Shopee metrics
+        // Shopee metrics: Today's orders identified by Shopee Order SN prefix (YYMMDD)
+        $todayPrefix = date('ymd');
         $shopeeConnectedCount = Product::whereNotNull('shopee_item_id')->count();
-        $todayShopeeOrders = ShopeeOrder::whereDate('created_at', today())->count();
-        $todayShopeeSales = ShopeeOrder::whereDate('created_at', today())->sum('total_amount');
+        $todayShopeeOrders = ShopeeOrder::where('order_sn', 'like', "{$todayPrefix}%")->count();
+        $todayShopeeSales = (float) ShopeeOrder::where('order_sn', 'like', "{$todayPrefix}%")
+            ->whereNotIn('order_status', ['CANCELLED', 'IN_CANCEL', 'TO_RETURN'])
+            ->sum('total_amount');
+
+        // Total sales all-time and active orders for warehouse packing
+        $totalShopeeSales = (float) ShopeeOrder::whereNotIn('order_status', ['CANCELLED', 'IN_CANCEL', 'TO_RETURN'])->sum('total_amount');
+        $totalShopeeOrders = ShopeeOrder::count();
+        $activePackingOrders = ShopeeOrder::whereIn('order_status', ['READY_TO_SHIP', 'PROCESSED'])->count();
 
         // Recent Mutations & Low Stock Items
         $recentMutations = StockMutation::with('product')->latest()->take(8)->get();
         $lowStockProducts = Product::whereColumn('stock', '<=', 'safety_stock')->orderBy('stock')->take(6)->get();
 
-        // Chart Data: Last 7 days mutations
+        // Chart Data: Last 7 days mutations & Shopee sales (Single grouped queries)
+        $sevenDaysAgo = today()->subDays(6)->startOfDay();
+        $sevenDaysPrefix = $sevenDaysAgo->format('ymd');
+
+        $mutationAggregates = StockMutation::whereBetween('created_at', [$sevenDaysAgo, $todayEnd])
+            ->whereIn('type', ['inbound', 'outbound', 'shopee_sale'])
+            ->selectRaw('DATE(created_at) as m_date, type, SUM(qty) as total_qty')
+            ->groupBy('m_date', 'type')
+            ->get()
+            ->groupBy('m_date');
+
+        $shopeeDailyCounts = ShopeeOrder::where('order_sn', '>=', $sevenDaysPrefix)
+            ->whereNotIn('order_status', ['CANCELLED', 'IN_CANCEL', 'TO_RETURN'])
+            ->selectRaw('SUBSTRING(order_sn, 1, 6) as o_prefix, COUNT(*) as total_orders')
+            ->groupBy('o_prefix')
+            ->pluck('total_orders', 'o_prefix');
+
         $chartLabels = [];
         $chartInbound = [];
         $chartOutbound = [];
@@ -60,22 +77,18 @@ class DashboardController extends Controller
 
         for ($i = 6; $i >= 0; $i--) {
             $date = today()->subDays($i);
+            $dateStr = $date->toDateString();
+            $datePrefix = $date->format('ymd');
             $chartLabels[] = $date->translatedFormat('d M');
 
-            $chartInbound[] = (int) StockMutation::whereDate('created_at', $date)
-                ->where('type', 'inbound')
-                ->sum('qty');
+            $dayData = $mutationAggregates->get($dateStr, collect());
 
-            $chartOutbound[] = abs((int) StockMutation::whereDate('created_at', $date)
-                ->where('type', 'outbound')
-                ->sum('qty'));
-
-            $chartShopee[] = abs((int) StockMutation::whereDate('created_at', $date)
-                ->where('type', 'shopee_sale')
-                ->sum('qty'));
+            $chartInbound[] = (int) ($dayData->firstWhere('type', 'inbound')?->total_qty ?? 0);
+            $chartOutbound[] = abs((int) ($dayData->firstWhere('type', 'outbound')?->total_qty ?? 0));
+            $chartShopee[] = (int) ($shopeeDailyCounts->get($datePrefix) ?? 0);
         }
 
-        $allProducts = Product::where('status', 'active')->orderBy('name')->get();
+        $allProducts = Product::where('status', 'active')->select(['id', 'sku', 'name', 'unit', 'stock'])->orderBy('name')->get();
         $shopeeSetting = ShopeeSetting::current();
 
         return view('dashboard.index', compact(
@@ -87,6 +100,9 @@ class DashboardController extends Controller
             'shopeeConnectedCount',
             'todayShopeeOrders',
             'todayShopeeSales',
+            'totalShopeeSales',
+            'totalShopeeOrders',
+            'activePackingOrders',
             'recentMutations',
             'lowStockProducts',
             'chartLabels',
@@ -104,24 +120,18 @@ class DashboardController extends Controller
      */
     public function notifications(): JsonResponse
     {
-        $shopeeSetting = ShopeeSetting::current();
-        if ($shopeeSetting->isConnected()) {
-            try {
-                app(ShopeeService::class)->syncLiveOrdersIfStale(25, 7, app(StockMutationService::class));
-            } catch (\Throwable) {
-            }
-        }
+        // 1. Pending Orders awaiting packing (READY_TO_SHIP and PROCESSED)
+        $activeStatuses = ['READY_TO_SHIP', 'PROCESSED'];
 
-        // 1. Pending Orders awaiting packing
-        $pendingOrders = ShopeeOrder::where('order_status', 'READY_TO_SHIP')
+        $pendingOrders = ShopeeOrder::whereIn('order_status', $activeStatuses)
             ->whereDoesntHave('packingRecords', function ($q) {
                 $q->where('status', 'completed');
             })
-            ->latest()
-            ->take(5)
+            ->latest('id')
+            ->take(8)
             ->get();
 
-        $pendingCount = ShopeeOrder::where('order_status', 'READY_TO_SHIP')
+        $pendingCount = ShopeeOrder::whereIn('order_status', $activeStatuses)
             ->whereDoesntHave('packingRecords', function ($q) {
                 $q->where('status', 'completed');
             })
@@ -129,8 +139,9 @@ class DashboardController extends Controller
 
         // 2. Buyer Cancellations & Return requests (last 48 hours)
         $cancellations = ShopeeOrder::whereIn('order_status', ['CANCELLED', 'IN_CANCEL', 'TO_RETURN', 'RETURNED'])
+            ->where('updated_at', '>=', now()->subHours(48))
             ->latest('updated_at')
-            ->take(5)
+            ->take(6)
             ->get();
 
         $cancellationsCount = ShopeeOrder::whereIn('order_status', ['CANCELLED', 'IN_CANCEL', 'TO_RETURN', 'RETURNED'])
@@ -151,8 +162,9 @@ class DashboardController extends Controller
                 'order_sn' => $o->order_sn,
                 'tracking_number' => $o->tracking_number,
                 'buyer' => $o->buyer_username,
+                'status' => $o->order_status,
                 'carrier' => $o->shipping_carrier ?? 'Shopee',
-                'time_ago' => $o->created_at->diffForHumans(),
+                'time_ago' => $o->created_at ? $o->created_at->diffForHumans(['locale' => 'id']) : 'Baru saja',
                 'items_count' => count($o->items_data ?? []),
             ]),
             'cancellations_count' => $cancellationsCount,
@@ -162,7 +174,7 @@ class DashboardController extends Controller
                 'tracking_number' => $o->tracking_number,
                 'status' => $o->order_status,
                 'buyer' => $o->buyer_username,
-                'time_ago' => $o->updated_at->diffForHumans(),
+                'time_ago' => $o->updated_at ? $o->updated_at->diffForHumans(['locale' => 'id']) : 'Baru saja',
             ]),
             'low_stock_count' => $lowStockCount,
         ]);
