@@ -127,13 +127,16 @@ class ShopeeController extends Controller
 
         $setting = ShopeeSetting::current();
 
-        $partnerIdChanged = (int) $setting->partner_id !== (int) ($validated['partner_id'] ?? null);
-        $partnerKeyChanged = $setting->partner_key !== ($validated['partner_key'] ?? null);
+        $partnerId = ! empty($validated['partner_id']) ? (int) trim((string) $validated['partner_id']) : null;
+        $partnerKey = ! empty($validated['partner_key']) ? trim((string) $validated['partner_key']) : null;
+
+        $partnerIdChanged = (int) $setting->partner_id !== (int) $partnerId;
+        $partnerKeyChanged = $setting->partner_key !== $partnerKey;
         $envChanged = $setting->environment !== $validated['environment'];
 
         $updateData = [
-            'partner_id' => $validated['partner_id'] ?? null,
-            'partner_key' => $validated['partner_key'] ?? null,
+            'partner_id' => $partnerId,
+            'partner_key' => $partnerKey,
             'shop_id' => $validated['shop_id'] ?? null,
             'shop_name' => $validated['shop_name'] ?: 'Medina Official Store',
             'environment' => $validated['environment'],
@@ -158,13 +161,15 @@ class ShopeeController extends Controller
     public function handleCallback(Request $request)
     {
         $code = $request->input('code');
-        $shopId = (int) ($request->input('shop_id') ?? ShopeeSetting::current()->shop_id);
+        $rawShopId = $request->input('shop_id');
+        $shopId = ! empty($rawShopId) ? (int) $rawShopId : (! empty(ShopeeSetting::current()->shop_id) ? (int) ShopeeSetting::current()->shop_id : null);
+        $mainAccountId = $request->filled('main_account_id') ? (int) $request->input('main_account_id') : null;
 
         if (! $code) {
             return redirect()->route('shopee.settings')->with('error', 'Otorisasi Shopee gagal: Kode otorisasi tidak diterima.');
         }
 
-        $result = $this->shopeeService->getAccessToken($code, $shopId);
+        $result = $this->shopeeService->getAccessToken($code, $shopId, $mainAccountId);
 
         if ($result['success']) {
             return redirect()->route('shopee.dashboard')->with('success', 'Selamat! Toko Shopee berhasil terhubung.');

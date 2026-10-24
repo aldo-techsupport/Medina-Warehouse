@@ -30,16 +30,16 @@
                             <small class="text-muted">Diberikan dari Shopee Open Platform Console.</small>
                         </div>
                         <div class="form-group col-md-6">
-                            <label class="font-weight-bold">Shop ID</label>
-                            <input type="number" name="shop_id" class="form-control" value="{{ old('shop_id', $setting->shop_id) }}" placeholder="Contoh: 28472918">
-                            <small class="text-muted">ID Toko Shopee Anda.</small>
+                            <label class="font-weight-bold">Shop ID <small class="text-muted font-weight-normal">(Opsional)</small></label>
+                            <input type="number" name="shop_id" class="form-control" value="{{ old('shop_id', $setting->shop_id) }}" placeholder="Otomatis terisi saat otorisasi">
+                            <small class="text-muted">Dapat dikosongkan. Shopee akan otomatis mengisi ini saat proses otorisasi berhasil.</small>
                         </div>
                     </div>
 
                     <div class="form-group">
                         <label class="font-weight-bold">Partner Key (Secret Key) <span class="text-danger">*</span></label>
-                        <input type="text" name="partner_key" class="form-control font-monospace" value="{{ old('partner_key', $setting->partner_key) }}" placeholder="Contoh: 6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d...">
-                        <small class="text-muted">Kunci rahasia untuk enkripsi HMAC-SHA256 signature.</small>
+                        <input type="text" name="partner_key" class="form-control font-monospace" value="{{ old('partner_key', $setting->partner_key) }}" placeholder="Contoh: shpk4672446d694e...">
+                        <small class="text-muted">Kunci rahasia dari Shopee Open Platform Console. Salin seluruh teks (termasuk awalan <code>shpk</code> jika ada, tanpa spasi tambahan).</small>
                     </div>
 
                     <div class="form-group">

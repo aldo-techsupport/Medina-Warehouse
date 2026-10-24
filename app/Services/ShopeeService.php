@@ -79,7 +79,7 @@ class ShopeeService
     /**
      * Exchange Authorization Code for Access Token & Refresh Token.
      */
-    public function getAccessToken(string $code, int $shopId): array
+    public function getAccessToken(string $code, ?int $shopId = null, ?int $mainAccountId = null): array
     {
         $path = '/api/v2/auth/token/get';
         $timestamp = time();
@@ -94,22 +94,36 @@ class ShopeeService
             $sign
         );
 
-        $response = Http::timeout(15)->post($url, [
+        $payload = [
             'code' => $code,
-            'shop_id' => $shopId,
             'partner_id' => (int) $this->setting->partner_id,
-        ]);
+        ];
+
+        if (! empty($shopId)) {
+            $payload['shop_id'] = $shopId;
+        }
+
+        if (! empty($mainAccountId)) {
+            $payload['main_account_id'] = $mainAccountId;
+        }
+
+        $response = Http::timeout(15)->post($url, $payload);
 
         $data = $response->json();
 
         if ($response->successful() && empty($data['error'])) {
-            $this->setting->update([
-                'shop_id' => $shopId,
+            $updateData = [
                 'access_token' => $data['access_token'] ?? null,
                 'refresh_token' => $data['refresh_token'] ?? null,
                 'expire_in' => $data['expire_in'] ?? null,
                 'token_expires_at' => now()->addSeconds(($data['expire_in'] ?? 14400) - 300),
-            ]);
+            ];
+
+            if (! empty($shopId)) {
+                $updateData['shop_id'] = $shopId;
+            }
+
+            $this->setting->update($updateData);
 
             return ['success' => true, 'data' => $data];
         }
@@ -119,6 +133,8 @@ class ShopeeService
             'response' => $data,
             'partner_id' => $this->setting->partner_id,
             'environment' => $this->setting->environment,
+            'shop_id' => $shopId,
+            'main_account_id' => $mainAccountId,
         ]);
 
         return [
