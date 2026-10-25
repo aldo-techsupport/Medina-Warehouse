@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\AiAdvisorController;
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\CourierTrackingController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\PackingController;
 use App\Http\Controllers\RoleController;
@@ -63,6 +64,15 @@ Route::middleware('auth')->group(function () {
         Route::middleware('menu:packing_history')->group(function () {
             Route::get('/history', [PackingController::class, 'history'])->name('history');
         });
+    });
+
+    // Courier & Logistics Tracking (Shopee Guide 4)
+    Route::prefix('courier-tracking')->name('courier.')->middleware('menu:courier_tracking')->group(function () {
+        Route::get('/', [CourierTrackingController::class, 'index'])->name('index');
+        Route::get('/{order}', [CourierTrackingController::class, 'show'])->name('show');
+        Route::post('/sync/{order}', [CourierTrackingController::class, 'syncTracking'])->name('sync');
+        Route::post('/sync-all', [CourierTrackingController::class, 'syncAllTracking'])->name('sync.all');
+        Route::post('/demo-seed', [CourierTrackingController::class, 'generateDemoPackages'])->name('demo.seed');
     });
 
     // Shopee Open API & Channel Integration

@@ -674,6 +674,71 @@ class ShopeeService
     }
 
     /**
+     * Sync logistics tracking info from Shopee Open API v2 into ShopeeOrder model.
+     * Implements Shopee Open Platform Developer Guide 4 (Logistics & Tracking).
+     */
+    public function syncOrderTrackingInfo(ShopeeOrder $order): array
+    {
+        if (! $this->setting->isConnected()) {
+            return ['success' => false, 'error' => 'Toko Shopee belum terhubung'];
+        }
+
+        // If tracking number is empty, fetch from get_tracking_number
+        if (empty($order->tracking_number)) {
+            $numRes = $this->getTrackingNumber($order->order_sn);
+            if ($numRes['success'] && ! empty($numRes['data']['tracking_number'])) {
+                $order->tracking_number = $numRes['data']['tracking_number'];
+            }
+        }
+
+        $res = $this->getTrackingInfo($order->order_sn);
+        if (! $res['success']) {
+            return $res;
+        }
+
+        $trackingData = $res['data']['tracking_info'] ?? [];
+        $logisticsStatus = $res['data']['logistics_status'] ?? null;
+
+        if (empty($logisticsStatus) && ! empty($trackingData)) {
+            $latest = end($trackingData);
+            $logisticsStatus = $latest['logistics_status'] ?? null;
+        }
+
+        $updateData = [
+            'tracking_data' => $trackingData,
+            'last_tracked_at' => now(),
+        ];
+
+        if ($order->tracking_number) {
+            $updateData['tracking_number'] = $order->tracking_number;
+        }
+
+        if ($logisticsStatus) {
+            $updateData['logistics_status'] = $logisticsStatus;
+            if ($logisticsStatus === 'LOGISTICS_DELIVERED') {
+                $updateData['delivered_at'] = $order->delivered_at ?? now();
+                $updateData['order_status'] = 'COMPLETED';
+            } elseif (in_array($logisticsStatus, ['LOGISTICS_PICKUP_DONE', 'LOGISTICS_DELIVERY_IN_PROCESS'])) {
+                if (empty($order->shipped_at)) {
+                    $updateData['shipped_at'] = now();
+                }
+            }
+        }
+
+        $order->update($updateData);
+
+        return [
+            'success' => true,
+            'data' => [
+                'order_sn' => $order->order_sn,
+                'tracking_number' => $order->tracking_number,
+                'logistics_status' => $order->logistics_status,
+                'tracking_info' => $order->tracking_data,
+            ],
+        ];
+    }
+
+    /**
      * Arrange shipment (ship order) in Shopee Open API v2.
      */
     public function shipOrder(string $orderSn, array $shippingParams = []): array

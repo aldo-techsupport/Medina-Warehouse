@@ -61,6 +61,12 @@ class Role extends Model
                 'icon' => 'fas fa-photo-film',
                 'route' => 'packing.history',
             ],
+            'courier_tracking' => [
+                'name' => 'Lacak Kurir',
+                'description' => 'Monitoring status pengiriman kurir, rincian paket, & filter paket tertahan (5+ hari)',
+                'icon' => 'fas fa-truck-fast',
+                'route' => 'courier.index',
+            ],
         ],
         'Integrasi Shopee' => [
             'shopee_dashboard' => [

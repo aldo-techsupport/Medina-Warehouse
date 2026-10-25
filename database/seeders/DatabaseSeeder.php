@@ -36,7 +36,7 @@ class DatabaseSeeder extends Seeder
             [
                 'name' => 'Admin Gudang',
                 'description' => 'Bertanggung jawab atas stok fisik, mutasi masuk/keluar, dan monitoring dashboard gudang.',
-                'permissions' => ['dashboard', 'warehouse_products', 'warehouse_mutations', 'packing_history'],
+                'permissions' => ['dashboard', 'warehouse_products', 'warehouse_mutations', 'packing_history', 'courier_tracking'],
             ]
         );
 
@@ -45,7 +45,7 @@ class DatabaseSeeder extends Seeder
             [
                 'name' => 'Operator Packing',
                 'description' => 'Petugas meja packing, scan resi, rekam video pengiriman, dan cek riwayat packing.',
-                'permissions' => ['packing_station', 'packing_history'],
+                'permissions' => ['packing_station', 'packing_history', 'courier_tracking'],
             ]
         );
 
@@ -54,7 +54,7 @@ class DatabaseSeeder extends Seeder
             [
                 'name' => 'Staff Shopee',
                 'description' => 'Spesialis operasional marketplace, sinkronisasi stok shopee, dan pemantauan order.',
-                'permissions' => ['shopee_dashboard', 'shopee_orders', 'shopee_settings', 'ai_advisor'],
+                'permissions' => ['shopee_dashboard', 'shopee_orders', 'shopee_settings', 'ai_advisor', 'courier_tracking'],
             ]
         );
 

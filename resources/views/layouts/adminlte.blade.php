@@ -500,7 +500,7 @@
                         @endif
                     @endif
 
-                    @if(auth()->user()->hasPermission('packing_station') || auth()->user()->hasPermission('packing_history'))
+                    @if(auth()->user()->hasPermission('packing_station') || auth()->user()->hasPermission('packing_history') || auth()->user()->hasPermission('courier_tracking'))
                         <li class="nav-header text-uppercase font-weight-bold text-muted mt-2" style="font-size: 10px;">Packing & Pengiriman</li>
 
                         @if(auth()->user()->hasPermission('packing_station'))
@@ -517,6 +517,34 @@
                                 <a href="{{ route('packing.history') }}" class="nav-link {{ request()->routeIs('packing.history') ? 'active bg-danger' : '' }}">
                                     <i class="nav-icon fas fa-photo-film text-danger"></i>
                                     <p>Galeri Video Packing</p>
+                                </a>
+                            </li>
+                        @endif
+
+                        @if(auth()->user()->hasPermission('courier_tracking'))
+                            <li class="nav-item">
+                                <a href="{{ route('courier.index') }}" class="nav-link {{ request()->routeIs('courier.*') ? 'active bg-primary' : '' }}">
+                                    <i class="nav-icon fas fa-truck-fast text-info"></i>
+                                    <p>
+                                        Lacak Kurir
+                                        @php
+                                            $delayedSidebarCount = \Illuminate\Support\Facades\Cache::remember('delayed_sidebar_count_badge', 60, function () {
+                                                return \App\Models\ShopeeOrder::whereNotIn('order_status', ['COMPLETED', 'CANCELLED', 'IN_CANCEL', 'RETURNED'])
+                                                    ->where(function ($q) {
+                                                        $q->whereNull('logistics_status')
+                                                          ->orWhere('logistics_status', '!=', 'LOGISTICS_DELIVERED');
+                                                    })
+                                                    ->where(function ($q) {
+                                                        $q->where('created_at', '<=', now()->subDays(5))
+                                                          ->orWhere('shipped_at', '<=', now()->subDays(5));
+                                                    })
+                                                    ->count();
+                                            });
+                                        @endphp
+                                        @if($delayedSidebarCount > 0)
+                                            <span class="badge badge-danger right" title="{{ $delayedSidebarCount }} paket tertahan >= 5 hari">{{ $delayedSidebarCount }}</span>
+                                        @endif
+                                    </p>
                                 </a>
                             </li>
                         @endif

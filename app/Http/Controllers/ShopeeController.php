@@ -573,9 +573,28 @@ class ShopeeController extends Controller
         try {
             $result = $this->shopeeService->syncActiveOrdersIncremental(20, $this->mutationService, 2);
 
+            // Also synchronize tracking milestones for active packages
+            $activePackages = ShopeeOrder::whereNotIn('order_status', ['COMPLETED', 'CANCELLED', 'IN_CANCEL', 'RETURNED'])
+                ->whereNotNull('tracking_number')
+                ->where(function ($q) {
+                    $q->whereNull('last_tracked_at')
+                        ->orWhere('last_tracked_at', '<=', now()->subMinutes(20));
+                })
+                ->take(5)
+                ->get();
+
+            $trackedCount = 0;
+            foreach ($activePackages as $pkg) {
+                $trackRes = $this->shopeeService->syncOrderTrackingInfo($pkg);
+                if (! empty($trackRes['success'])) {
+                    $trackedCount++;
+                }
+            }
+
             return response()->json([
                 'status' => 'success',
                 'data' => $result,
+                'packages_tracked' => $trackedCount,
             ]);
         } catch (\Throwable $e) {
             return response()->json([
