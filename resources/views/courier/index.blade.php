@@ -81,6 +81,22 @@
         color: #ffffff !important;
         box-shadow: 0 2px 8px rgba(220, 38, 38, 0.35);
     }
+    .filter-pill.cancel-pill {
+        border-color: #fecdd3;
+        background: #fff;
+        color: #e11d48;
+    }
+    .filter-pill.cancel-pill:hover {
+        background: #fff1f2;
+        border-color: #fda4af;
+        color: #be123c;
+    }
+    .filter-pill.cancel-pill.active {
+        background: #e11d48;
+        border-color: #e11d48;
+        color: #ffffff !important;
+        box-shadow: 0 2px 8px rgba(225, 29, 72, 0.35);
+    }
     .badge-light-custom {
         background: #e2e8f0;
         color: #334155;
@@ -260,6 +276,9 @@
     <a href="{{ route('courier.index', array_merge(request()->except('filter', 'page'), ['filter' => 'ready_to_ship'])) }}" 
        class="filter-pill {{ $filter === 'ready_to_ship' ? 'active' : '' }}">
         Perlu Dikirim 
+        @if(isset($readyToShipCount) && $readyToShipCount > 0)
+            <span class="badge-light-custom">{{ $readyToShipCount }}</span>
+        @endif
     </a>
 
     <a href="{{ route('courier.index', array_merge(request()->except('filter', 'page'), ['filter' => 'delivered'])) }}" 
@@ -271,6 +290,15 @@
     <a href="{{ route('courier.index', array_merge(request()->except('filter', 'page'), ['filter' => 'failed'])) }}" 
        class="filter-pill {{ $filter === 'failed' ? 'active' : '' }}">
         Kendala Antar
+        @if(isset($failedCount) && $failedCount > 0)
+            <span class="badge-light-custom">{{ $failedCount }}</span>
+        @endif
+    </a>
+
+    <a href="{{ route('courier.index', array_merge(request()->except('filter', 'page'), ['filter' => 'cancelled'])) }}" 
+       class="filter-pill cancel-pill {{ $filter === 'cancelled' ? 'active' : '' }}">
+        <i class="fas fa-ban mr-1"></i> Dibatalkan
+        <span class="badge-light-custom">{{ $cancelledCount }}</span>
     </a>
 </div>
 
@@ -344,6 +372,10 @@
             <span class="badge badge-danger p-2 font-weight-bold">
                 Filter: Paket Tertahan (≥ 5 Hari)
             </span>
+        @elseif($filter === 'cancelled')
+            <span class="badge badge-danger p-2 font-weight-bold">
+                Filter: Paket Dibatalkan / Retur
+            </span>
         @endif
     </div>
 
@@ -357,6 +389,8 @@
                 <p class="text-sm mb-3">
                     @if($filter === 'delayed_5_days')
                         Saat ini tidak ada paket yang tertahan ≥ 5 hari.
+                    @elseif($filter === 'cancelled')
+                        Saat ini tidak ada paket yang dibatalkan atau retur.
                     @else
                         Tidak ada data paket yang sesuai dengan kriteria pencarian.
                     @endif

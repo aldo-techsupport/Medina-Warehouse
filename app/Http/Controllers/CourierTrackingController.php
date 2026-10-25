@@ -65,6 +65,11 @@ class CourierTrackingController extends Controller
                     $q->whereNull('logistics_status')
                         ->orWhere('logistics_status', 'LOGISTICS_NOT_START');
                 });
+        } elseif ($filter === 'cancelled') {
+            $query->where(function ($q) {
+                $q->whereIn('order_status', ['CANCELLED', 'IN_CANCEL', 'TO_RETURN', 'RETURNED'])
+                    ->orWhereIn('logistics_status', ['LOGISTICS_CANCEL', 'LOGISTICS_RETURN']);
+            });
         }
 
         // Filter by Courier / Carrier
@@ -124,6 +129,19 @@ class CourierTrackingController extends Controller
                 ->orWhere('logistics_status', 'LOGISTICS_DELIVERED');
         })->count();
 
+        $cancelledCount = ShopeeOrder::where(function ($q) {
+            $q->whereIn('order_status', ['CANCELLED', 'IN_CANCEL', 'TO_RETURN', 'RETURNED'])
+                ->orWhereIn('logistics_status', ['LOGISTICS_CANCEL', 'LOGISTICS_RETURN']);
+        })->count();
+
+        $readyToShipCount = ShopeeOrder::where('order_status', 'READY_TO_SHIP')
+            ->where(function ($q) {
+                $q->whereNull('logistics_status')
+                    ->orWhere('logistics_status', 'LOGISTICS_NOT_START');
+            })->count();
+
+        $failedCount = ShopeeOrder::whereIn('logistics_status', ['LOGISTICS_DELIVERY_FAILED', 'LOGISTICS_COD_REJECTED'])->count();
+
         $cachedCarriers = Cache::remember('courier_unique_carriers_list', 1800, function () {
             return ShopeeOrder::whereNotNull('shipping_carrier')
                 ->where('shipping_carrier', '!=', '')
@@ -157,6 +175,9 @@ class CourierTrackingController extends Controller
             'delayed5DaysCount',
             'inTransitCount',
             'deliveredCount',
+            'cancelledCount',
+            'readyToShipCount',
+            'failedCount',
             'carriersList'
         ));
     }

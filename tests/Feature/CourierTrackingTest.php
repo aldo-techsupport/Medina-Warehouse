@@ -273,3 +273,31 @@ test('it handles carrier list dropdown safely with various cache payloads', func
     $response->assertSee('SPX Express');
     $response->assertSee('J&T Express');
 });
+
+test('it filters packages by cancelled status correctly', function () {
+    ShopeeOrder::create([
+        'order_sn' => 'TEST_ORD_CANCEL_01',
+        'tracking_number' => 'SPXID_CANCEL_01',
+        'shipping_carrier' => 'SPX Express',
+        'order_status' => 'CANCELLED',
+        'total_amount' => 110000,
+        'buyer_username' => 'cancel_buyer_01',
+    ]);
+
+    ShopeeOrder::create([
+        'order_sn' => 'TEST_ORD_ACTIVE_02',
+        'tracking_number' => 'SPXID_ACTIVE_02',
+        'shipping_carrier' => 'SPX Express',
+        'order_status' => 'PROCESSED',
+        'total_amount' => 150000,
+        'buyer_username' => 'active_buyer_02',
+    ]);
+
+    $response = $this->actingAs($this->adminUser)->get(route('courier.index', ['filter' => 'cancelled']));
+
+    $response->assertStatus(200);
+    $response->assertSee('TEST_ORD_CANCEL_01');
+    $response->assertSee('SPXID_CANCEL_01');
+    $response->assertDontSee('TEST_ORD_ACTIVE_02');
+    $response->assertSee('Dibatalkan');
+});
