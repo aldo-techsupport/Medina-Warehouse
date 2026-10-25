@@ -26,6 +26,15 @@
         transition: all 0.2s ease;
         border: 1px solid #e2e8f0;
     }
+    #packingVideoModal, #packageDetailModal {
+        z-index: 1060 !important;
+    }
+    #packingVideoModal .modal-dialog, #packageDetailModal .modal-dialog {
+        z-index: 1061 !important;
+    }
+    .modal-backdrop {
+        z-index: 1050 !important;
+    }
     .kpi-card:hover {
         transform: translateY(-2px);
         box-shadow: 0 4px 12px rgba(0,0,0,0.06);
@@ -634,8 +643,11 @@
                 <button type="button" class="btn btn-secondary btn-sm font-weight-bold" data-dismiss="modal">Tutup</button>
             </div>
         </div>
+    </div>
+</div>
+
 <!-- Modal Video Packing Langsung -->
-<div class="modal fade" id="packingVideoModal" tabindex="-1" role="dialog" aria-hidden="true">
+<div class="modal fade" id="packingVideoModal" tabindex="-1" role="dialog" aria-hidden="true" style="z-index: 1060;">
     <div class="modal-dialog modal-dialog-centered modal-lg" role="document">
         <div class="modal-content border-0 shadow-lg" style="border-radius: 12px; overflow: hidden;">
             <div class="modal-header bg-dark text-white py-2 px-3 border-0">
@@ -731,7 +743,7 @@
 @push('scripts')
 <script>
     function openPackageDetailModal(orderId) {
-        $('#packageDetailModal').modal('show');
+        $('#packageDetailModal').appendTo('body').modal('show');
         $('#modalOrderSn').text('Memuat...');
         $('#modalTrackingNumber').text('-');
         $('#modalContent').html(`
@@ -1049,7 +1061,11 @@
             $('#noVideoBuyer').text(data.buyer || '-');
         }
 
-        $('#packingVideoModal').modal('show');
+        if ($('#packageDetailModal').hasClass('show')) {
+            $('#packageDetailModal').modal('hide');
+        }
+
+        $('#packingVideoModal').appendTo('body').modal('show');
     }
 
     function stopPackingVideo() {

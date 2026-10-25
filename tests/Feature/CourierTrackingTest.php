@@ -340,6 +340,14 @@ test('it displays direct packing video action and modal in courier tracking with
     $response->assertSee('Tidak ada video');
     $response->assertSee('packingVideoModal');
 
+    // Verify modals are not nested inside each other
+    $content = $response->getContent();
+    $detailPos = strpos($content, 'id="packageDetailModal"');
+    $videoPos = strpos($content, 'id="packingVideoModal"');
+    expect($detailPos)->toBeLessThan($videoPos);
+    $detailModalSub = substr($content, $detailPos, $videoPos - $detailPos);
+    expect(substr_count($detailModalSub, '<div'))->toEqual(substr_count($detailModalSub, '</div>'));
+
     // Test JSON endpoint for order with video
     $jsonWithVid = $this->actingAs($this->adminUser)->getJson(route('courier.show', $orderWithVideo));
     $jsonWithVid->assertStatus(200);
