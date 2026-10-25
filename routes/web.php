@@ -58,8 +58,11 @@ Route::middleware('auth')->group(function () {
         Route::middleware('menu:packing_station')->group(function () {
             Route::get('/', [PackingController::class, 'index'])->name('index');
             Route::post('/check', [PackingController::class, 'checkOrder'])->name('check');
-            Route::post('/upload-video', [PackingController::class, 'uploadVideo'])->name('upload');
         });
+
+        // Background upload endpoints accessible across all warehouse pages
+        Route::post('/init-upload', [PackingController::class, 'initUpload'])->name('initUpload');
+        Route::post('/upload-video', [PackingController::class, 'uploadVideo'])->name('upload');
 
         Route::middleware('menu:packing_history')->group(function () {
             Route::get('/history', [PackingController::class, 'history'])->name('history');

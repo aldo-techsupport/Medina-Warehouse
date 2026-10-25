@@ -12,6 +12,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\ValidationException;
 
 class PackingController extends Controller
 {
@@ -295,8 +296,8 @@ class PackingController extends Controller
             ]);
         }
 
-        // Check if Order has already been packed previously
-        $existingPacking = PackingRecord::where('status', 'completed')
+        // Check if Order has already been packed previously or is currently uploading
+        $existingPacking = PackingRecord::whereIn('status', ['completed', 'in_progress'])
             ->where(function ($q) use ($order, $query) {
                 $q->where('order_sn', $order->order_sn);
                 if (! empty($order->tracking_number)) {
@@ -309,15 +310,45 @@ class PackingController extends Controller
             ->latest()
             ->first();
 
+        // If in_progress record was created > 3 minutes ago without video, it was abandoned (browser closed / connection lost)
+        if ($existingPacking && $existingPacking->status === 'in_progress' && empty($existingPacking->video_path) && $existingPacking->created_at->isBefore(now()->subMinutes(3))) {
+            $completedRecord = PackingRecord::where('status', 'completed')
+                ->where(function ($q) use ($order, $query) {
+                    $q->where('order_sn', $order->order_sn);
+                    if (! empty($order->tracking_number)) {
+                        $q->orWhere('tracking_number', $order->tracking_number);
+                    }
+                    if (! empty($query)) {
+                        $q->orWhere('tracking_number', $query);
+                    }
+                })
+                ->latest()
+                ->first();
+
+            $existingPacking->delete();
+            $existingPacking = $completedRecord;
+        }
+
         $alreadyPacked = $existingPacking !== null;
+        $isUploading = $existingPacking?->status === 'in_progress';
         $existingPackingData = $alreadyPacked ? [
             'id' => $existingPacking->id,
+            'status' => $existingPacking->status,
+            'is_uploading' => $isUploading,
             'packed_at' => $existingPacking->created_at->translatedFormat('d M Y, H:i'),
             'packed_time_diff' => $existingPacking->created_at->diffForHumans(),
             'packer_name' => $existingPacking->packer_name ?: 'Staff Packing',
             'video_url' => $existingPacking->video_url,
             'duration' => $existingPacking->formatted_duration,
         ] : null;
+
+        $customMessage = $alreadyPacked
+            ? ($isUploading
+                ? "Video packing untuk Resi ini sedang diunggah di latar belakang oleh {$existingPacking->packer_name} ({$existingPacking->created_at->diffForHumans()})."
+                : "Resi ini sudah pernah dipacking oleh {$existingPacking->packer_name} ({$existingPacking->created_at->diffForHumans()}).")
+            : ($liveVerified
+                ? 'Pesanan aktif & terverifikasi langsung via Shopee API. Silakan periksa produk dan mulai perekaman video packing.'
+                : 'Pesanan aktif & valid. Silakan periksa produk dan mulai perekaman video packing.');
 
         return response()->json([
             'status' => 'ready',
@@ -332,24 +363,20 @@ class PackingController extends Controller
             'live_tracking_info' => $liveTrackingInfo,
             'items' => $formattedItems,
             'already_packed' => $alreadyPacked,
+            'is_uploading' => $isUploading,
             'existing_packing' => $existingPackingData,
-            'message' => $alreadyPacked
-                ? "Resi ini sudah pernah dipacking oleh {$existingPacking->packer_name} ({$existingPacking->created_at->diffForHumans()})."
-                : ($liveVerified
-                    ? 'Pesanan aktif & terverifikasi langsung via Shopee API. Silakan periksa produk dan mulai perekaman video packing.'
-                    : 'Pesanan aktif & valid. Silakan periksa produk dan mulai perekaman video packing.'),
+            'message' => $customMessage,
         ]);
     }
 
     /**
-     * Upload & save recorded packing video.
+     * Pre-register a packing record with status 'in_progress' for background processing.
      */
-    public function uploadVideo(Request $request): JsonResponse
+    public function initUpload(Request $request): JsonResponse
     {
         $validated = $request->validate([
             'order_sn' => 'required|string',
             'tracking_number' => 'nullable|string',
-            'video' => 'required|file|max:102400', // Max 100MB
             'duration' => 'nullable|integer',
             'packer_name' => 'nullable|string',
             'items_checked' => 'nullable|string',
@@ -358,58 +385,193 @@ class PackingController extends Controller
         ]);
 
         $order = ShopeeOrder::where('order_sn', $validated['order_sn'])->first();
-
-        // Store video to storage/app/public/packing_videos
-        $videoFile = $request->file('video');
-        $extension = $videoFile->getClientOriginalExtension() ?: 'webm';
-        $filename = 'pack_'.$validated['order_sn'].'_'.date('Ymd_His').'.'.$extension;
-        $path = $videoFile->storeAs('packing_videos', $filename, 'public');
+        $mode = $validated['mode'] ?? 'packing';
+        $isReturn = $mode === 'return_unboxing';
 
         $itemsChecked = [];
         if (! empty($validated['items_checked'])) {
             $itemsChecked = json_decode($validated['items_checked'], true) ?: [];
         }
 
-        $mode = $validated['mode'] ?? 'packing';
-        $isReturn = $mode === 'return_unboxing';
+        // Avoid duplicate in_progress records if one is already in flight
+        $record = PackingRecord::where('order_sn', $validated['order_sn'])
+            ->where('status', 'in_progress')
+            ->latest()
+            ->first();
 
-        $record = PackingRecord::create([
-            'order_sn' => $validated['order_sn'],
-            'tracking_number' => $validated['tracking_number'] ?? ($order->tracking_number ?? null),
-            'shopee_order_id' => $order?->id,
-            'status' => 'completed',
-            'packer_name' => ($validated['packer_name'] ?? null) ?: ($isReturn ? 'Staff Pemeriksa Retur' : 'Staff Packing'),
-            'items_checked' => $itemsChecked,
-            'video_path' => $path,
-            'video_duration' => (int) ($validated['duration'] ?? 0),
-            'file_size' => $videoFile->getSize(),
-            'notes' => $validated['notes'] ?? ($isReturn ? 'Video Unboxing & Pemeriksaan Paket Retur Shopee.' : 'Video packing berhasil disimpan.'),
-        ]);
-
-        // Update Shopee order status to PROCESSED if ready
-        if ($order && $order->order_status === 'READY_TO_SHIP') {
-            $order->update(['order_status' => 'PROCESSED']);
-
-            // Jika terhubung ke Shopee Open API dan bukan mock simulasi, kirim sinyal ship_order ke Shopee
-            if ($this->shopeeService->getSetting()->isConnected() && ! str_starts_with($order->order_sn, 'ORD-') && ! str_starts_with($order->order_sn, 'SAMPLE-')) {
-                try {
-                    $this->shopeeService->shipOrder($order->order_sn);
-                } catch (Exception $e) {
-                    Log::info("Shopee shipOrder notice for {$order->order_sn}: ".$e->getMessage());
-                }
-            }
+        if ($record) {
+            $record->update([
+                'tracking_number' => $validated['tracking_number'] ?? ($order->tracking_number ?? null),
+                'packer_name' => ($validated['packer_name'] ?? null) ?: $record->packer_name,
+                'items_checked' => $itemsChecked,
+                'video_duration' => (int) ($validated['duration'] ?? $record->video_duration ?? 0),
+            ]);
+        } else {
+            $record = PackingRecord::create([
+                'order_sn' => $validated['order_sn'],
+                'tracking_number' => $validated['tracking_number'] ?? ($order->tracking_number ?? null),
+                'shopee_order_id' => $order?->id,
+                'status' => 'in_progress',
+                'packer_name' => ($validated['packer_name'] ?? null) ?: ($isReturn ? 'Staff Pemeriksa Retur' : 'Staff Packing'),
+                'items_checked' => $itemsChecked,
+                'video_path' => null,
+                'video_duration' => (int) ($validated['duration'] ?? 0),
+                'file_size' => 0,
+                'notes' => $validated['notes'] ?? ($isReturn ? 'Pemeriksaan unboxing selesai, video sedang diunggah di latar belakang.' : 'Packing selesai, video sedang diunggah di latar belakang.'),
+            ]);
         }
-
-        $message = $isReturn
-            ? "Video Unboxing & Pemeriksaan Retur untuk Resi [{$record->tracking_number}] berhasil disimpan!"
-            : "Video packing untuk Resi [{$record->tracking_number}] berhasil disimpan!";
 
         return response()->json([
             'status' => 'success',
-            'message' => $message,
             'record_id' => $record->id,
-            'video_url' => $record->video_url,
+            'order_sn' => $record->order_sn,
+            'tracking_number' => $record->tracking_number,
+            'message' => 'Upload video berhasil diinisialisasi di latar belakang.',
         ]);
+    }
+
+    /**
+     * Upload & save recorded packing video.
+     */
+    public function uploadVideo(Request $request): JsonResponse
+    {
+        try {
+            if (! $request->hasFile('video')) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'File video tidak ditemukan dalam request upload.',
+                ], 422);
+            }
+
+            $videoFile = $request->file('video');
+            if (! $videoFile->isValid()) {
+                $errorMsg = match ($videoFile->getError()) {
+                    UPLOAD_ERR_INI_SIZE, UPLOAD_ERR_FORM_SIZE => 'Ukuran file video melebihi batas upload server.',
+                    UPLOAD_ERR_PARTIAL => 'File video hanya terunggah sebagian. Silakan coba lagi.',
+                    UPLOAD_ERR_NO_FILE => 'Tidak ada file video yang dikirim.',
+                    UPLOAD_ERR_NO_TMP_DIR => 'Folder temporary server tidak ditemukan.',
+                    UPLOAD_ERR_CANT_WRITE => 'Gagal menulis file video ke disk server.',
+                    default => 'Upload video gagal dengan kode error: '.$videoFile->getError(),
+                };
+
+                return response()->json([
+                    'status' => 'error',
+                    'message' => $errorMsg,
+                ], 422);
+            }
+
+            $validated = $request->validate([
+                'order_sn' => 'required|string',
+                'tracking_number' => 'nullable|string',
+                'video' => 'required|file|max:102400', // Max 100MB
+                'duration' => 'nullable|integer',
+                'packer_name' => 'nullable|string',
+                'items_checked' => 'nullable|string',
+                'notes' => 'nullable|string',
+                'mode' => 'nullable|string',
+            ]);
+
+            $order = ShopeeOrder::where('order_sn', $validated['order_sn'])->first();
+
+            // Store video to storage/app/public/packing_videos
+            $extension = strtolower($videoFile->getClientOriginalExtension());
+            if (! in_array($extension, ['mp4', 'webm', 'mov', 'm4v'])) {
+                $mime = $videoFile->getMimeType() ?: '';
+                $extension = str_contains($mime, 'mp4') ? 'mp4' : 'webm';
+            }
+
+            $filename = 'pack_'.$validated['order_sn'].'_'.date('Ymd_His').'.'.$extension;
+            $path = $videoFile->storeAs('packing_videos', $filename, 'public');
+
+            if (! $path) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Gagal menyimpan file video ke direktori penyimpanan server.',
+                ], 500);
+            }
+
+            $itemsChecked = [];
+            if (! empty($validated['items_checked'])) {
+                $itemsChecked = json_decode($validated['items_checked'], true) ?: [];
+            }
+
+            $mode = $validated['mode'] ?? 'packing';
+            $isReturn = $mode === 'return_unboxing';
+
+            // Check if there was an initial 'in_progress' record to transition to 'completed'
+            $record = PackingRecord::where('order_sn', $validated['order_sn'])
+                ->where('status', 'in_progress')
+                ->latest()
+                ->first();
+
+            if ($record) {
+                $record->update([
+                    'tracking_number' => $validated['tracking_number'] ?? ($order->tracking_number ?? null),
+                    'shopee_order_id' => $order?->id,
+                    'status' => 'completed',
+                    'packer_name' => ($validated['packer_name'] ?? null) ?: $record->packer_name,
+                    'items_checked' => $itemsChecked,
+                    'video_path' => $path,
+                    'video_duration' => (int) ($validated['duration'] ?? $record->video_duration ?? 0),
+                    'file_size' => $videoFile->getSize() ?: 0,
+                    'notes' => $validated['notes'] ?? ($isReturn ? 'Video Unboxing & Pemeriksaan Paket Retur Shopee.' : 'Video packing berhasil disimpan.'),
+                ]);
+            } else {
+                $record = PackingRecord::create([
+                    'order_sn' => $validated['order_sn'],
+                    'tracking_number' => $validated['tracking_number'] ?? ($order->tracking_number ?? null),
+                    'shopee_order_id' => $order?->id,
+                    'status' => 'completed',
+                    'packer_name' => ($validated['packer_name'] ?? null) ?: ($isReturn ? 'Staff Pemeriksa Retur' : 'Staff Packing'),
+                    'items_checked' => $itemsChecked,
+                    'video_path' => $path,
+                    'video_duration' => (int) ($validated['duration'] ?? 0),
+                    'file_size' => $videoFile->getSize() ?: 0,
+                    'notes' => $validated['notes'] ?? ($isReturn ? 'Video Unboxing & Pemeriksaan Paket Retur Shopee.' : 'Video packing berhasil disimpan.'),
+                ]);
+            }
+
+            // Update Shopee order status to PROCESSED if ready
+            if ($order && $order->order_status === 'READY_TO_SHIP') {
+                $order->update(['order_status' => 'PROCESSED']);
+
+                // Jika terhubung ke Shopee Open API dan bukan mock simulasi, kirim sinyal ship_order ke Shopee
+                if ($this->shopeeService->getSetting()->isConnected() && ! str_starts_with($order->order_sn, 'ORD-') && ! str_starts_with($order->order_sn, 'SAMPLE-')) {
+                    try {
+                        $this->shopeeService->shipOrder($order->order_sn);
+                    } catch (Exception $e) {
+                        Log::info("Shopee shipOrder notice for {$order->order_sn}: ".$e->getMessage());
+                    }
+                }
+            }
+
+            $message = $isReturn
+                ? "Video Unboxing & Pemeriksaan Retur untuk Resi [{$record->tracking_number}] berhasil disimpan!"
+                : "Video packing untuk Resi [{$record->tracking_number}] berhasil disimpan!";
+
+            return response()->json([
+                'status' => 'success',
+                'message' => $message,
+                'record_id' => $record->id,
+                'video_url' => $record->video_url,
+            ]);
+        } catch (ValidationException $ve) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Validasi gagal: '.collect($ve->errors())->flatten()->implode(', '),
+                'errors' => $ve->errors(),
+            ], 422);
+        } catch (\Throwable $e) {
+            Log::error('PackingController uploadVideo error: '.$e->getMessage(), [
+                'trace' => $e->getTraceAsString(),
+                'order_sn' => $request->input('order_sn'),
+            ]);
+
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Terjadi kesalahan pada server saat menyimpan video: '.$e->getMessage(),
+            ], 500);
+        }
     }
 
     /**
@@ -417,6 +579,12 @@ class PackingController extends Controller
      */
     public function history(Request $request)
     {
+        // Auto-clean stale in_progress records that were abandoned (> 3 minutes old without video)
+        PackingRecord::where('status', 'in_progress')
+            ->whereNull('video_path')
+            ->where('created_at', '<', now()->subMinutes(3))
+            ->delete();
+
         $query = PackingRecord::with('shopeeOrder');
 
         if ($request->filled('status')) {

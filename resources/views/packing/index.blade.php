@@ -277,6 +277,37 @@
             padding: 12px 6px !important;
         }
     }
+
+    /* Floating Background Upload Indicator */
+    .floating-upload-pill {
+        position: fixed;
+        bottom: 24px;
+        right: 24px;
+        z-index: 1045;
+        background: #0f172a;
+        color: #ffffff;
+        padding: 9px 16px;
+        border-radius: 30px;
+        cursor: pointer;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.45);
+        display: flex;
+        align-items: center;
+        transition: all 0.25s ease;
+    }
+    .floating-upload-pill:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 14px 30px rgba(0, 0, 0, 0.6);
+        background: #1e293b;
+    }
+    @media (max-width: 767.98px) {
+        .floating-upload-pill {
+            bottom: 82px;
+            right: 12px;
+            padding: 7px 12px;
+            font-size: 12px;
+        }
+    }
 </style>
 @endpush
 
@@ -321,6 +352,10 @@
                     </div>
 
                     <div class="d-flex align-items-center">
+                        <button type="button" class="btn btn-sm btn-outline-info font-weight-bold mr-2" onclick="openGalleryModal()" title="Buka Galeri Video & Antrean Upload">
+                            <i class="fas fa-photo-video mr-1"></i> Galeri Video
+                            <span class="badge badge-warning ml-1" id="headerActiveUploadBadge" style="display: none;">0</span>
+                        </button>
                         <input type="text" id="packerNameInput" class="form-control form-control-sm font-weight-bold mr-2" value="Staff Packing 1" style="width: 130px;" title="Nama Staf">
                         <button class="btn btn-sm btn-outline-secondary mr-2" onclick="toggleCameraZoom()" id="desktopZoomBtn" title="Zoom Kamera">
                             <i class="fas fa-search-plus mr-1"></i> 1x
@@ -394,6 +429,10 @@
                             </span>
 
                             <div class="d-flex align-items-center">
+                                <button type="button" class="btn-cam-glass mr-2 position-relative" onclick="openGalleryModal()" title="Galeri Video & Antrean">
+                                    <i class="fas fa-photo-video"></i>
+                                    <span class="badge badge-warning position-absolute" id="mobileHeaderActiveUploadBadge" style="top: -4px; right: -4px; font-size: 9px; padding: 2px 4px; display: none;">0</span>
+                                </button>
                                 <button type="button" class="btn-cam-glass mr-2 font-weight-bold" id="mobileZoomBtn" onclick="toggleCameraZoom()" title="Zoom Kamera">
                                     1x
                                 </button>
@@ -650,11 +689,11 @@
     </div>
 </div>
 
-<!-- ⚠️ MODAL POPUP: RESI SUDAH PERNAH DI-PACKING SEBELUMNYA -->
+<!-- ⚠️ MODAL POPUP: RESI SUDAH PERNAH DI-PACKING SEBELUMNYA / SEDANG UPLOAD -->
 <div class="modal fade" id="alreadyPackedModal" tabindex="-1" role="dialog" aria-labelledby="alreadyPackedModalLabel" aria-hidden="true" data-backdrop="static" data-keyboard="false">
     <div class="modal-dialog modal-dialog-centered" role="document">
-        <div class="modal-content border-0 shadow-lg" style="border: 3px solid #f59e0b !important; border-radius: 12px; overflow: hidden;">
-            <div class="modal-header bg-warning text-dark py-3 d-flex justify-content-between align-items-center">
+        <div class="modal-content border-0 shadow-lg" id="alreadyPackedModalCard" style="border: 3px solid #f59e0b !important; border-radius: 12px; overflow: hidden;">
+            <div class="modal-header bg-warning text-dark py-3 d-flex justify-content-between align-items-center" id="alreadyPackedModalHeader">
                 <h5 class="modal-title font-weight-bold" id="alreadyPackedModalLabel">
                     <i class="fas fa-exclamation-triangle mr-2"></i> RESI SUDAH PERNAH DI-PACK!
                 </h5>
@@ -663,11 +702,28 @@
                 </button>
             </div>
             <div class="modal-body p-4 text-center bg-white">
-                <div class="rounded-circle bg-warning text-white p-3 d-inline-flex align-items-center justify-content-center mb-3 shadow" style="width: 72px; height: 72px;">
-                    <i class="fas fa-box-check fa-3x text-dark"></i>
+                <div class="rounded-circle bg-warning text-white p-3 d-inline-flex align-items-center justify-content-center mb-3 shadow" id="alreadyPackedModalIcon" style="width: 72px; height: 72px;">
+                    <i class="fas fa-box-check fa-3x text-dark" id="alreadyPackedModalIconInner"></i>
                 </div>
-                <h5 class="font-weight-bold text-dark mb-1">Paket Ini Sudah Pernah Dikemas!</h5>
-                <p class="text-muted mb-3 text-sm">Resi ini tercatat sudah selesai dipacking dan tersimpan di sistem.</p>
+                <h5 class="font-weight-bold text-dark mb-1" id="alreadyPackedSubtitle">Paket Ini Sudah Pernah Dikemas!</h5>
+                <p class="text-muted mb-3 text-sm" id="alreadyPackedNoticeText">Resi ini tercatat sudah selesai dipacking dan tersimpan di sistem.</p>
+
+                <!-- 🚀 LIVE UPLOAD PROGRESS SECTION (WHEN SCANNED WHILE UPLOADING) -->
+                <div id="alreadyPackedUploadProgressSection" class="p-3 bg-light rounded border mb-3 text-left" style="display: none; border-left: 4px solid #17a2b8 !important;">
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <span class="font-weight-bold text-dark text-sm">
+                            <i class="fas fa-spinner fa-spin text-info mr-1"></i> Progres Pengunggahan Video:
+                        </span>
+                        <span class="badge badge-info px-2 py-1 font-weight-bold" id="alreadyPackedProgressPercentBadge">0%</span>
+                    </div>
+                    <div class="progress mb-2" style="height: 16px; border-radius: 8px;">
+                        <div id="alreadyPackedProgressBar" class="progress-bar progress-bar-striped progress-bar-animated bg-info font-weight-bold" style="width: 0%; font-size: 11px;">0%</div>
+                    </div>
+                    <div class="d-flex justify-content-between text-xs text-muted">
+                        <span id="alreadyPackedUploadSizeText">Sedang menghubungkan ke server...</span>
+                        <span class="badge badge-warning" id="alreadyPackedUploadStatusBadge">Sedang Mengunggah</span>
+                    </div>
+                </div>
 
                 <div class="bg-light p-3 rounded text-left border mb-3">
                     <div class="row">
@@ -705,7 +761,7 @@
                     </div>
                 </div>
 
-                <div class="alert alert-warning text-left py-2 mb-0 text-xs">
+                <div class="alert alert-warning text-left py-2 mb-0 text-xs" id="alreadyPackedFootnoteAlert">
                     <i class="fas fa-info-circle mr-1"></i> Anda dapat memutar video sebelumnya untuk memeriksa paket, atau melanjutkan <strong>Packing Ulang</strong> jika kemasan perlu diperbaiki.
                 </div>
             </div>
@@ -747,6 +803,72 @@
                     </button>
                     <button type="button" class="btn btn-secondary btn-xs" data-dismiss="modal" onclick="stopStationModalVideo()">Tutup</button>
                 </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 🎞️ MODAL: GALERI VIDEO & ANTREAN UPLOAD LATAR BELAKANG -->
+<div class="modal fade" id="packingGalleryModal" tabindex="-1" role="dialog" aria-labelledby="packingGalleryModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable" role="document">
+        <div class="modal-content border-0 shadow-lg" style="border-radius: 14px; overflow: hidden;">
+            <div class="modal-header bg-dark text-white py-3 d-flex justify-content-between align-items-center">
+                <h5 class="modal-title font-weight-bold" id="packingGalleryModalLabel">
+                    <i class="fas fa-photo-video text-info mr-2"></i> Galeri Video & Antrean Upload
+                </h5>
+                <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body p-3 bg-light">
+                <!-- Section 1: Active background uploads -->
+                <div class="card border-0 shadow-sm mb-3">
+                    <div class="card-header bg-white py-2 d-flex justify-content-between align-items-center border-bottom">
+                        <span class="font-weight-bold text-dark" style="font-size: 14px;">
+                            <i class="fas fa-cloud-upload-alt text-info mr-1"></i> Sedang Mengunggah di Latar Belakang
+                        </span>
+                        <span class="badge badge-info px-2 py-1 font-weight-bold" id="galleryActiveUploadCount">0 Aktif</span>
+                    </div>
+                    <div class="card-body p-0" id="galleryActiveUploadContainer">
+                        <!-- Populated dynamically via JS -->
+                    </div>
+                </div>
+
+                <!-- Section 2: Recently Completed Videos -->
+                <div class="card border-0 shadow-sm mb-2">
+                    <div class="card-header bg-white py-2 d-flex justify-content-between align-items-center border-bottom">
+                        <span class="font-weight-bold text-dark" style="font-size: 14px;">
+                            <i class="fas fa-check-circle text-success mr-1"></i> Video Selesai Diunggah (Sesi Ini)
+                        </span>
+                        <a href="{{ route('packing.history') }}" class="btn btn-xs btn-outline-primary font-weight-bold" target="_blank">
+                            <i class="fas fa-history mr-1"></i> Buka Riwayat Penuh
+                        </a>
+                    </div>
+                    <div class="card-body p-0" id="galleryCompletedContainer">
+                        <!-- Populated dynamically via JS -->
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer bg-white py-2 d-flex justify-content-between">
+                <a href="{{ route('packing.history') }}" class="btn btn-outline-secondary btn-sm" target="_blank">
+                    <i class="fas fa-external-link-alt mr-1"></i> Buka Halaman Riwayat Packing
+                </a>
+                <button type="button" class="btn btn-primary btn-sm px-4 font-weight-bold" data-dismiss="modal">
+                    Tutup
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 🚀 FLOATING BACKGROUND UPLOAD PILL -->
+<div id="floatingUploadPill" class="floating-upload-pill shadow-lg" onclick="openGalleryModal()" style="display: none;" title="Klik untuk membuka Galeri Video & Status Upload">
+    <div class="d-flex align-items-center">
+        <div class="spinner-border spinner-border-sm text-info mr-2" role="status" style="width: 1rem; height: 1rem; border-width: 2px;"></div>
+        <div>
+            <div class="font-weight-bold" style="font-size: 12px; line-height: 1.2;" id="floatingUploadText">Mengunggah 1 video (0%)...</div>
+            <div class="progress mt-1" style="height: 4px; width: 130px; background: rgba(255,255,255,0.25); border-radius: 2px;">
+                <div id="floatingUploadProgressBar" class="progress-bar bg-info" style="width: 0%;"></div>
             </div>
         </div>
     </div>
@@ -1765,15 +1887,130 @@
         document.getElementById('alreadyPackedDurationText').innerText = data.existing_packing ? `${data.existing_packing.duration}` : '-';
 
         const btnPlay = document.getElementById('btnPreviewPackedVideo');
-        if (data.existing_packing && data.existing_packing.video_url) {
-            btnPlay.style.display = 'inline-block';
-            btnPlay.innerHTML = '<i class="fas fa-play mr-1"></i> Putar Video';
-            btnPlay.className = 'btn btn-info btn-sm mr-2 font-weight-bold';
+        const cardEl = document.getElementById('alreadyPackedModalCard');
+        const headerEl = document.getElementById('alreadyPackedModalHeader');
+        const titleEl = document.getElementById('alreadyPackedModalLabel');
+        const iconEl = document.getElementById('alreadyPackedModalIcon');
+        const iconInner = document.getElementById('alreadyPackedModalIconInner');
+        const subTitleEl = document.getElementById('alreadyPackedSubtitle');
+        const noticeEl = document.getElementById('alreadyPackedNoticeText');
+        const progressSection = document.getElementById('alreadyPackedUploadProgressSection');
+        const footnoteEl = document.getElementById('alreadyPackedFootnoteAlert');
+
+        const activeJob = BackgroundUploadManager.getActiveUploadFor(data.tracking_number || data.order_sn);
+        const isCurrentlyUploading = (data.is_uploading === true) || (activeJob && activeJob.status === 'in_progress');
+
+        if (isCurrentlyUploading) {
+            // 🚀 UPLOADING STATE (CLIENT KNOWS PACKING VIDEO IS CURRENTLY UPLOADING)
+            if (cardEl) cardEl.style.border = '3px solid #17a2b8 !important';
+            if (headerEl) headerEl.className = 'modal-header bg-info text-white py-3 d-flex justify-content-between align-items-center';
+            if (titleEl) titleEl.innerHTML = '<i class="fas fa-cloud-upload-alt mr-2"></i> VIDEO PACKING SEDANG DIUNGGAH!';
+            if (iconEl) iconEl.className = 'rounded-circle bg-info text-white p-3 d-inline-flex align-items-center justify-content-center mb-3 shadow';
+            if (iconInner) iconInner.className = 'fas fa-cloud-upload-alt fa-3x text-white';
+            if (subTitleEl) subTitleEl.innerText = 'Video Paket Ini Sedang Diunggah!';
+            if (noticeEl) noticeEl.innerHTML = 'Paket ini baru saja selesai dikemas dan videonya <strong>sedang diunggah ke server di latar belakang</strong>. Anda tidak perlu packing ulang, paket sudah aman.';
+            if (footnoteEl) footnoteEl.innerHTML = '<i class="fas fa-info-circle mr-1"></i> Video sedang diunggah otomatis di latar belakang. Anda dapat menutup modal ini dan melanjutkan scan paket berikutnya.';
+
+            if (progressSection) progressSection.style.display = 'block';
+
+            if (activeJob) {
+                renderAlreadyPackedUploadProgress(activeJob);
+            } else {
+                renderAlreadyPackedUploadProgress({
+                    percent: 50,
+                    loadedMB: '...',
+                    totalMB: '...',
+                    status: 'in_progress'
+                });
+            }
+
+            if (btnPlay) btnPlay.style.display = 'none';
         } else {
-            btnPlay.style.display = 'none';
+            // ⚠️ STANDARD ALREADY PACKED (COMPLETED)
+            if (cardEl) cardEl.style.border = '3px solid #f59e0b !important';
+            if (headerEl) headerEl.className = 'modal-header bg-warning text-dark py-3 d-flex justify-content-between align-items-center';
+            if (titleEl) titleEl.innerHTML = '<i class="fas fa-exclamation-triangle mr-2"></i> RESI SUDAH PERNAH DI-PACK!';
+            if (iconEl) iconEl.className = 'rounded-circle bg-warning text-white p-3 d-inline-flex align-items-center justify-content-center mb-3 shadow';
+            if (iconInner) iconInner.className = 'fas fa-box-check fa-3x text-dark';
+            if (subTitleEl) subTitleEl.innerText = 'Paket Ini Sudah Pernah Dikemas!';
+            if (noticeEl) noticeEl.innerHTML = 'Resi ini tercatat sudah selesai dipacking dan tersimpan di sistem.';
+            if (footnoteEl) footnoteEl.innerHTML = '<i class="fas fa-info-circle mr-1"></i> Anda dapat memutar video sebelumnya untuk memeriksa paket, atau melanjutkan <strong>Packing Ulang</strong> jika kemasan perlu diperbaiki.';
+
+            if (progressSection) progressSection.style.display = 'none';
+
+            if (data.existing_packing && data.existing_packing.video_url) {
+                btnPlay.style.display = 'inline-block';
+                btnPlay.innerHTML = '<i class="fas fa-play mr-1"></i> Putar Video';
+                btnPlay.className = 'btn btn-info btn-sm mr-2 font-weight-bold';
+            } else {
+                btnPlay.style.display = 'none';
+            }
         }
 
         $('#alreadyPackedModal').modal('show');
+    }
+
+    function renderAlreadyPackedUploadProgress(item) {
+        const progressSection = document.getElementById('alreadyPackedUploadProgressSection');
+        const badgePercent = document.getElementById('alreadyPackedProgressPercentBadge');
+        const progressBar = document.getElementById('alreadyPackedProgressBar');
+        const sizeText = document.getElementById('alreadyPackedUploadSizeText');
+        const statusBadge = document.getElementById('alreadyPackedUploadStatusBadge');
+        const btnPlay = document.getElementById('btnPreviewPackedVideo');
+
+        if (!progressSection) return;
+        progressSection.style.display = 'block';
+
+        const percent = (typeof item.percent !== 'undefined') ? item.percent : (item.progress || 0);
+        const loadedMB = item.loadedMB || '0.0';
+        const totalMB = item.totalMB || '0.0';
+
+        if (badgePercent) badgePercent.innerText = `${percent}%`;
+        if (progressBar) {
+            progressBar.style.width = `${percent}%`;
+            progressBar.innerText = `${percent}%`;
+        }
+        if (sizeText) {
+            sizeText.innerText = (totalMB && totalMB !== '...') ? `${loadedMB} MB / ${totalMB} MB terunggah` : 'Mengunggah video ke server...';
+        }
+
+        if (item.status === 'completed' || percent >= 100) {
+            if (statusBadge) {
+                statusBadge.className = 'badge badge-success font-weight-bold';
+                statusBadge.innerText = 'Selesai Diunggah';
+            }
+            if (progressBar) {
+                progressBar.className = 'progress-bar bg-success font-weight-bold';
+                progressBar.classList.remove('progress-bar-striped', 'progress-bar-animated');
+                progressBar.style.width = '100%';
+                progressBar.innerText = '100% Selesai';
+            }
+            if (item.video_url && btnPlay) {
+                btnPlay.style.display = 'inline-block';
+                btnPlay.innerHTML = '<i class="fas fa-play mr-1"></i> Putar Video';
+                btnPlay.className = 'btn btn-info btn-sm mr-2 font-weight-bold';
+                if (currentOrderData && currentOrderData.existing_packing) {
+                    currentOrderData.existing_packing.video_url = item.video_url;
+                }
+            }
+        } else if (item.status === 'failed') {
+            if (statusBadge) {
+                statusBadge.className = 'badge badge-danger font-weight-bold';
+                statusBadge.innerText = 'Gagal';
+            }
+            if (progressBar) {
+                progressBar.className = 'progress-bar bg-danger font-weight-bold';
+                progressBar.classList.remove('progress-bar-animated');
+            }
+            if (sizeText) {
+                sizeText.innerText = item.errorMessage || 'Terjadi kesalahan saat upload';
+            }
+        } else {
+            if (statusBadge) {
+                statusBadge.className = 'badge badge-warning font-weight-bold';
+                statusBadge.innerText = 'Sedang Mengunggah';
+            }
+        }
     }
 
     function viewExistingPackingVideo() {
@@ -1868,10 +2105,45 @@
         checkResiOrder('CANCEL_DEMO_SPX99182');
     }
 
+    // Helper to control save/record button states across desktop and mobile
+    function setSavingButtonsState(isSaving, text = 'Menyimpan video...') {
+        const btnStop = document.getElementById('btnStopRecord');
+        const mBtnStop = document.getElementById('mobileBtnStopRecord');
+        const mins = String(Math.floor(recordDuration / 60)).padStart(2, '0');
+        const secs = String(recordDuration % 60).padStart(2, '0');
+
+        if (btnStop) {
+            btnStop.disabled = isSaving;
+            btnStop.innerHTML = isSaving
+                ? `<i class="fas fa-spinner fa-spin mr-1"></i> ${text}`
+                : '<i class="fas fa-check mr-1"></i> Selesai & Simpan';
+        }
+
+        if (mBtnStop) {
+            mBtnStop.disabled = isSaving;
+            mBtnStop.innerHTML = isSaving
+                ? `<i class="fas fa-spinner fa-spin mr-2"></i> ${text}`
+                : `<i class="fas fa-check-circle mr-2"></i> SELESAI & SIMPAN (<span id="mobileRecBtnTimer">${mins}:${secs}</span>)`;
+        }
+    }
+
     // Video Recording Implementation
     function startPackingRecording() {
         if (!mediaStream) {
-            alert('Kamera tidak aktif! Silakan izinkan akses kamera.');
+            Swal.fire({
+                icon: 'warning',
+                title: 'Kamera Tidak Aktif',
+                text: 'Kamera belum aktif. Silakan izinkan akses kamera pada browser Anda.'
+            });
+            return;
+        }
+
+        if (!currentOrderData) {
+            Swal.fire({
+                icon: 'warning',
+                title: 'Pesanan Belum Dipilih',
+                text: 'Silakan scan atau masukkan nomor resi pesanan terlebih dahulu sebelum merekam video.'
+            });
             return;
         }
 
@@ -1881,13 +2153,13 @@
 
         recordedChunks = [];
         
-        // Dynamic mimeType selection: iOS Safari prefers video/mp4, Android/Chrome prefers video/webm
+        // Dynamic mimeType selection (pure video codecs to prevent issues with audio-disabled stream)
         const mimeCandidates = [
-            'video/mp4;codecs=avc1,mp4a.40.2',
-            'video/mp4',
-            'video/webm;codecs=vp8,opus',
-            'video/webm;codecs=vp9,opus',
-            'video/webm'
+            'video/webm;codecs=vp8',
+            'video/webm;codecs=vp9',
+            'video/webm',
+            'video/mp4;codecs=avc1',
+            'video/mp4'
         ];
         let chosenMime = '';
         if (typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported) {
@@ -1909,10 +2181,29 @@
             }
         }
 
+        if (!mediaRecorder) {
+            Swal.fire({
+                icon: 'error',
+                title: 'Perekaman Tidak Didukung',
+                text: 'Browser Anda tidak mendukung MediaRecorder untuk merekam video.'
+            });
+            return;
+        }
+
         mediaRecorder.ondataavailable = function(e) {
             if (e.data && e.data.size > 0) {
                 recordedChunks.push(e.data);
             }
+        };
+
+        mediaRecorder.onerror = function(e) {
+            console.error('MediaRecorder error:', e);
+            setSavingButtonsState(false);
+            Swal.fire({
+                icon: 'error',
+                title: 'Error Perekaman Video',
+                text: 'Terjadi masalah pada encoder kamera saat merekam video.'
+            });
         };
 
         mediaRecorder.onstop = function() {
@@ -1933,7 +2224,11 @@
         const mReticle = document.getElementById('mobileCamReticle');
 
         if (mBtnStart) mBtnStart.style.display = 'none';
-        if (mBtnStop) { mBtnStop.style.display = 'block'; mBtnStop.disabled = false; }
+        if (mBtnStop) { 
+            mBtnStop.style.display = 'block'; 
+            mBtnStop.disabled = false;
+            mBtnStop.innerHTML = '<i class="fas fa-check-circle mr-2"></i> SELESAI & SIMPAN (<span id="mobileRecBtnTimer">00:00</span>)';
+        }
         if (mPillStandby) mPillStandby.style.display = 'none';
         if (mPillRec) mPillRec.style.display = 'inline-flex';
         if (mReticle) mReticle.style.display = 'none';
@@ -1960,22 +2255,584 @@
 
         clearInterval(timerInterval);
         document.getElementById('recordingBadge').style.display = 'none';
-        document.getElementById('btnStopRecord').disabled = true;
-        document.getElementById('btnStopRecord').innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i> Menyimpan...';
+        
+        setSavingButtonsState(true, 'Menyiapkan video...');
 
-        const mBtnStop = document.getElementById('mobileBtnStopRecord');
-        if (mBtnStop) {
-            mBtnStop.disabled = true;
-            mBtnStop.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Menyimpan...';
+        try {
+            if (mediaRecorder.state === 'recording') {
+                mediaRecorder.requestData();
+            }
+        } catch (e) {
+            console.warn('mediaRecorder.requestData notice:', e);
         }
 
-        mediaRecorder.stop();
+        try {
+            mediaRecorder.stop();
+        } catch (stopErr) {
+            console.error('mediaRecorder.stop error:', stopErr);
+            setSavingButtonsState(false);
+            Swal.fire({
+                icon: 'error',
+                title: 'Gagal Menghentikan Rekaman',
+                text: 'Terjadi kesalahan saat menghentikan perekaman video.'
+            });
+            return;
+        }
+
         playBeep(750, 'sine', 0.2);
     }
 
-    async function uploadRecordedVideo() {
-        if (recordedChunks.length === 0 || !currentOrderData) {
-            document.getElementById('btnStopRecord').innerHTML = '<i class="fas fa-check mr-1"></i> Selesai & Simpan';
+    // ========================================================
+    // 🚀 BACKGROUND UPLOAD & GALLERY MANAGER
+    // ========================================================
+    const BackgroundUploadManager = {
+        activeUploads: new Map(), // key: id -> { job, xhr }
+        completed: [],
+        channel: (typeof BroadcastChannel !== 'undefined') ? new BroadcastChannel('packing_upload_channel') : null,
+
+        init() {
+            try {
+                const savedCompleted = sessionStorage.getItem('packing_recent_completed');
+                if (savedCompleted) {
+                    this.completed = JSON.parse(savedCompleted);
+                }
+            } catch (e) {}
+
+            // Clean up any stale/expired queue items from localStorage (> 3 mins)
+            try {
+                const now = Date.now();
+                let savedQueue = JSON.parse(localStorage.getItem('packing_upload_queue') || '[]');
+                savedQueue = savedQueue.filter(item => {
+                    const itemTime = item.timestamp || 0;
+                    return (now - itemTime) < 180000;
+                });
+                localStorage.setItem('packing_upload_queue', JSON.stringify(savedQueue));
+            } catch (err) {}
+
+            if (this.channel) {
+                this.channel.onmessage = (event) => {
+                    const msg = event.data;
+                    if (!msg) return;
+                    this.handleBroadcastMessage(msg);
+                };
+            }
+
+            window.addEventListener('storage', (e) => {
+                if (e.key === 'packing_upload_queue' && e.newValue) {
+                    try {
+                        const queue = JSON.parse(e.newValue);
+                        queue.forEach(item => {
+                            this.handleBroadcastMessage(item);
+                        });
+                    } catch (err) {}
+                }
+            });
+
+            this.updateUI();
+        },
+
+        enqueue(job) {
+            job.retries = 0;
+            job.timestamp = Date.now();
+            this.activeUploads.set(job.id, { job, xhr: null });
+            this.updateUI();
+            this.syncStorage();
+
+            // Delegate persistent background upload to GlobalPackingUploader (stored in IndexedDB across all menus)
+            if (typeof GlobalPackingUploader !== 'undefined') {
+                GlobalPackingUploader.enqueue(job);
+            } else {
+                this.callInitUpload(job)
+                    .catch(err => console.warn('Init upload notice:', err))
+                    .finally(() => {
+                        this.startUpload(job);
+                    });
+            }
+        },
+
+        async callInitUpload(job) {
+            try {
+                const res = await fetch("{{ route('packing.initUpload') }}", {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        order_sn: job.order_sn,
+                        tracking_number: job.tracking_number,
+                        packer_name: job.packer_name
+                    })
+                });
+                return await res.json();
+            } catch (err) {
+                console.warn('callInitUpload error:', err);
+                return null;
+            }
+        },
+
+        startUpload(job) {
+            const formData = new FormData();
+            formData.append('video', job.blob, `pack_${job.order_sn}.${job.ext}`);
+            formData.append('order_sn', job.order_sn);
+            formData.append('tracking_number', job.tracking_number || '');
+            formData.append('duration', job.duration);
+            formData.append('packer_name', job.packer_name);
+            formData.append('items_checked', JSON.stringify(job.items_checked || []));
+            formData.append('mode', job.mode || 'packing');
+
+            const xhr = new XMLHttpRequest();
+            const entry = this.activeUploads.get(job.id);
+            if (entry) entry.xhr = xhr;
+
+            xhr.open('POST', "{{ route('packing.upload') }}", true);
+            xhr.setRequestHeader('X-CSRF-TOKEN', '{{ csrf_token() }}');
+            xhr.setRequestHeader('Accept', 'application/json');
+            xhr.timeout = 180000; // 3 menit timeout
+
+            xhr.upload.onprogress = (e) => {
+                if (e.lengthComputable && e.total > 0) {
+                    job.percent = Math.min(99, Math.round((e.loaded / e.total) * 100));
+                    job.loadedMB = (e.loaded / (1024 * 1024)).toFixed(1);
+                    job.totalMB = (e.total / (1024 * 1024)).toFixed(1);
+                }
+                this.broadcastProgress(job);
+                this.syncStorage();
+                this.updateUI();
+                this.updateModalIfMatching(job);
+            };
+
+            xhr.onload = () => {
+                let result;
+                try {
+                    result = JSON.parse(xhr.responseText);
+                } catch (err) {
+                    result = { status: 'error', message: 'Respon server tidak valid' };
+                }
+
+                if (xhr.status >= 200 && xhr.status < 300 && result.status === 'success') {
+                    job.percent = 100;
+                    job.status = 'completed';
+                    job.video_url = result.data ? result.data.video_url : null;
+
+                    this.broadcastCompleted(job);
+
+                    this.completed.unshift({
+                        order_sn: job.order_sn,
+                        tracking_number: job.tracking_number,
+                        video_url: job.video_url,
+                        completed_at: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+                        duration: job.duration
+                    });
+                    if (this.completed.length > 25) this.completed.pop();
+                    try {
+                        sessionStorage.setItem('packing_recent_completed', JSON.stringify(this.completed));
+                    } catch(e) {}
+
+                    this.activeUploads.delete(job.id);
+                    this.syncStorage();
+                    this.updateUI();
+                    this.updateModalIfMatching(job);
+
+                    if (typeof Swal !== 'undefined') {
+                        const Toast = Swal.mixin({
+                            toast: true,
+                            position: 'bottom-end',
+                            showConfirmButton: false,
+                            timer: 3500,
+                            timerProgressBar: true
+                        });
+                        Toast.fire({
+                            icon: 'success',
+                            title: `Video [${job.tracking_number || job.order_sn}] selesai diunggah!`
+                        });
+                    }
+                } else {
+                    job.retries = (job.retries || 0) + 1;
+                    if (job.retries <= 1) {
+                        console.log(`Retrying upload for ${job.order_sn}...`);
+                        setTimeout(() => { this.startUpload(job); }, 2000);
+                        return;
+                    }
+
+                    job.status = 'failed';
+                    let errMsg = result.message || 'Gagal menyimpan video ke server.';
+                    if (result.errors) errMsg = Object.values(result.errors).flat().join('<br>');
+                    job.errorMessage = errMsg;
+                    this.syncStorage();
+                    this.updateUI();
+                    this.updateModalIfMatching(job);
+                }
+            };
+
+            xhr.onerror = () => {
+                job.retries = (job.retries || 0) + 1;
+                if (job.retries <= 2) {
+                    console.log(`Koneksi terputus, mencoba upload ulang ${job.order_sn} (percobaan ke-${job.retries})...`);
+                    setTimeout(() => { this.startUpload(job); }, 2000);
+                    return;
+                }
+                job.status = 'failed';
+                job.errorMessage = 'Koneksi terputus saat upload video.';
+                this.syncStorage();
+                this.updateUI();
+                this.updateModalIfMatching(job);
+            };
+
+            xhr.ontimeout = () => {
+                job.retries = (job.retries || 0) + 1;
+                if (job.retries <= 1) {
+                    console.log(`Timeout, mencoba upload ulang ${job.order_sn}...`);
+                    setTimeout(() => { this.startUpload(job); }, 2000);
+                    return;
+                }
+                job.status = 'failed';
+                job.errorMessage = 'Waktu upload melebihi batas (timeout).';
+                this.syncStorage();
+                this.updateUI();
+                this.updateModalIfMatching(job);
+            };
+
+            xhr.send(formData);
+        },
+
+        retryUpload(id) {
+            if (typeof GlobalPackingUploader !== 'undefined') {
+                GlobalPackingUploader.retryCurrentJob();
+            } else {
+                const entry = this.activeUploads.get(id);
+                if (!entry) return;
+                entry.job.status = 'in_progress';
+                entry.job.percent = 0;
+                entry.job.retries = 0;
+                entry.job.errorMessage = null;
+                this.updateUI();
+                this.syncStorage();
+                this.startUpload(entry.job);
+            }
+        },
+
+        cancelUpload(id) {
+            if (typeof GlobalPackingUploader !== 'undefined') {
+                GlobalPackingUploader.cancelCurrentJob();
+            }
+            const entry = this.activeUploads.get(id);
+            if (entry && entry.xhr) {
+                try { entry.xhr.abort(); } catch (e) {}
+            }
+            this.activeUploads.delete(id);
+            this.updateUI();
+            this.syncStorage();
+        },
+
+        broadcastProgress(job) {
+            const payload = {
+                type: 'progress',
+                id: job.id,
+                order_sn: job.order_sn,
+                tracking_number: job.tracking_number,
+                progress: job.percent,
+                percent: job.percent,
+                loadedMB: job.loadedMB,
+                totalMB: job.totalMB,
+                status: 'uploading'
+            };
+            if (this.channel) {
+                try { this.channel.postMessage(payload); } catch(e) {}
+            }
+        },
+
+        broadcastCompleted(job) {
+            const payload = {
+                type: 'completed',
+                id: job.id,
+                order_sn: job.order_sn,
+                tracking_number: job.tracking_number,
+                progress: 100,
+                percent: 100,
+                status: 'completed',
+                video_url: job.video_url,
+                packer_name: job.packer_name,
+                duration: `${job.duration}s`
+            };
+            if (this.channel) {
+                try { this.channel.postMessage(payload); } catch(e) {}
+            }
+        },
+
+        syncStorage() {
+            try {
+                const list = [];
+                for (const entry of this.activeUploads.values()) {
+                    list.push({
+                        id: entry.job.id,
+                        order_sn: entry.job.order_sn,
+                        tracking_number: entry.job.tracking_number,
+                        progress: entry.job.percent || 0,
+                        percent: entry.job.percent || 0,
+                        loadedMB: entry.job.loadedMB,
+                        totalMB: entry.job.totalMB,
+                        status: entry.job.status === 'failed' ? 'failed' : 'uploading',
+                        timestamp: entry.job.timestamp || Date.now()
+                    });
+                }
+                localStorage.setItem('packing_upload_queue', JSON.stringify(list));
+            } catch(e) {}
+        },
+
+        handleBroadcastMessage(msg) {
+            if (msg.type === 'progress') {
+                const entry = this.activeUploads.get(msg.id);
+                if (entry) {
+                    entry.job.percent = msg.percent;
+                    entry.job.loadedMB = msg.loadedMB;
+                    entry.job.totalMB = msg.totalMB;
+                    this.updateUI();
+                } else {
+                    this.activeUploads.set(msg.id, { job: msg, xhr: null });
+                    this.updateUI();
+                }
+            } else if (msg.type === 'completed') {
+                this.activeUploads.delete(msg.id);
+                this.completed.unshift({
+                    order_sn: msg.order_sn,
+                    tracking_number: msg.tracking_number,
+                    video_url: msg.video_url,
+                    completed_at: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+                    duration: msg.duration
+                });
+                if (this.completed.length > 25) this.completed.pop();
+                this.updateUI();
+            }
+            this.updateModalIfMatching(msg);
+        },
+
+        getActiveUploadFor(identifier) {
+            if (!identifier) return null;
+            for (const entry of this.activeUploads.values()) {
+                if (entry.job.tracking_number === identifier || entry.job.order_sn === identifier) {
+                    return entry.job;
+                }
+            }
+            return null;
+        },
+
+        updateModalIfMatching(item) {
+            const modal = document.getElementById('alreadyPackedModal');
+            if (!modal || !$('#alreadyPackedModal').hasClass('show')) return;
+
+            const curTrack = document.getElementById('alreadyPackedTrackingText')?.innerText?.trim();
+            const curSn = document.getElementById('alreadyPackedOrderSnText')?.innerText?.trim();
+
+            if (item.tracking_number === curTrack || item.order_sn === curSn || item.tracking_number === curSn) {
+                renderAlreadyPackedUploadProgress(item);
+            }
+        },
+
+        updateUI() {
+            const count = this.activeUploads.size;
+
+            // Desktop header badge
+            const dBadge = document.getElementById('headerActiveUploadBadge');
+            if (dBadge) {
+                if (count > 0) {
+                    dBadge.innerText = count;
+                    dBadge.style.display = 'inline-block';
+                } else {
+                    dBadge.style.display = 'none';
+                }
+            }
+
+            // Mobile header badge
+            const mBadge = document.getElementById('mobileHeaderActiveUploadBadge');
+            if (mBadge) {
+                if (count > 0) {
+                    mBadge.innerText = count;
+                    mBadge.style.display = 'inline-block';
+                } else {
+                    mBadge.style.display = 'none';
+                }
+            }
+
+            // Floating pill
+            const pill = document.getElementById('floatingUploadPill');
+            if (pill) {
+                if (count > 0) {
+                    pill.style.display = 'flex';
+                    let firstJob = null;
+                    for (const entry of this.activeUploads.values()) {
+                        firstJob = entry.job;
+                        break;
+                    }
+                    const textEl = document.getElementById('floatingUploadText');
+                    const barEl = document.getElementById('floatingUploadProgressBar');
+                    if (textEl && firstJob) {
+                        textEl.innerText = count === 1
+                            ? `${firstJob.tracking_number || firstJob.order_sn}: ${firstJob.percent}%`
+                            : `${count} video upload (${firstJob.percent}%)`;
+                    }
+                    if (barEl && firstJob) {
+                        barEl.style.width = `${firstJob.percent}%`;
+                    }
+                } else {
+                    pill.style.display = 'none';
+                }
+            }
+
+            if ($('#packingGalleryModal').hasClass('show')) {
+                renderGalleryUploadList();
+            }
+        }
+    };
+
+    function openGalleryModal() {
+        renderGalleryUploadList();
+        $('#packingGalleryModal').modal('show');
+    }
+
+    function renderGalleryUploadList() {
+        const activeContainer = document.getElementById('galleryActiveUploadContainer');
+        const completedContainer = document.getElementById('galleryCompletedContainer');
+        const activeCountBadge = document.getElementById('galleryActiveUploadCount');
+
+        if (!activeContainer || !completedContainer) return;
+
+        const activeList = Array.from(BackgroundUploadManager.activeUploads.values());
+        if (activeCountBadge) activeCountBadge.innerText = `${activeList.length} Aktif`;
+
+        if (activeList.length === 0) {
+            activeContainer.innerHTML = `
+                <div class="p-3 text-center text-muted">
+                    <i class="fas fa-check-circle text-success fa-2x mb-2 d-block"></i>
+                    <div class="font-weight-bold text-dark">Tidak ada video yang sedang diunggah</div>
+                    <small>Semua video rekaman packing telah tersimpan di server.</small>
+                </div>
+            `;
+        } else {
+            let html = '<ul class="list-group list-group-flush">';
+            activeList.forEach(entry => {
+                const job = entry.job;
+                const percent = job.percent || 0;
+                const isFailed = job.status === 'failed';
+                const badgeClass = isFailed ? 'badge-danger' : 'badge-info';
+                const badgeText = isFailed ? 'Gagal' : 'Mengunggah...';
+
+                html += `
+                    <li class="list-group-item p-3">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <div>
+                                <span class="font-weight-bold text-dark" style="font-size: 14px;">
+                                    <i class="fas fa-box text-secondary mr-1"></i> ${job.tracking_number || job.order_sn}
+                                </span>
+                                ${job.tracking_number ? `<span class="badge badge-light border ml-1 font-weight-normal">${job.order_sn}</span>` : ''}
+                            </div>
+                            <span class="badge ${badgeClass} px-2 py-1 font-weight-bold">${badgeText} (${percent}%)</span>
+                        </div>
+                        <div class="progress mb-2" style="height: 14px; border-radius: 7px;">
+                            <div class="progress-bar ${isFailed ? 'bg-danger' : 'progress-bar-striped progress-bar-animated bg-info'} font-weight-bold" 
+                                 style="width: ${percent}%; font-size: 11px;">
+                                ${percent}%
+                            </div>
+                        </div>
+                        <div class="d-flex justify-content-between text-xs text-muted">
+                            <span><i class="fas fa-file-video mr-1"></i> ${job.loadedMB || '0.0'} MB / ${job.totalMB || '0.0'} MB</span>
+                            <span><i class="fas fa-stopwatch mr-1"></i> Durasi: ${job.duration}s</span>
+                        </div>
+                        ${isFailed ? `
+                            <div class="mt-2 pt-2 border-top d-flex justify-content-between align-items-center">
+                                <span class="text-danger text-xs font-weight-bold">
+                                    <i class="fas fa-exclamation-triangle mr-1"></i> ${job.errorMessage || 'Gagal mengunggah'}
+                                </span>
+                                <div>
+                                    <button type="button" class="btn btn-xs btn-outline-primary mr-1" onclick="BackgroundUploadManager.retryUpload('${job.id}')">
+                                        <i class="fas fa-redo mr-1"></i> Coba Lagi
+                                    </button>
+                                    <button type="button" class="btn btn-xs btn-outline-danger" onclick="BackgroundUploadManager.cancelUpload('${job.id}')">
+                                        <i class="fas fa-times mr-1"></i> Hapus
+                                    </button>
+                                </div>
+                            </div>
+                        ` : ''}
+                    </li>
+                `;
+            });
+            html += '</ul>';
+            activeContainer.innerHTML = html;
+        }
+
+        // Render completed list
+        const completedList = BackgroundUploadManager.completed;
+        if (completedList.length === 0) {
+            completedContainer.innerHTML = `
+                <div class="p-3 text-center text-muted">
+                    <small>Belum ada video selesai pada sesi ini.</small>
+                </div>
+            `;
+        } else {
+            let compHtml = '<ul class="list-group list-group-flush" style="max-height: 220px; overflow-y: auto;">';
+            completedList.forEach(item => {
+                compHtml += `
+                    <li class="list-group-item px-3 py-2 d-flex justify-content-between align-items-center">
+                        <div>
+                            <div class="font-weight-bold text-dark text-sm">
+                                <i class="fas fa-check-circle text-success mr-1"></i> ${item.tracking_number || item.order_sn}
+                            </div>
+                            <div class="text-xs text-muted">
+                                ${item.completed_at} &bull; Durasi ${item.duration}s
+                            </div>
+                        </div>
+                        <div>
+                            ${item.video_url ? `
+                                <button type="button" class="btn btn-xs btn-outline-info font-weight-bold" onclick="playGalleryVideo('${item.video_url}', '${item.tracking_number || item.order_sn}')">
+                                    <i class="fas fa-play mr-1"></i> Putar
+                                </button>
+                            ` : '<span class="badge badge-secondary">Tersimpan</span>'}
+                        </div>
+                    </li>
+                `;
+            });
+            compHtml += '</ul>';
+            completedContainer.innerHTML = compHtml;
+        }
+    }
+
+    function playGalleryVideo(url, label) {
+        const videoEl = document.getElementById('stationModalVideoElement');
+        const titleEl = document.getElementById('stationVideoModalTitle');
+        const metaEl = document.getElementById('stationVideoModalMeta');
+        if (videoEl) {
+            videoEl.src = url;
+            videoEl.load();
+            videoEl.play().catch(e => console.log('Autoplay notice:', e));
+        }
+        if (titleEl) {
+            titleEl.innerText = `Rekaman Packing: ${label}`;
+        }
+        if (metaEl) {
+            metaEl.innerText = 'Video tersimpan di server';
+        }
+        $('#stationVideoPlayerModal').modal('show');
+    }
+
+    function uploadRecordedVideo() {
+        if (!currentOrderData) {
+            setSavingButtonsState(false);
+            Swal.fire({
+                icon: 'warning',
+                title: 'Data Pesanan Tidak Ditemukan',
+                text: 'Silakan scan kembali nomor resi sebelum menyimpan video.'
+            });
+            return;
+        }
+
+        if (recordedChunks.length === 0) {
+            setSavingButtonsState(false);
+            Swal.fire({
+                icon: 'warning',
+                title: 'Video Tidak Berisi Data',
+                text: 'Tidak ada frame video yang berhasil terekam. Pastikan kamera memiliki izin dan coba rekam ulang.'
+            });
             return;
         }
 
@@ -1983,68 +2840,72 @@
         const isMp4 = mime.includes('mp4');
         const ext = isMp4 ? 'mp4' : 'webm';
         const videoBlob = new Blob(recordedChunks, { type: mime });
-        const formData = new FormData();
-        formData.append('video', videoBlob, `pack_${currentOrderData.order_sn}.${ext}`);
-        formData.append('order_sn', currentOrderData.order_sn);
-        formData.append('tracking_number', currentOrderData.tracking_number || '');
-        formData.append('duration', recordDuration);
-        formData.append('packer_name', document.getElementById('packerNameInput').value);
-        formData.append('items_checked', JSON.stringify(currentOrderData.items));
-        formData.append('mode', currentPackingMode);
 
-        try {
-            const response = await fetch("{{ route('packing.upload') }}", {
-                method: 'POST',
-                headers: {
-                    'X-CSRF-TOKEN': '{{ csrf_token() }}'
-                },
-                body: formData
-            });
-
-            const result = await response.json();
-            document.getElementById('btnStopRecord').innerHTML = '<i class="fas fa-check mr-1"></i> Selesai & Simpan';
-
-            if (result.status === 'success') {
-                playSuccessSound();
-                const isReturn = currentPackingMode === 'return_unboxing';
-                const successTitle = isReturn ? 'Unboxing Retur Selesai!' : 'Packing Selesai!';
-                const successText = isReturn
-                    ? `Video pemeriksaan unboxing retur untuk <strong>[${currentOrderData.tracking_number || currentOrderData.order_sn}]</strong> berhasil disimpan sebagai bukti klaim/inspeksi.<br><small class="text-muted">Durasi: ${recordDuration} detik</small>`
-                    : `Video packing untuk <strong>[${currentOrderData.tracking_number || currentOrderData.order_sn}]</strong> berhasil disimpan.<br><small class="text-muted">Durasi: ${recordDuration} detik</small>`;
-
-                Swal.fire({
-                    icon: 'success',
-                    title: successTitle,
-                    html: successText,
-                    timer: 3500,
-                    showConfirmButton: true
-                });
-
-                // Increment counters
-                const packedCounter = document.getElementById('todayPackedCounter');
-                if (packedCounter) {
-                    const nextCount = parseInt(packedCounter.innerText || 0) + 1;
-                    packedCounter.innerText = nextCount;
-                    const mPacked = document.getElementById('mobilePackedCounter');
-                    if (mPacked) mPacked.innerText = nextCount;
-                }
-
-                resetPackingState();
-            } else {
-                Swal.fire({
-                    icon: 'error',
-                    title: 'Gagal Menyimpan Video',
-                    text: result.message || 'Terjadi kesalahan saat upload.'
-                });
-            }
-        } catch (err) {
-            document.getElementById('btnStopRecord').innerHTML = '<i class="fas fa-check mr-1"></i> Selesai & Simpan';
+        if (videoBlob.size === 0) {
+            setSavingButtonsState(false);
             Swal.fire({
-                icon: 'error',
-                title: 'Upload Error',
-                text: 'Gagal mengunggah video packing ke server.'
+                icon: 'warning',
+                title: 'Ukuran Video Kosong',
+                text: 'File video berukuran 0 byte. Silakan coba rekam ulang.'
             });
+            return;
         }
+
+        // 📦 CREATE ASYNC BACKGROUND UPLOAD JOB
+        const orderDataSnapshot = JSON.parse(JSON.stringify(currentOrderData));
+        const durationSnapshot = recordDuration;
+        const modeSnapshot = currentPackingMode;
+        const packerNameSnapshot = document.getElementById('packerNameInput') ? document.getElementById('packerNameInput').value : 'Staff Packing';
+
+        const uploadJob = {
+            id: 'up_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6),
+            order_sn: orderDataSnapshot.order_sn,
+            tracking_number: orderDataSnapshot.tracking_number || '',
+            duration: durationSnapshot,
+            packer_name: packerNameSnapshot,
+            items_checked: orderDataSnapshot.items || [],
+            mode: modeSnapshot,
+            blob: videoBlob,
+            ext: ext,
+            mime: mime,
+            size: videoBlob.size,
+            percent: 0,
+            loadedMB: '0.0',
+            totalMB: (videoBlob.size / (1024 * 1024)).toFixed(1),
+            status: 'in_progress',
+            started_at: new Date()
+        };
+
+        // 1. Hand off to background upload manager immediately
+        BackgroundUploadManager.enqueue(uploadJob);
+
+        // 2. Increment counters immediately
+        const packedCounter = document.getElementById('todayPackedCounter');
+        if (packedCounter) {
+            const nextCount = parseInt(packedCounter.innerText || 0) + 1;
+            packedCounter.innerText = nextCount;
+            const mPacked = document.getElementById('mobilePackedCounter');
+            if (mPacked) mPacked.innerText = nextCount;
+        }
+
+        // 3. Play success chime and show immediate non-blocking feedback toast
+        playSuccessSound();
+        const isReturn = modeSnapshot === 'return_unboxing';
+        const titleText = isReturn ? 'Unboxing Selesai!' : 'Packing Selesai!';
+        Swal.fire({
+            toast: true,
+            position: 'top-end',
+            icon: 'success',
+            title: `✅ ${titleText} [${uploadJob.tracking_number || uploadJob.order_sn}]`,
+            text: 'Video diunggah di latar belakang. Anda bisa langsung scan paket berikutnya!',
+            showConfirmButton: false,
+            timer: 3500,
+            timerProgressBar: true
+        });
+
+        // 4. Immediately reset button state and packing station
+        setSavingButtonsState(false);
+        resetPackingState();
     }
 
     // 📱 MOBILE HELPER FUNCTIONS
@@ -2089,6 +2950,7 @@
     }
 
     document.addEventListener('DOMContentLoaded', () => {
+        BackgroundUploadManager.init();
         startCamera();
         if (isMobileDevice) {
             const bInput = document.getElementById('barcodeInput');
@@ -2106,6 +2968,23 @@
                 }
             }, 800);
         });
+    });
+
+    // ⚠️ Peringatkan pengguna jika ada upload video yang masih berjalan saat menutup browser
+    document.addEventListener('click', (e) => {
+        const link = e.target.closest('a');
+        if (link && link.href && link.href.startsWith(window.location.origin)) {
+            window.__isInternalNavigation = true;
+        }
+    });
+
+    window.addEventListener('beforeunload', (e) => {
+        if (window.__isInternalNavigation) return;
+        if (typeof BackgroundUploadManager !== 'undefined' && BackgroundUploadManager.activeUploads && BackgroundUploadManager.activeUploads.size > 0) {
+            e.preventDefault();
+            e.returnValue = 'Video packing sedang diunggah di latar belakang. Jangan tutup browser agar proses unggah tidak terputus.';
+            return e.returnValue;
+        }
     });
 </script>
 @endpush

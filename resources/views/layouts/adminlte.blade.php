@@ -1166,6 +1166,10 @@
     });
 </script>
 
+@auth
+@include('layouts.global-uploader')
+@endauth
+
 @stack('scripts')
 </body>
 </html>

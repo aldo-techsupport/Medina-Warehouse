@@ -28,6 +28,7 @@
                     <select name="status" class="form-control form-control-sm" onchange="this.form.submit()">
                         <option value="">-- Semua Status --</option>
                         <option value="completed" {{ request('status') === 'completed' ? 'selected' : '' }}>✅ Selesai (Ada Video)</option>
+                        <option value="in_progress" {{ request('status') === 'in_progress' ? 'selected' : '' }}>⏳ Sedang Diunggah (Proses)</option>
                         <option value="blocked_cancelled" {{ request('status') === 'blocked_cancelled' ? 'selected' : '' }}>🚫 Dicegah (Shopee Cancel)</option>
                     </select>
                 </div>
@@ -68,11 +69,14 @@
                         <th class="d-none d-sm-table-cell">Staf</th>
                         <th class="text-center">Status</th>
                         <th class="text-center d-none d-md-table-cell">Durasi</th>
-                        <th class="text-center" style="width: 100px;">Video</th>
+                        <th class="text-center" style="width: 120px;">Video</th>
                     </tr>
                 </thead>
                 <tbody>
                     @foreach($records as $rec)
+                        @php
+                            $trackingKey = $rec->tracking_number ?: $rec->order_sn;
+                        @endphp
                         <tr>
                             <td>
                                 <span class="badge badge-light border text-dark font-weight-bold" style="font-size: 12px;">
@@ -89,11 +93,18 @@
                             <td class="d-none d-sm-table-cell">
                                 <span class="badge badge-secondary">{{ $rec->packer_name }}</span>
                             </td>
-                            <td class="text-center">
+                            <td class="text-center" id="status_cell_{{ $trackingKey }}">
                                 @if($rec->status === 'completed')
                                     <span class="badge badge-success px-2 py-1">
                                         <i class="fas fa-check mr-1"></i> Selesai
                                     </span>
+                                @elseif($rec->status === 'in_progress')
+                                    <span class="badge badge-warning px-2 py-1 font-weight-bold" id="badge_status_{{ $trackingKey }}">
+                                        <i class="fas fa-spinner fa-spin mr-1"></i> Mengunggah <span class="upload-percent-text" data-tracking="{{ $trackingKey }}">(Proses...)</span>
+                                    </span>
+                                    <div class="progress mt-1 shadow-none" style="height: 6px; width: 110px; margin: 0 auto; background-color: #f1f3f5; border-radius: 4px;">
+                                        <div class="progress-bar progress-bar-striped progress-bar-animated bg-warning upload-progress-bar" data-tracking="{{ $trackingKey }}" style="width: 35%;"></div>
+                                    </div>
                                 @else
                                     <span class="badge badge-danger px-2 py-1 font-weight-bold">
                                         <i class="fas fa-ban mr-1"></i> Dicegah (Cancel)
@@ -103,11 +114,15 @@
                             <td class="text-center d-none d-md-table-cell font-weight-bold text-dark">
                                 {{ $rec->duration_formatted }}
                             </td>
-                            <td class="text-center">
+                            <td class="text-center" id="action_cell_{{ $trackingKey }}">
                                 @if($rec->hasVideo())
                                     <button type="button" class="btn btn-xs btn-danger font-weight-bold shadow-sm" onclick="openVideoPlayerModal('{{ $rec->video_url }}', '{{ $rec->tracking_number ?: $rec->order_sn }}', '{{ $rec->packer_name }}', '{{ $rec->duration_formatted }}', '{{ $rec->created_at->format('d/m/Y H:i') }}')">
                                         <i class="fas fa-play mr-1"></i> Putar
                                     </button>
+                                @elseif($rec->status === 'in_progress')
+                                    <span class="text-warning text-xs font-weight-bold" id="action_text_{{ $trackingKey }}">
+                                        <i class="fas fa-cloud-upload-alt mr-1"></i> Mengunggah...
+                                    </span>
                                 @else
                                     <span class="text-muted text-xs">-</span>
                                 @endif
@@ -177,5 +192,89 @@
     $('#videoPlayerModal').on('hidden.bs.modal', function () {
         stopModalVideo();
     });
+
+    // 📡 REALTIME BROADCAST & LOCALSTORAGE SYNC FOR PROGRESS PERCENTAGE
+    (function initRealtimeUploadSync() {
+        function updateProgressUI(data) {
+            const tracking = data.tracking_number;
+            const orderSn = data.order_sn;
+            const percent = data.progress || 0;
+            const percentStr = `(${percent}%)`;
+
+            // Update matching elements by tracking or orderSn
+            const targets = [tracking, orderSn].filter(Boolean);
+            targets.forEach(key => {
+                document.querySelectorAll(`.upload-percent-text[data-tracking="${key}"]`).forEach(el => {
+                    el.innerText = percentStr;
+                });
+                document.querySelectorAll(`.upload-progress-bar[data-tracking="${key}"]`).forEach(el => {
+                    el.style.width = `${percent}%`;
+                });
+            });
+        }
+
+        function markCompletedUI(data) {
+            const targets = [data.tracking_number, data.order_sn].filter(Boolean);
+            targets.forEach(key => {
+                const statusCell = document.getElementById(`status_cell_${key}`);
+                if (statusCell) {
+                    statusCell.innerHTML = '<span class="badge badge-success px-2 py-1"><i class="fas fa-check mr-1"></i> Selesai</span>';
+                }
+                const actionCell = document.getElementById(`action_cell_${key}`);
+                if (actionCell && data.video_url) {
+                    actionCell.innerHTML = `<button type="button" class="btn btn-xs btn-danger font-weight-bold shadow-sm" onclick="openVideoPlayerModal('${data.video_url}', '${key}', '${data.packer_name || 'Staff'}', '${data.duration || '00:00'}', 'Baru saja')"><i class="fas fa-play mr-1"></i> Putar</button>`;
+                }
+            });
+        }
+
+        // 1. Initial sync from localStorage (discarding stale items older than 3 minutes)
+        try {
+            const now = Date.now();
+            let savedQueue = JSON.parse(localStorage.getItem('packing_upload_queue') || '[]');
+            savedQueue = savedQueue.filter(item => {
+                const itemTime = item.timestamp || 0;
+                return (now - itemTime) < 180000;
+            });
+            localStorage.setItem('packing_upload_queue', JSON.stringify(savedQueue));
+
+            savedQueue.forEach(item => {
+                if (item.status === 'uploading') {
+                    updateProgressUI(item);
+                } else if (item.status === 'completed') {
+                    markCompletedUI(item);
+                }
+            });
+        } catch (e) {
+            console.warn('Queue parse error:', e);
+        }
+
+        // 2. BroadcastChannel Listener across tabs
+        if (typeof BroadcastChannel !== 'undefined') {
+            const channel = new BroadcastChannel('packing_upload_channel');
+            channel.onmessage = function (e) {
+                const msg = e.data;
+                if (!msg) return;
+
+                if (msg.type === 'progress') {
+                    updateProgressUI(msg);
+                } else if (msg.type === 'completed') {
+                    markCompletedUI(msg);
+                }
+            };
+        }
+
+        // 3. Storage Event fallback
+        window.addEventListener('storage', function(e) {
+            if (e.key === 'packing_upload_queue' && e.newValue) {
+                try {
+                    const queue = JSON.parse(e.newValue);
+                    queue.forEach(item => {
+                        if (item.status === 'uploading') updateProgressUI(item);
+                        else if (item.status === 'completed') markCompletedUI(item);
+                    });
+                } catch (err) {}
+            }
+        });
+    })();
 </script>
 @endpush
