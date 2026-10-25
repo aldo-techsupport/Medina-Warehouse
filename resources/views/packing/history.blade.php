@@ -186,6 +186,8 @@
         }
         
         document.getElementById('videoDownloadBtn').href = videoUrl;
+        const dlExt = videoUrl.endsWith('.mp4') ? 'mp4' : 'webm';
+        document.getElementById('videoDownloadBtn').setAttribute('download', `pack_${resi}.${dlExt}`);
         
         $('#videoPlayerModal').modal('show');
     };

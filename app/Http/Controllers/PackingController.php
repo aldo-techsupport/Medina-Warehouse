@@ -720,52 +720,54 @@ class PackingController extends Controller
             }
         }
 
-        // 2. Transcode to faststart MP4 (H.264/AAC) if ffmpeg is available
-        $ffmpegBin = '/usr/local/bin/ffmpeg';
-        if (! file_exists($ffmpegBin)) {
-            $ffmpegBin = trim((string) @shell_exec('which ffmpeg'));
-        }
+        // 2. Transcode to faststart MP4 (H.264/AAC) if ffmpeg and exec are available
+        if (function_exists('exec')) {
+            $ffmpegBin = '/usr/local/bin/ffmpeg';
+            if (! file_exists($ffmpegBin) && function_exists('shell_exec')) {
+                $ffmpegBin = trim((string) @shell_exec('which ffmpeg'));
+            }
 
-        if ($ffmpegBin && is_executable($ffmpegBin)) {
-            $targetMp4Name = 'pack_'.$orderSn.'_'.date('Ymd_His').'.mp4';
-            $targetMp4FullPath = storage_path('app/public/packing_videos/'.$targetMp4Name);
+            if ($ffmpegBin && is_executable($ffmpegBin)) {
+                $targetMp4Name = 'pack_'.$orderSn.'_'.date('Ymd_His').'.mp4';
+                $targetMp4FullPath = storage_path('app/public/packing_videos/'.$targetMp4Name);
 
-            $cmd = sprintf(
-                '%s -y -i %s -c:v libx264 -preset veryfast -crf 26 -c:a aac -b:a 128k -movflags +faststart %s 2>&1',
-                escapeshellarg($ffmpegBin),
-                escapeshellarg($diskPath),
-                escapeshellarg($targetMp4FullPath)
-            );
+                $cmd = sprintf(
+                    '%s -y -i %s -c:v libx264 -preset veryfast -crf 26 -c:a aac -b:a 128k -movflags +faststart %s 2>&1',
+                    escapeshellarg($ffmpegBin),
+                    escapeshellarg($diskPath),
+                    escapeshellarg($targetMp4FullPath)
+                );
 
-            $output = [];
-            $returnCode = 1;
-            @exec($cmd, $output, $returnCode);
+                $output = [];
+                $returnCode = 1;
+                @exec($cmd, $output, $returnCode);
 
-            if ($returnCode === 0 && file_exists($targetMp4FullPath) && filesize($targetMp4FullPath) > 1000) {
-                if ($diskPath !== $targetMp4FullPath && file_exists($diskPath)) {
-                    @unlink($diskPath);
-                }
-                @chmod($targetMp4FullPath, 0664);
-
-                $duration = 0;
-                $ffprobeBin = '/usr/local/bin/ffprobe';
-                if (file_exists($ffprobeBin) && is_executable($ffprobeBin)) {
-                    $probeCmd = sprintf(
-                        '%s -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 %s 2>&1',
-                        escapeshellarg($ffprobeBin),
-                        escapeshellarg($targetMp4FullPath)
-                    );
-                    $probeOut = @shell_exec($probeCmd);
-                    if ($probeOut && is_numeric(trim($probeOut))) {
-                        $duration = (int) round((float) trim($probeOut));
+                if ($returnCode === 0 && file_exists($targetMp4FullPath) && filesize($targetMp4FullPath) > 1000) {
+                    if ($diskPath !== $targetMp4FullPath && file_exists($diskPath)) {
+                        @unlink($diskPath);
                     }
-                }
+                    @chmod($targetMp4FullPath, 0664);
 
-                return [
-                    'path' => 'packing_videos/'.$targetMp4Name,
-                    'size' => filesize($targetMp4FullPath),
-                    'duration' => $duration,
-                ];
+                    $duration = 0;
+                    $ffprobeBin = '/usr/local/bin/ffprobe';
+                    if (file_exists($ffprobeBin) && is_executable($ffprobeBin) && function_exists('shell_exec')) {
+                        $probeCmd = sprintf(
+                            '%s -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 %s 2>&1',
+                            escapeshellarg($ffprobeBin),
+                            escapeshellarg($targetMp4FullPath)
+                        );
+                        $probeOut = @shell_exec($probeCmd);
+                        if ($probeOut && is_numeric(trim($probeOut))) {
+                            $duration = (int) round((float) trim($probeOut));
+                        }
+                    }
+
+                    return [
+                        'path' => 'packing_videos/'.$targetMp4Name,
+                        'size' => filesize($targetMp4FullPath),
+                        'duration' => $duration,
+                    ];
+                }
             }
         }
 
