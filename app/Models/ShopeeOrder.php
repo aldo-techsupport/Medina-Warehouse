@@ -174,6 +174,29 @@ class ShopeeOrder extends Model
         return $this->hasMany(PackingRecord::class);
     }
 
+    /**
+     * Get the latest packing record that has a video.
+     */
+    public function getLatestPackingRecordAttribute(): ?PackingRecord
+    {
+        if ($this->relationLoaded('packingRecords')) {
+            $record = $this->packingRecords->whereNotNull('video_path')->sortByDesc('id')->first();
+            if ($record) {
+                return $record;
+            }
+        }
+
+        return $this->packingRecords()->whereNotNull('video_path')->latest('id')->first();
+    }
+
+    /**
+     * Check if this order has an associated packing video.
+     */
+    public function hasPackingVideo(): bool
+    {
+        return $this->latest_packing_record !== null && ! empty($this->latest_packing_record->video_path);
+    }
+
     public function isCancelled(): bool
     {
         return in_array($this->order_status, ['CANCELLED', 'IN_CANCEL', 'TO_RETURN', 'RETURNED']);

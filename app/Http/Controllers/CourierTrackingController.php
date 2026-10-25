@@ -239,9 +239,14 @@ class CourierTrackingController extends Controller
                     'shipped_at' => $order->shipped_at ? $order->shipped_at->format('d M Y, H:i') : null,
                     'delivered_at' => $order->delivered_at ? $order->delivered_at->format('d M Y, H:i') : null,
                     'last_tracked_at' => $order->last_tracked_at ? $order->last_tracked_at->format('d M Y, H:i') : null,
-                    'tracking_timeline' => $order->tracking_data ?? [],
-                    'has_video' => $order->packingRecords->whereNotNull('video_path')->isNotEmpty(),
-                    'packing_record' => $order->packingRecords->first(),
+                    'has_video' => $order->hasPackingVideo(),
+                    'packing_record' => $order->latest_packing_record ? [
+                        'id' => $order->latest_packing_record->id,
+                        'video_url' => $order->latest_packing_record->video_url,
+                        'packer_name' => $order->latest_packing_record->packer_name,
+                        'duration_formatted' => $order->latest_packing_record->duration_formatted,
+                        'created_at' => $order->latest_packing_record->created_at->format('d M Y, H:i'),
+                    ] : null,
                 ],
             ]);
         }

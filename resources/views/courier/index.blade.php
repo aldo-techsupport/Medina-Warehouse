@@ -411,7 +411,7 @@
                         <th style="width: 140px;">Pembeli</th>
                         <th style="width: 130px;" class="text-center">Durasi Kirim</th>
                         <th style="width: 180px;" class="text-center">Status Pengiriman</th>
-                        <th style="width: 110px;" class="text-center">Aksi</th>
+                        <th style="width: 135px;" class="text-center">Aksi</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -423,9 +423,21 @@
                             $days = $pkg->days_in_transit;
                             $items = $pkg->items_data ?? [];
                             $totalQty = collect($items)->sum('model_quantity_purchased');
-                            $hasVideo = $pkg->packingRecords->whereNotNull('video_path')->isNotEmpty();
+                            $latestPacking = $pkg->latest_packing_record;
+                            $hasVideo = $latestPacking && $latestPacking->hasVideo();
                         @endphp
-                        <tr class="{{ $isDelayed ? 'table-danger' : '' }}" style="{{ $isDelayed ? 'border-left: 4px solid #dc2626;' : '' }}">
+                        <tr id="pkg-row-{{ $pkg->id }}"
+                            data-order-sn="{{ $pkg->order_sn }}"
+                            data-tracking-number="{{ $pkg->tracking_number ?? 'Belum ada resi' }}"
+                            data-carrier="{{ $pkg->shipping_carrier ?? 'Ekspedisi' }}"
+                            data-buyer="{{ $pkg->buyer_username ?? '-' }}"
+                            data-has-video="{{ $hasVideo ? '1' : '0' }}"
+                            data-video-url="{{ $hasVideo ? $latestPacking->video_url : '' }}"
+                            data-packer="{{ $hasVideo ? $latestPacking->packer_name : 'Staff Packing' }}"
+                            data-duration="{{ $hasVideo ? $latestPacking->duration_formatted : '00:00' }}"
+                            data-packed-at="{{ $hasVideo ? $latestPacking->created_at->format('d/m/Y H:i') : '' }}"
+                            class="{{ $isDelayed ? 'table-danger' : '' }}" 
+                            style="{{ $isDelayed ? 'border-left: 4px solid #dc2626;' : '' }}">
                             <!-- No. Resi & Order SN -->
                             <td>
                                 <div class="d-flex align-items-center mb-1">
@@ -448,9 +460,17 @@
                                 </div>
                                 @if($hasVideo)
                                     <div class="mt-1">
-                                        <span class="badge badge-success text-xs font-weight-normal">
+                                        <button type="button" class="btn btn-xs btn-outline-success font-weight-bold py-0 px-2 rounded-pill shadow-2xs" 
+                                                onclick="openPackingVideoModal({{ $pkg->id }})" title="Putar Video Packing">
                                             <i class="fas fa-video mr-1"></i> Video Ada
-                                        </span>
+                                        </button>
+                                    </div>
+                                @else
+                                    <div class="mt-1">
+                                        <button type="button" class="btn btn-xs btn-light text-muted border py-0 px-2 rounded-pill" 
+                                                onclick="openPackingVideoModal({{ $pkg->id }})" title="Tidak ada video packing">
+                                            <i class="fas fa-video-slash mr-1 text-secondary"></i> Tidak ada video
+                                        </button>
                                     </div>
                                 @endif
                             </td>
@@ -549,6 +569,20 @@
                                         <i class="fas fa-eye"></i>
                                     </button>
 
+                                    @if($hasVideo)
+                                        <button type="button" class="btn btn-danger btn-sm shadow-xs" 
+                                                onclick="openPackingVideoModal({{ $pkg->id }})" 
+                                                title="Tonton Video Packing Paket">
+                                            <i class="fas fa-video"></i>
+                                        </button>
+                                    @else
+                                        <button type="button" class="btn btn-outline-secondary btn-sm" 
+                                                onclick="openPackingVideoModal({{ $pkg->id }})" 
+                                                title="Tidak ada video packing">
+                                            <i class="fas fa-video-slash text-muted"></i>
+                                        </button>
+                                    @endif
+
                                     <form action="{{ route('courier.sync', $pkg) }}" method="POST" class="d-inline">
                                         @csrf
                                         <button type="submit" class="btn btn-outline-secondary btn-sm" title="Sinkronkan Tracking">
@@ -599,6 +633,95 @@
                 <div id="modalSlaNotice"></div>
                 <button type="button" class="btn btn-secondary btn-sm font-weight-bold" data-dismiss="modal">Tutup</button>
             </div>
+        </div>
+<!-- Modal Video Packing Langsung -->
+<div class="modal fade" id="packingVideoModal" tabindex="-1" role="dialog" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg" role="document">
+        <div class="modal-content border-0 shadow-lg" style="border-radius: 12px; overflow: hidden;">
+            <div class="modal-header bg-dark text-white py-2 px-3 border-0">
+                <div class="d-flex align-items-center">
+                    <span class="badge badge-danger mr-2 px-2 py-1" id="videoModalBadge">
+                        <i class="fas fa-video mr-1"></i> Video Packing
+                    </span>
+                    <h6 class="modal-title font-weight-bold mb-0 text-truncate text-white" id="videoModalHeading" style="max-width: 520px;">
+                        Bukti Video Packing
+                    </h6>
+                </div>
+                <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close" onclick="stopPackingVideo()">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+
+            <!-- Tampilan Jika Ada Video Packing -->
+            <div id="videoAvailableContainer" style="display: none;">
+                <div class="modal-body p-0 bg-black text-center" style="background-color: #000000;">
+                    <video id="packingVideoPlayer" controls playsinline style="max-height: 480px; width: 100%; object-fit: contain; background: #000; outline: none;"></video>
+                </div>
+                <div class="p-3 bg-light border-top">
+                    <div class="row align-items-center text-xs">
+                        <div class="col-sm-7 col-12 mb-2 mb-sm-0">
+                            <div class="d-flex flex-wrap align-items-center" style="gap: 8px;">
+                                <span class="badge badge-secondary" id="videoMetaPacker"><i class="fas fa-user mr-1"></i> Operator</span>
+                                <span class="badge badge-info" id="videoMetaDuration"><i class="fas fa-clock mr-1"></i> 00:00</span>
+                                <span class="text-muted" id="videoMetaDate"><i class="fas fa-calendar mr-1"></i> -</span>
+                            </div>
+                            <div class="text-muted mt-1" id="videoMetaResi" style="font-family: monospace;">-</div>
+                        </div>
+                        <div class="col-sm-5 col-12 text-sm-right">
+                            <a id="videoDownloadLink" href="#" download class="btn btn-outline-primary btn-sm font-weight-bold mr-1">
+                                <i class="fas fa-download mr-1"></i> Unduh Video
+                            </a>
+                            <button type="button" class="btn btn-secondary btn-sm" data-dismiss="modal" onclick="stopPackingVideo()">
+                                Tutup
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tampilan Jika TIDAK ADA Video Packing -->
+            <div id="noVideoContainer" style="display: none;">
+                <div class="modal-body py-5 px-4 text-center">
+                    <div class="mb-3">
+                        <span class="d-inline-flex align-items-center justify-content-center rounded-circle" style="width: 80px; height: 80px; background-color: #fef2f2; color: #ef4444; border: 3px solid #fee2e2;">
+                            <i class="fas fa-video-slash" style="font-size: 34px;"></i>
+                        </span>
+                    </div>
+                    <h5 class="font-weight-bold text-dark mb-2">Tidak Ada Video</h5>
+                    <p class="text-muted mb-4 mx-auto" style="max-width: 460px; font-size: 13.5px; line-height: 1.5;">
+                        Paket ini belum memiliki rekaman video packing yang tersimpan di sistem.
+                    </p>
+
+                    <div class="p-3 rounded mx-auto mb-4 text-left border" style="max-width: 480px; background-color: #f8fafc; font-size: 12.5px;">
+                        <div class="d-flex justify-content-between mb-1">
+                            <span class="text-muted">Nomor Resi:</span>
+                            <strong class="text-dark font-monospace" id="noVideoTrackingNumber">-</strong>
+                        </div>
+                        <div class="d-flex justify-content-between mb-1">
+                            <span class="text-muted">Nomor Pesanan (SN):</span>
+                            <span class="text-dark font-monospace font-weight-semibold" id="noVideoOrderSn">-</span>
+                        </div>
+                        <div class="d-flex justify-content-between mb-1">
+                            <span class="text-muted">Ekspedisi:</span>
+                            <span class="text-dark" id="noVideoCarrier">-</span>
+                        </div>
+                        <div class="d-flex justify-content-between">
+                            <span class="text-muted">Pembeli:</span>
+                            <span class="text-dark" id="noVideoBuyer">-</span>
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-content-center" style="gap: 8px;">
+                        <a href="{{ route('packing.index') }}" class="btn btn-danger btn-sm font-weight-bold px-3">
+                            <i class="fas fa-barcode mr-1"></i> Buka Stasiun Packing
+                        </a>
+                        <button type="button" class="btn btn-outline-secondary btn-sm px-3" data-dismiss="modal">
+                            Tutup
+                        </button>
+                    </div>
+                </div>
+            </div>
+
         </div>
     </div>
 </div>
@@ -699,13 +822,24 @@
                 let videoSection = '';
                 if (d.has_video && d.packing_record) {
                     videoSection = `
-                        <div class="alert alert-success border-0 p-2 mb-3 d-flex align-items-center justify-content-between text-xs">
+                        <div class="alert alert-success border-0 p-2 mb-3 d-flex align-items-center justify-content-between text-xs rounded shadow-xs">
                             <div>
                                 <i class="fas fa-video mr-1"></i> Rekaman video packing tersedia (${d.packing_record.packer_name || 'Operator'})
                             </div>
-                            <a href="${d.packing_record.video_path ? '/storage/' + d.packing_record.video_path.replace(/^\//, '') : '#'}" target="_blank" class="btn btn-xs btn-success font-weight-bold">
-                                Putar Video
-                            </a>
+                            <button type="button" class="btn btn-xs btn-danger font-weight-bold shadow-xs" onclick="openPackingVideoModal(${d.id})">
+                                <i class="fas fa-play mr-1"></i> Putar Video
+                            </button>
+                        </div>
+                    `;
+                } else {
+                    videoSection = `
+                        <div class="alert alert-light border p-2 mb-3 d-flex align-items-center justify-content-between text-xs text-muted rounded">
+                            <div>
+                                <i class="fas fa-video-slash text-secondary mr-1"></i> Tidak ada video packing
+                            </div>
+                            <button type="button" class="btn btn-xs btn-outline-secondary font-weight-semibold" onclick="openPackingVideoModal(${d.id})">
+                                <i class="fas fa-info-circle mr-1"></i> Cek Info
+                            </button>
                         </div>
                     `;
                 }
@@ -827,5 +961,108 @@
             }
         });
     }
+
+    function openPackingVideoModal(param) {
+        let data = {};
+        if (typeof param === 'object' && param !== null) {
+            data = param;
+            renderPackingVideoModal(data);
+        } else {
+            const orderId = param;
+            const row = document.getElementById('pkg-row-' + orderId);
+            if (row) {
+                data = {
+                    orderId: orderId,
+                    orderSn: row.getAttribute('data-order-sn') || '',
+                    trackingNumber: row.getAttribute('data-tracking-number') || '',
+                    carrier: row.getAttribute('data-carrier') || '',
+                    buyer: row.getAttribute('data-buyer') || '',
+                    hasVideo: row.getAttribute('data-has-video') === '1',
+                    videoUrl: row.getAttribute('data-video-url') || '',
+                    packer: row.getAttribute('data-packer') || 'Staff Packing',
+                    duration: row.getAttribute('data-duration') || '00:00',
+                    packedAt: row.getAttribute('data-packed-at') || '-'
+                };
+                renderPackingVideoModal(data);
+            } else {
+                // Fallback AJAX if called outside table row context
+                $.ajax({
+                    url: `/courier-tracking/${orderId}`,
+                    method: 'GET',
+                    headers: { 'Accept': 'application/json' },
+                    success: function(res) {
+                        if (res.success) {
+                            const d = res.data;
+                            renderPackingVideoModal({
+                                orderId: d.id,
+                                orderSn: d.order_sn,
+                                trackingNumber: d.tracking_number,
+                                carrier: d.shipping_carrier,
+                                buyer: d.buyer_username,
+                                hasVideo: d.has_video,
+                                videoUrl: d.packing_record ? d.packing_record.video_url : '',
+                                packer: d.packing_record ? d.packing_record.packer_name : 'Staff Packing',
+                                duration: d.packing_record ? d.packing_record.duration_formatted : '00:00',
+                                packedAt: d.packing_record ? d.packing_record.created_at : '-'
+                            });
+                        }
+                    }
+                });
+            }
+        }
+    }
+
+    function renderPackingVideoModal(data) {
+        stopPackingVideo();
+
+        if (data.hasVideo && data.videoUrl) {
+            $('#noVideoContainer').hide();
+            $('#videoAvailableContainer').show();
+
+            $('#videoModalBadge').removeClass('badge-secondary').addClass('badge-danger').html('<i class="fas fa-video mr-1"></i> Video Packing');
+            $('#videoModalHeading').text(`Video Packing: ${data.trackingNumber} (#${data.orderSn})`);
+            
+            $('#videoMetaPacker').html(`<i class="fas fa-user-check mr-1"></i> ${data.packer || 'Staff Packing'}`);
+            $('#videoMetaDuration').html(`<i class="fas fa-clock mr-1"></i> Durasi: ${data.duration || '00:00'}`);
+            $('#videoMetaDate').html(`<i class="fas fa-calendar-alt mr-1"></i> ${data.packedAt || '-'}`);
+            $('#videoMetaResi').html(`No. Resi: <strong>${data.trackingNumber}</strong> &bull; Pesanan: <strong>${data.orderSn}</strong>`);
+
+            const player = document.getElementById('packingVideoPlayer');
+            if (player) {
+                player.src = data.videoUrl;
+                player.play().catch(function() {
+                    // Autoplay fallback (user can click play if browser policy restricts autoplay)
+                });
+            }
+
+            $('#videoDownloadLink').attr('href', data.videoUrl).attr('download', `packing_${data.orderSn}.webm`);
+        } else {
+            $('#videoAvailableContainer').hide();
+            $('#noVideoContainer').show();
+
+            $('#videoModalBadge').removeClass('badge-danger').addClass('badge-secondary').html('<i class="fas fa-video-slash mr-1"></i> Tidak Ada Video');
+            $('#videoModalHeading').text(`Video Packing: ${data.trackingNumber || data.orderSn || '-'}`);
+
+            $('#noVideoTrackingNumber').text(data.trackingNumber || '-');
+            $('#noVideoOrderSn').text(data.orderSn || '-');
+            $('#noVideoCarrier').text(data.carrier || '-');
+            $('#noVideoBuyer').text(data.buyer || '-');
+        }
+
+        $('#packingVideoModal').modal('show');
+    }
+
+    function stopPackingVideo() {
+        const player = document.getElementById('packingVideoPlayer');
+        if (player) {
+            player.pause();
+            player.removeAttribute('src');
+            player.load();
+        }
+    }
+
+    $('#packingVideoModal').on('hidden.bs.modal', function() {
+        stopPackingVideo();
+    });
 </script>
 @endpush

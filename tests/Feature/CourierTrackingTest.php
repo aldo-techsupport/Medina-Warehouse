@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\PackingRecord;
 use App\Models\Role;
 use App\Models\ShopeeOrder;
 use App\Models\ShopeeSetting;
@@ -300,4 +301,54 @@ test('it filters packages by cancelled status correctly', function () {
     $response->assertSee('SPXID_CANCEL_01');
     $response->assertDontSee('TEST_ORD_ACTIVE_02');
     $response->assertSee('Dibatalkan');
+});
+
+test('it displays direct packing video action and modal in courier tracking with correct states', function () {
+    $orderWithVideo = ShopeeOrder::create([
+        'order_sn' => 'ORD_WITH_VID_01',
+        'tracking_number' => 'RESI_VID_01',
+        'shipping_carrier' => 'J&T Express',
+        'order_status' => 'PROCESSED',
+        'total_amount' => 125000,
+        'buyer_username' => 'buyer_video',
+    ]);
+
+    PackingRecord::create([
+        'order_sn' => $orderWithVideo->order_sn,
+        'tracking_number' => $orderWithVideo->tracking_number,
+        'shopee_order_id' => $orderWithVideo->id,
+        'status' => 'completed',
+        'packer_name' => 'Budi Packer',
+        'video_path' => 'packing_videos/test_vid.webm',
+        'video_duration' => 15,
+        'file_size' => 102400,
+    ]);
+
+    $orderWithoutVideo = ShopeeOrder::create([
+        'order_sn' => 'ORD_NO_VID_02',
+        'tracking_number' => 'RESI_NO_VID_02',
+        'shipping_carrier' => 'SPX Express',
+        'order_status' => 'READY_TO_SHIP',
+        'total_amount' => 90000,
+        'buyer_username' => 'buyer_novideo',
+    ]);
+
+    $response = $this->actingAs($this->adminUser)->get(route('courier.index'));
+
+    $response->assertStatus(200);
+    $response->assertSee('Video Ada');
+    $response->assertSee('Tidak ada video');
+    $response->assertSee('packingVideoModal');
+
+    // Test JSON endpoint for order with video
+    $jsonWithVid = $this->actingAs($this->adminUser)->getJson(route('courier.show', $orderWithVideo));
+    $jsonWithVid->assertStatus(200);
+    $jsonWithVid->assertJsonPath('data.has_video', true);
+    $jsonWithVid->assertJsonPath('data.packing_record.packer_name', 'Budi Packer');
+
+    // Test JSON endpoint for order without video
+    $jsonNoVid = $this->actingAs($this->adminUser)->getJson(route('courier.show', $orderWithoutVideo));
+    $jsonNoVid->assertStatus(200);
+    $jsonNoVid->assertJsonPath('data.has_video', false);
+    $jsonNoVid->assertJsonPath('data.packing_record', null);
 });
