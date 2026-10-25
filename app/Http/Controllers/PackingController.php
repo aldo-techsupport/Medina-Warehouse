@@ -722,12 +722,25 @@ class PackingController extends Controller
 
         // 2. Transcode to faststart MP4 (H.264/AAC) if ffmpeg and exec are available
         if (function_exists('exec')) {
-            $ffmpegBin = '/usr/local/bin/ffmpeg';
-            if (! file_exists($ffmpegBin) && function_exists('shell_exec')) {
-                $ffmpegBin = trim((string) @shell_exec('which ffmpeg'));
+            $isWin = strtoupper(substr(PHP_OS, 0, 3)) === 'WIN';
+            $ffmpegBin = null;
+
+            if ($isWin) {
+                $testOut = [];
+                $testCode = 1;
+                @exec('where ffmpeg 2>nul', $testOut, $testCode);
+                if ($testCode === 0 && ! empty($testOut[0])) {
+                    $ffmpegBin = trim($testOut[0]);
+                }
+            } else {
+                if (file_exists('/usr/local/bin/ffmpeg')) {
+                    $ffmpegBin = '/usr/local/bin/ffmpeg';
+                } elseif (function_exists('shell_exec')) {
+                    $ffmpegBin = trim((string) @shell_exec('which ffmpeg 2>/dev/null'));
+                }
             }
 
-            if ($ffmpegBin && is_executable($ffmpegBin)) {
+            if ($ffmpegBin && ($isWin || is_executable($ffmpegBin))) {
                 $targetMp4Name = 'pack_'.$orderSn.'_'.date('Ymd_His').'.mp4';
                 $targetMp4FullPath = storage_path('app/public/packing_videos/'.$targetMp4Name);
 
@@ -749,16 +762,34 @@ class PackingController extends Controller
                     @chmod($targetMp4FullPath, 0664);
 
                     $duration = 0;
-                    $ffprobeBin = '/usr/local/bin/ffprobe';
-                    if (file_exists($ffprobeBin) && is_executable($ffprobeBin) && function_exists('shell_exec')) {
+                    $ffprobeBin = null;
+
+                    if ($isWin) {
+                        $testProbeOut = [];
+                        $testProbeCode = 1;
+                        @exec('where ffprobe 2>nul', $testProbeOut, $testProbeCode);
+                        if ($testProbeCode === 0 && ! empty($testProbeOut[0])) {
+                            $ffprobeBin = trim($testProbeOut[0]);
+                        }
+                    } else {
+                        if (file_exists('/usr/local/bin/ffprobe')) {
+                            $ffprobeBin = '/usr/local/bin/ffprobe';
+                        } elseif (function_exists('shell_exec')) {
+                            $ffprobeBin = trim((string) @shell_exec('which ffprobe 2>/dev/null'));
+                        }
+                    }
+
+                    if ($ffprobeBin) {
                         $probeCmd = sprintf(
                             '%s -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 %s 2>&1',
                             escapeshellarg($ffprobeBin),
                             escapeshellarg($targetMp4FullPath)
                         );
-                        $probeOut = @shell_exec($probeCmd);
-                        if ($probeOut && is_numeric(trim($probeOut))) {
-                            $duration = (int) round((float) trim($probeOut));
+                        $probeOut = [];
+                        @exec($probeCmd, $probeOut);
+                        $probeStr = trim(implode('', $probeOut));
+                        if ($probeStr && is_numeric($probeStr)) {
+                            $duration = (int) round((float) $probeStr);
                         }
                     }
 
