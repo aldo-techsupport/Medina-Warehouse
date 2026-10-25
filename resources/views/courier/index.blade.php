@@ -274,7 +274,10 @@
                     <select name="carrier" class="form-control form-control-sm" onchange="this.form.submit()">
                         <option value="">-- Semua Ekspedisi --</option>
                         @foreach($carriersList as $c)
-                            <option value="{{ $c }}" {{ request('carrier') == $c ? 'selected' : '' }}>{{ $c }}</option>
+                            @if(is_string($c) && trim($c) !== '')
+                                @php $cName = trim($c); @endphp
+                                <option value="{{ $cName }}" {{ request('carrier') === $cName ? 'selected' : '' }}>{{ $cName }}</option>
+                            @endif
                         @endforeach
                     </select>
                 </div>

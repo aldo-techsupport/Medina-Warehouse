@@ -5,6 +5,7 @@ use App\Models\ShopeeOrder;
 use App\Models\ShopeeSetting;
 use App\Models\User;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 
 beforeEach(function () {
@@ -225,4 +226,14 @@ test('it syncs tracking info using Shopee Logistics API according to Guide 4', f
     expect($order->logistics_status)->toBe('LOGISTICS_DELIVERY_IN_PROCESS');
     expect($order->tracking_data)->toHaveCount(2);
     expect($order->last_tracked_at)->not->toBeNull();
+});
+
+test('it handles carrier list dropdown safely with various cache payloads', function () {
+    // Put a collection directly in cache
+    Cache::put('courier_unique_carriers_list', collect(['SPX Express', 'J&T Express']), 60);
+
+    $response = $this->actingAs($this->adminUser)->get(route('courier.index'));
+    $response->assertStatus(200);
+    $response->assertSee('SPX Express');
+    $response->assertSee('J&T Express');
 });

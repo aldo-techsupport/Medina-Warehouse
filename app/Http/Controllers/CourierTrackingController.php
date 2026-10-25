@@ -10,6 +10,7 @@ use Exception;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\View\View;
 
@@ -123,12 +124,30 @@ class CourierTrackingController extends Controller
                 ->orWhere('logistics_status', 'LOGISTICS_DELIVERED');
         })->count();
 
-        $carriersList = Cache::remember('courier_unique_carriers_list', 1800, function () {
+        $cachedCarriers = Cache::remember('courier_unique_carriers_list', 1800, function () {
             return ShopeeOrder::whereNotNull('shipping_carrier')
+                ->where('shipping_carrier', '!=', '')
                 ->distinct()
                 ->orderBy('shipping_carrier')
-                ->pluck('shipping_carrier');
+                ->pluck('shipping_carrier')
+                ->map(fn ($item) => is_string($item) ? trim($item) : '')
+                ->filter(fn ($item) => $item !== '')
+                ->values()
+                ->all();
         });
+
+        $carriersList = [];
+        if (is_array($cachedCarriers)) {
+            $carriersList = $cachedCarriers;
+        } elseif ($cachedCarriers instanceof Collection) {
+            $carriersList = $cachedCarriers->all();
+        } elseif (is_object($cachedCarriers) && isset($cachedCarriers->items) && is_array($cachedCarriers->items)) {
+            $carriersList = $cachedCarriers->items;
+        }
+
+        $carriersList = array_values(array_unique(array_filter(array_map(function ($c) {
+            return is_string($c) ? trim($c) : '';
+        }, (array) $carriersList), fn ($c) => $c !== '')));
 
         return view('courier.index', compact(
             'packages',
