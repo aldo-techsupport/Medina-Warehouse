@@ -171,7 +171,7 @@
 
 @push('scripts')
 <script>
-    function openVideoPlayerModal(videoUrl, resi, packer, duration, time) {
+    window.openVideoPlayerModal = function(videoUrl, resi, packer, duration, time) {
         document.getElementById('videoModalTitle').innerHTML = `<i class="fas fa-video text-danger mr-1"></i> Video Packing: <strong>${resi}</strong>`;
         document.getElementById('videoModalMeta').innerHTML = `Staf: <strong>${packer}</strong> &bull; Durasi: <strong>${duration}</strong> &bull; ${time}`;
         
@@ -181,16 +181,18 @@
         document.getElementById('videoDownloadBtn').href = videoUrl;
         
         $('#videoPlayerModal').modal('show');
-    }
+    };
 
-    function stopModalVideo() {
+    window.stopModalVideo = function() {
         const videoEl = document.getElementById('modalVideoElement');
-        videoEl.pause();
-        videoEl.src = '';
-    }
+        if (videoEl) {
+            videoEl.pause();
+            videoEl.src = '';
+        }
+    };
 
     $('#videoPlayerModal').on('hidden.bs.modal', function () {
-        stopModalVideo();
+        window.stopModalVideo();
     });
 
     // 📡 REALTIME BROADCAST & LOCALSTORAGE SYNC FOR PROGRESS PERCENTAGE

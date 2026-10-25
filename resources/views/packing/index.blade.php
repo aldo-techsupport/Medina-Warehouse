@@ -1041,6 +1041,20 @@
         if (mBadge) mBadge.innerHTML = `<i class="fas fa-qrcode text-success mr-1"></i> Scan [${engine}]`;
     }
 
+    // Camera Stop & Cleanup hook for SPA navigation
+    window.stopPackingCamera = function() {
+        if (mediaStream) {
+            try {
+                mediaStream.getTracks().forEach(track => track.stop());
+                mediaStream = null;
+            } catch (e) {}
+        }
+        const videoEl = document.getElementById('cameraPreview');
+        if (videoEl) videoEl.srcObject = null;
+        isScanningActive = false;
+        isScannerLocked = true;
+    };
+
     // Camera Init & QR/Barcode Reader Integration
     async function startCamera() {
         try {
@@ -2840,6 +2854,7 @@
         const isMp4 = mime.includes('mp4');
         const ext = isMp4 ? 'mp4' : 'webm';
         const videoBlob = new Blob(recordedChunks, { type: mime });
+        recordedChunks = []; // 🧹 Bebaskan memori binary RAM HP segera
 
         if (videoBlob.size === 0) {
             setSavingButtonsState(false);
@@ -2980,7 +2995,9 @@
 
     window.addEventListener('beforeunload', (e) => {
         if (window.__isInternalNavigation) return;
-        if (typeof BackgroundUploadManager !== 'undefined' && BackgroundUploadManager.activeUploads && BackgroundUploadManager.activeUploads.size > 0) {
+        const isUploading = (typeof GlobalPackingUploader !== 'undefined' && GlobalPackingUploader.isUploading) ||
+                            (typeof BackgroundUploadManager !== 'undefined' && BackgroundUploadManager.activeUploads && BackgroundUploadManager.activeUploads.size > 0);
+        if (isUploading) {
             e.preventDefault();
             e.returnValue = 'Video packing sedang diunggah di latar belakang. Jangan tutup browser agar proses unggah tidak terputus.';
             return e.returnValue;

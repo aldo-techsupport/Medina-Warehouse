@@ -4,7 +4,7 @@
         position: fixed;
         bottom: 24px;
         right: 24px;
-        z-index: 1060;
+        z-index: 1055;
         width: 340px;
         max-width: calc(100vw - 32px);
         background: rgba(255, 255, 255, 0.98);
@@ -15,11 +15,11 @@
         box-shadow: 0 12px 30px -4px rgba(15, 23, 42, 0.18), 0 4px 6px -2px rgba(15, 23, 42, 0.05);
         font-family: inherit;
         overflow: hidden;
-        transition: transform 0.25s ease, opacity 0.25s ease;
+        transition: transform 0.25s ease, opacity 0.25s ease, bottom 0.25s ease;
     }
     .global-upload-widget.minimized {
         width: auto;
-        min-width: 190px;
+        min-width: 200px;
     }
     .global-upload-widget.minimized .upload-widget-body {
         display: none !important;
@@ -32,6 +32,7 @@
         background: #0f172a;
         color: #f8fafc;
         border-bottom: 1px solid #1e293b;
+        cursor: pointer;
     }
     .global-upload-header .upload-title {
         font-size: 12px;
@@ -48,6 +49,7 @@
         margin-right: 8px;
         box-shadow: 0 0 0 0 rgba(56, 189, 248, 0.7);
         animation: globalPulse 1.6s infinite cubic-bezier(0.66, 0, 0, 1);
+        flex-shrink: 0;
     }
     .global-upload-header .live-pulse-dot.success {
         background-color: #22c55e;
@@ -73,26 +75,38 @@
         background: linear-gradient(90deg, #0284c7 0%, #38bdf8 100%);
         transition: width 0.3s ease;
     }
-    @media (max-width: 576px) {
+
+    /* 📱 RESPONSIVE MOBILE STYLING: Di atas navbar bawah HP agar tidak bertabrakan */
+    @media (max-width: 767.98px) {
         .global-upload-widget {
-            bottom: 14px;
-            right: 14px;
-            left: 14px;
+            bottom: calc(68px + env(safe-area-inset-bottom, 0px)) !important;
+            right: 12px;
+            left: 12px;
             width: auto;
-            max-width: none;
+            max-width: calc(100vw - 24px);
+            border-radius: 14px;
+        }
+        .global-upload-widget.minimized {
+            left: auto;
+            right: 12px;
+            bottom: calc(66px + env(safe-area-inset-bottom, 0px)) !important;
+            width: auto;
+            min-width: 190px;
+            max-width: calc(100vw - 24px);
+            border-radius: 20px;
         }
     }
 </style>
 
 <div id="globalUploadWidget" class="global-upload-widget shadow-lg" style="display: none;">
-    <div class="global-upload-header">
-        <div class="upload-title">
+    <div class="global-upload-header" onclick="GlobalPackingUploader.toggleMinimize()">
+        <div class="upload-title text-truncate mr-2">
             <span class="live-pulse-dot" id="globalUploadPulse"></span>
             <span id="globalUploadHeaderTitle">Upload Video Packing</span>
             <span class="badge badge-info ml-2 px-1.5 py-0.5 text-xs font-weight-bold" id="globalUploadCountBadge" style="display: none;">1</span>
         </div>
-        <div class="d-flex align-items-center">
-            <button type="button" class="btn btn-link text-white-50 p-0 mr-2" id="globalUploadMinimizeBtn" onclick="GlobalPackingUploader.toggleMinimize()" title="Perkecil">
+        <div class="d-flex align-items-center" onclick="event.stopPropagation()">
+            <button type="button" class="btn btn-link text-white-50 p-0 mr-2" id="globalUploadMinimizeBtn" onclick="GlobalPackingUploader.toggleMinimize()" title="Perkecil / Perbesar">
                 <i class="fas fa-minus text-xs"></i>
             </button>
             <button type="button" class="btn btn-link text-white-50 p-0" id="globalUploadCloseBtn" onclick="GlobalPackingUploader.closeWidget()" title="Tutup" style="display: none;">
@@ -124,9 +138,9 @@
             <div class="text-danger font-weight-bold mb-2" id="globalUploadErrorMsg">
                 <i class="fas fa-exclamation-triangle mr-1"></i> Upload terputus.
             </div>
-            <div class="d-flex justify-content-end">
-                <button type="button" class="btn btn-xs btn-outline-danger mr-1" onclick="GlobalPackingUploader.cancelCurrentJob()">
-                    <i class="fas fa-trash mr-1"></i> Batal
+            <div class="d-flex justify-content-between align-items-center">
+                <button type="button" class="btn btn-xs btn-outline-danger" onclick="GlobalPackingUploader.cancelCurrentJob()" title="Hapus dari antrean agar hemat memori HP">
+                    <i class="fas fa-trash-alt mr-1"></i> Hapus Video
                 </button>
                 <button type="button" class="btn btn-xs btn-primary font-weight-bold" onclick="GlobalPackingUploader.retryCurrentJob()">
                     <i class="fas fa-redo mr-1"></i> Coba Lagi
@@ -146,6 +160,7 @@
         storeName: 'upload_jobs',
         activeXhr: null,
         currentJobId: null,
+        currentJob: null,
         isUploading: false,
         channel: (typeof BroadcastChannel !== 'undefined') ? new BroadcastChannel('packing_upload_channel') : null,
         heartbeatTimer: null,
@@ -156,24 +171,30 @@
             this.setupBroadcast();
             this.setupStorageListener();
 
-            // Process queue immediately when page loads
-            setTimeout(() => {
+            // Jalankan cleanup kedaluwarsa & proses antrean
+            setTimeout(async () => {
+                await this.purgeExpiredJobs();
                 this.processQueue();
-            }, 600);
+            }, 500);
 
-            // Periodic queue check (every 5 seconds) to handle multi-tab handoffs or resumed tasks
+            // Cek periodik setiap 5 detik untuk multi-tab handoff & pembersihan memori
             setInterval(() => {
                 if (!this.isUploading) {
                     this.processQueue();
                 }
             }, 5000);
+
+            // Pembersihan memori HP setiap 3 menit
+            setInterval(() => {
+                this.purgeExpiredJobs();
+            }, 180000);
         },
 
         // Open IndexedDB connection
         openDB() {
             return new Promise((resolve, reject) => {
                 if (!window.indexedDB) {
-                    console.warn('Browser does not support IndexedDB');
+                    console.warn('Browser tidak mendukung IndexedDB');
                     return resolve(null);
                 }
                 const req = indexedDB.open(this.dbName, this.dbVersion);
@@ -195,7 +216,7 @@
         async enqueue(job) {
             const db = await this.openDB();
             if (!db) {
-                console.error('Cannot enqueue: IndexedDB not available');
+                console.error('Cannot enqueue: IndexedDB tidak tersedia');
                 return;
             }
 
@@ -255,7 +276,7 @@
             });
         },
 
-        // Update single job record
+        // Update single job record in IndexedDB
         async updateJob(job) {
             const db = await this.openDB();
             if (!db) return;
@@ -272,7 +293,7 @@
             });
         },
 
-        // Remove job from IndexedDB upon success or cancellation
+        // 🧹 HAPUS JOB & BLOB DARI INDEXEDDB SETELAH SUKSES (Menghemat Memori HP)
         async deleteJob(id) {
             const db = await this.openDB();
             if (!db) return;
@@ -288,6 +309,32 @@
             });
         },
 
+        // 🧹 KEBIJAKAN PEMBERSIHAN OTOMATIS: Hapus job selesai atau gagal kedaluwarsa (> 2 jam)
+        async purgeExpiredJobs() {
+            try {
+                const jobs = await this.getAllJobs();
+                const now = Date.now();
+                for (const j of jobs) {
+                    // Hapus jika status completed masih tertinggal
+                    if (j.status === 'completed') {
+                        await this.deleteJob(j.id);
+                        continue;
+                    }
+                    // Hapus job gagal yang sudah terbengkalai lebih dari 2 jam (menyelamatkan memori HP)
+                    if (j.status === 'failed' && (now - (j.updated_at || j.created_at || 0)) > 7200000) {
+                        console.log('Purging abandoned failed video job to free phone storage:', j.order_sn);
+                        await this.deleteJob(j.id);
+                        continue;
+                    }
+                    // Hapus job tanpa blob (corrupt)
+                    if (!j.blob || (j.blob && j.blob.size === 0)) {
+                        await this.deleteJob(j.id);
+                    }
+                }
+                this.syncLocalStorageMetadata();
+            } catch (e) {}
+        },
+
         // Check queue and start upload if idle
         async processQueue() {
             if (this.isUploading) return;
@@ -296,29 +343,25 @@
             const now = Date.now();
             const activeTabInfo = JSON.parse(localStorage.getItem('medina_upload_lock') || '{}');
             if (activeTabInfo.tabId && activeTabInfo.tabId !== this.tabId && (now - (activeTabInfo.time || 0)) < 4000) {
-                // Another tab is actively uploading; this tab only mirrors progress
+                // Tab lain sedang aktif mengunggah; tab ini cukup menampilkan progress
                 return;
             }
 
             const jobs = await this.getAllJobs();
-            
-            // Clean up stale jobs older than 24 hours
-            for (const j of jobs) {
-                if ((now - (j.created_at || 0)) > 86400000) {
-                    await this.deleteJob(j.id);
-                }
-            }
-
             const activeJobs = jobs.filter(j => j.status !== 'completed');
+
             if (activeJobs.length === 0) {
                 this.updateUIIdle();
                 return;
             }
 
-            // Pick the next pending or failed job
-            const nextJob = activeJobs.find(j => j.status !== 'failed') || activeJobs[0];
+            // Pilih job pending atau job gagal yang belum mencapai batas retry
+            const nextJob = activeJobs.find(j => j.status === 'pending') 
+                || activeJobs.find(j => j.status === 'uploading') 
+                || activeJobs.find(j => j.status === 'failed' && (j.retries || 0) < 3)
+                || activeJobs[0];
+
             if (nextJob.status === 'failed' && (nextJob.retries || 0) >= 3) {
-                // Already exceeded retries: show failed view on widget and wait for user click
                 this.updateUIFailed(nextJob);
                 return;
             }
@@ -326,19 +369,37 @@
             this.startUpload(nextJob);
         },
 
-        // Perform the upload via XMLHttpRequest
+        // Perform the upload via XMLHttpRequest (TETAP BERJALAN KETIKA BERPINDAH MENU!)
         async startUpload(job) {
             this.isUploading = true;
             this.currentJobId = job.id;
+            this.currentJob = job;
             job.status = 'uploading';
-            this.updateJob(job);
+            await this.updateJob(job);
             this.claimLock();
 
             this.updateUIProgress(job);
 
-            // Notify server init if needed
-            this.callInitUpload(job).catch(e => console.warn('initUpload error:', e));
+            // 1. Daftarkan status 'in_progress' ke server (tidak membatalkan upload jika file baru tersedia)
+            try {
+                await this.callInitUpload(job);
+            } catch (err) {
+                console.warn('initUpload register notice:', err);
+            }
 
+            // 2. Pastikan file blob video valid sebelum mengirim
+            if (!job.blob || job.blob.size === 0) {
+                console.warn('Job blob is empty, removing job:', job.id);
+                await this.deleteJob(job.id);
+                this.releaseLock();
+                this.isUploading = false;
+                this.currentJobId = null;
+                this.currentJob = null;
+                this.processQueue();
+                return;
+            }
+
+            // 3. Kirim data video utuh via XHR
             const formData = new FormData();
             formData.append('video', job.blob, `pack_${job.order_sn}.${job.ext || 'webm'}`);
             formData.append('order_sn', job.order_sn);
@@ -354,7 +415,7 @@
             xhr.open('POST', "{{ route('packing.upload') }}", true);
             xhr.setRequestHeader('X-CSRF-TOKEN', '{{ csrf_token() }}');
             xhr.setRequestHeader('Accept', 'application/json');
-            xhr.timeout = 240000; // 4 menit timeout
+            xhr.timeout = 240000; // 4 menit timeout untuk file video besar
 
             xhr.upload.onprogress = (e) => {
                 this.claimLock();
@@ -376,22 +437,31 @@
                     res = { status: 'error', message: 'Respon server tidak valid' };
                 }
 
+                // ⚠️ HANYA HAPUS VIDEO SETELAH SERVER BENAR-BENAR MENGONFIRMASI SUKSES!
                 if (xhr.status >= 200 && xhr.status < 300 && res.status === 'success') {
+                    const videoUrl = res.video_url || (res.data && res.data.video_url) || null;
                     job.percent = 100;
                     job.status = 'completed';
-                    job.video_url = res.data ? res.data.video_url : null;
+                    job.video_url = videoUrl;
 
+                    // 🧹 Hapus Blob video sumber dari IndexedDB secara permanen
                     await this.deleteJob(job.id);
+                    job.blob = null; // Bebaskan memori RAM browser
+
                     this.releaseLock();
                     this.isUploading = false;
                     this.activeXhr = null;
                     this.currentJobId = null;
+                    this.currentJob = null;
+
+                    // Simpan data riwayat ringkas di sessionStorage (hanya string metadata, bukan binary)
+                    this.saveRecentCompleted(job);
 
                     this.updateUISuccess(job);
                     this.broadcastCompleted(job);
                     this.syncLocalStorageMetadata();
 
-                    // Non-blocking toast notification
+                    // Notifikasi Toast
                     if (typeof Swal !== 'undefined') {
                         const Toast = Swal.mixin({
                             toast: true,
@@ -406,7 +476,7 @@
                         });
                     }
 
-                    // Process next in queue after short pause
+                    // Lanjutkan antrean berikutnya jika ada
                     setTimeout(() => {
                         this.processQueue();
                     }, 800);
@@ -426,26 +496,29 @@
             xhr.send(formData);
         },
 
-        // Call init-upload so server knows upload started
+        // Call init-upload so server knows upload started & checks existing completion
+        // Call init-upload so server knows upload started & marks in_progress
         async callInitUpload(job) {
-            try {
-                await fetch("{{ route('packing.initUpload') }}", {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRF-TOKEN': '{{ csrf_token() }}',
-                        'Accept': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        order_sn: job.order_sn,
-                        tracking_number: job.tracking_number,
-                        packer_name: job.packer_name
-                    })
-                });
-            } catch (e) {}
+            const res = await fetch("{{ route('packing.initUpload') }}", {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                    'Accept': 'application/json'
+                },
+                body: JSON.stringify({
+                    order_sn: job.order_sn,
+                    tracking_number: job.tracking_number,
+                    packer_name: job.packer_name,
+                    duration: job.duration,
+                    mode: job.mode,
+                    force_new: true
+                })
+            });
+            return await res.json();
         },
 
-        // Error & Retry Handler
+        // ⚠️ TANGANI KEGAGALAN UPLOAD: Jangan hapus video sumber, pertahankan data retry
         async handleUploadError(job, errMsg) {
             this.releaseLock();
             this.isUploading = false;
@@ -456,6 +529,9 @@
             if (job.retries <= 2) {
                 console.log(`Auto-retrying upload ${job.order_sn} (Percobaan ke-${job.retries})...`);
                 await this.updateJob(job);
+                this.updateUIProgress(job);
+                const headerTitle = document.getElementById('globalUploadHeaderTitle');
+                if (headerTitle) headerTitle.innerText = `Mencoba Ulang (${job.retries}/3)...`;
                 setTimeout(() => {
                     this.processQueue();
                 }, 3000);
@@ -492,7 +568,7 @@
             }
         },
 
-        // Cancel and delete job
+        // Batal & Hapus video secara eksplisit atas kehendak pengguna
         async cancelCurrentJob() {
             if (this.activeXhr) {
                 try { this.activeXhr.abort(); } catch (e) {}
@@ -502,10 +578,38 @@
             if (this.currentJobId) {
                 await this.deleteJob(this.currentJobId);
                 this.currentJobId = null;
+                this.currentJob = null;
             }
             this.releaseLock();
             this.syncLocalStorageMetadata();
+            this.updateUIIdle();
             this.processQueue();
+        },
+
+        // Simpan data riwayat ringkas di sessionStorage (hanya string kecil, tanpa blob)
+        saveRecentCompleted(job) {
+            try {
+                let completedList = JSON.parse(sessionStorage.getItem('packing_recent_completed') || '[]');
+                completedList.unshift({
+                    order_sn: job.order_sn,
+                    tracking_number: job.tracking_number,
+                    video_url: job.video_url,
+                    packer_name: job.packer_name,
+                    duration: job.duration ? `${job.duration}s` : '0s',
+                    completed_at: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+                });
+                if (completedList.length > 25) completedList = completedList.slice(0, 25);
+                sessionStorage.setItem('packing_recent_completed', JSON.stringify(completedList));
+            } catch (e) {}
+        },
+
+        // Query active job by tracking number or order sn
+        getActiveJobFor(key) {
+            if (!key) return null;
+            if (this.currentJob && (this.currentJob.tracking_number === key || this.currentJob.order_sn === key)) {
+                return this.currentJob;
+            }
+            return null;
         },
 
         // UI Helpers
@@ -518,7 +622,11 @@
             if (pulse) pulse.className = 'live-pulse-dot';
 
             const headerTitle = document.getElementById('globalUploadHeaderTitle');
-            if (headerTitle) headerTitle.innerText = 'Mengunggah Video Packing';
+            if (headerTitle) {
+                headerTitle.innerText = widget.classList.contains('minimized') 
+                    ? `[${job.percent || 0}%] ${job.tracking_number || job.order_sn}`
+                    : 'Mengunggah Video Packing';
+            }
 
             const orderSnEl = document.getElementById('globalUploadOrderSn');
             if (orderSnEl) orderSnEl.innerText = job.tracking_number || job.order_sn;
@@ -582,13 +690,13 @@
             const closeBtn = document.getElementById('globalUploadCloseBtn');
             if (closeBtn) closeBtn.style.display = 'inline-block';
 
-            // Auto-hide widget after 4.5 seconds if queue is clear
+            // Auto-hide widget setelah 4 detik jika antrean sudah bersih
             setTimeout(async () => {
                 const remaining = await this.getAllJobs();
                 if (remaining.length === 0) {
                     widget.style.display = 'none';
                 }
-            }, 4500);
+            }, 4000);
         },
 
         updateUIFailed(job) {
@@ -627,7 +735,11 @@
         async updateUIIdle() {
             const widget = document.getElementById('globalUploadWidget');
             if (widget && !this.isUploading) {
-                widget.style.display = 'none';
+                const jobs = await this.getAllJobs();
+                const active = jobs.filter(j => j.status !== 'completed');
+                if (active.length === 0) {
+                    widget.style.display = 'none';
+                }
             }
         },
 
@@ -641,6 +753,14 @@
                     icon.className = 'fas fa-chevron-up text-xs';
                 } else {
                     icon.className = 'fas fa-minus text-xs';
+                }
+            }
+            if (this.currentJob && this.isUploading) {
+                const headerTitle = document.getElementById('globalUploadHeaderTitle');
+                if (headerTitle) {
+                    headerTitle.innerText = widget.classList.contains('minimized') 
+                        ? `[${this.currentJob.percent || 0}%] ${this.currentJob.tracking_number || this.currentJob.order_sn}`
+                        : 'Mengunggah Video Packing';
                 }
             }
         },
@@ -745,7 +865,13 @@
         }
     };
 
-    document.addEventListener('DOMContentLoaded', () => {
+    window.GlobalPackingUploader = GlobalPackingUploader;
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', () => {
+            GlobalPackingUploader.init();
+        });
+    } else {
         GlobalPackingUploader.init();
-    });
+    }
 </script>

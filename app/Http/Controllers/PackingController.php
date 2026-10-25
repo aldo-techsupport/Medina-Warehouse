@@ -393,6 +393,37 @@ class PackingController extends Controller
             $itemsChecked = json_decode($validated['items_checked'], true) ?: [];
         }
 
+        $forceNew = $request->boolean('force_new', false);
+
+        if (! $forceNew) {
+            // Check if an existing completed record already exists with valid video on disk
+            $existingCompleted = PackingRecord::where('order_sn', $validated['order_sn'])
+                ->where('status', 'completed')
+                ->whereNotNull('video_path')
+                ->latest()
+                ->first();
+
+            if ($existingCompleted && $existingCompleted->video_path) {
+                $fileExists = file_exists(storage_path('app/public/'.$existingCompleted->video_path))
+                    || Storage::disk('public')->exists($existingCompleted->video_path);
+
+                if ($fileExists) {
+                    return response()->json([
+                        'status' => 'already_completed',
+                        'record_id' => $existingCompleted->id,
+                        'order_sn' => $existingCompleted->order_sn,
+                        'tracking_number' => $existingCompleted->tracking_number,
+                        'video_url' => $existingCompleted->video_url,
+                        'data' => [
+                            'record_id' => $existingCompleted->id,
+                            'video_url' => $existingCompleted->video_url,
+                        ],
+                        'message' => 'Video packing untuk pesanan ini sudah tersimpan di server.',
+                    ]);
+                }
+            }
+        }
+
         // Avoid duplicate in_progress records if one is already in flight
         $record = PackingRecord::where('order_sn', $validated['order_sn'])
             ->where('status', 'in_progress')
@@ -481,7 +512,32 @@ class PackingController extends Controller
             }
 
             $filename = 'pack_'.$validated['order_sn'].'_'.date('Ymd_His').'.'.$extension;
-            $path = $videoFile->storeAs('packing_videos', $filename, 'public');
+            $targetDir = storage_path('app/public/packing_videos');
+            if (! is_dir($targetDir)) {
+                mkdir($targetDir, 0755, true);
+            }
+
+            $path = null;
+            try {
+                $path = $videoFile->storeAs('packing_videos', $filename, 'public');
+            } catch (\Throwable $e) {
+                Log::warning('PackingController storeAs exception, fallback to move: '.$e->getMessage());
+                try {
+                    $videoFile->move($targetDir, $filename);
+                    $path = 'packing_videos/'.$filename;
+                } catch (\Throwable $moveEx) {
+                    Log::error('PackingController move failed: '.$moveEx->getMessage());
+                }
+            }
+
+            if (! $path || (! file_exists(storage_path('app/public/'.$path)) && ! Storage::disk('public')->exists($path))) {
+                if (file_exists($targetDir.'/'.$filename)) {
+                    $path = 'packing_videos/'.$filename;
+                } else {
+                    $videoFile->move($targetDir, $filename);
+                    $path = 'packing_videos/'.$filename;
+                }
+            }
 
             if (! $path) {
                 return response()->json([
@@ -554,6 +610,10 @@ class PackingController extends Controller
                 'message' => $message,
                 'record_id' => $record->id,
                 'video_url' => $record->video_url,
+                'data' => [
+                    'record_id' => $record->id,
+                    'video_url' => $record->video_url,
+                ],
             ]);
         } catch (ValidationException $ve) {
             return response()->json([

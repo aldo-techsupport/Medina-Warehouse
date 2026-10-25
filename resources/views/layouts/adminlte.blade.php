@@ -263,7 +263,9 @@
             }
         }
     </style>
-    @stack('styles')
+    <div id="spa-page-styles">
+        @stack('styles')
+    </div>
 </head>
 <body class="hold-transition sidebar-mini layout-fixed layout-navbar-fixed text-sm">
 <div class="wrapper">
@@ -900,6 +902,8 @@
 <!-- ChartJS -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
 
+@include('layouts.spa-navigation')
+
 <script>
     function toggleFullscreen() {
         var elem = document.documentElement;
@@ -1170,6 +1174,8 @@
 @include('layouts.global-uploader')
 @endauth
 
+<div id="spa-page-scripts">
 @stack('scripts')
+</div>
 </body>
 </html>

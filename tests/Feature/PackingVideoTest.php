@@ -318,3 +318,142 @@ test('it auto cleans abandoned in_progress upload records older than 3 minutes',
 
     expect(PackingRecord::find($staleRecord->id))->toBeNull();
 });
+
+test('it returns already_completed in initUpload if video record already exists on disk', function () {
+    Storage::fake('public');
+
+    $order = ShopeeOrder::create([
+        'order_sn' => 'ORD-EXISTING-DONE-009',
+        'tracking_number' => 'RESI-EXISTING-999',
+        'order_status' => 'PROCESSED',
+        'total_amount' => 150000,
+        'buyer_username' => 'buyer_existing_done',
+    ]);
+
+    // Create fake video file on disk
+    $fakePath = 'packing_videos/pack_ORD-EXISTING-DONE-009_test.webm';
+    Storage::disk('public')->put($fakePath, 'fake video content');
+
+    $completedRecord = PackingRecord::create([
+        'order_sn' => 'ORD-EXISTING-DONE-009',
+        'tracking_number' => 'RESI-EXISTING-999',
+        'shopee_order_id' => $order->id,
+        'status' => 'completed',
+        'video_path' => $fakePath,
+        'video_duration' => 18,
+        'packer_name' => 'Doni Packer',
+    ]);
+
+    $response = $this->actingAs($this->user)->postJson(route('packing.initUpload'), [
+        'order_sn' => 'ORD-EXISTING-DONE-009',
+        'tracking_number' => 'RESI-EXISTING-999',
+        'packer_name' => 'Doni Packer',
+    ]);
+
+    $response->assertStatus(200);
+    $response->assertJson([
+        'status' => 'already_completed',
+        'order_sn' => 'ORD-EXISTING-DONE-009',
+        'tracking_number' => 'RESI-EXISTING-999',
+        'video_url' => $completedRecord->video_url,
+    ]);
+});
+
+test('it returns both video_url and data array on successful upload', function () {
+    Storage::fake('public');
+
+    $order = ShopeeOrder::create([
+        'order_sn' => 'ORD-PAYLOAD-TEST-010',
+        'tracking_number' => 'RESI-PAYLOAD-010',
+        'order_status' => 'READY_TO_SHIP',
+        'total_amount' => 85000,
+        'buyer_username' => 'buyer_payload_test',
+    ]);
+
+    $dummyVideo = UploadedFile::fake()->create('packing_sample.webm', 512, 'video/webm');
+
+    $response = $this->actingAs($this->user)->postJson(route('packing.upload'), [
+        'order_sn' => 'ORD-PAYLOAD-TEST-010',
+        'tracking_number' => 'RESI-PAYLOAD-010',
+        'video' => $dummyVideo,
+        'duration' => 10,
+    ]);
+
+    $response->assertStatus(200);
+    $data = $response->json();
+    expect($data['status'])->toBe('success');
+    expect($data)->toHaveKey('video_url');
+    expect($data)->toHaveKey('data');
+    expect($data['data']['video_url'])->toBe($data['video_url']);
+});
+
+test('it allows re-packing when force_new is true even if completed record exists', function () {
+    Storage::fake('public');
+
+    $order = ShopeeOrder::create([
+        'order_sn' => 'ORD-FORCE-NEW-011',
+        'tracking_number' => 'RESI-FORCE-NEW-011',
+        'order_status' => 'PROCESSED',
+        'total_amount' => 150000,
+        'buyer_username' => 'buyer_force_new',
+    ]);
+
+    $fakePath = 'packing_videos/pack_ORD-FORCE-NEW-011_test.webm';
+    Storage::disk('public')->put($fakePath, 'fake video content');
+
+    PackingRecord::create([
+        'order_sn' => 'ORD-FORCE-NEW-011',
+        'tracking_number' => 'RESI-FORCE-NEW-011',
+        'shopee_order_id' => $order->id,
+        'status' => 'completed',
+        'video_path' => $fakePath,
+        'video_duration' => 18,
+        'packer_name' => 'Doni Packer',
+    ]);
+
+    $response = $this->actingAs($this->user)->postJson(route('packing.initUpload'), [
+        'order_sn' => 'ORD-FORCE-NEW-011',
+        'tracking_number' => 'RESI-FORCE-NEW-011',
+        'packer_name' => 'Doni Packer',
+        'force_new' => true,
+    ]);
+
+    $response->assertStatus(200);
+    $response->assertJson([
+        'status' => 'success',
+        'order_sn' => 'ORD-FORCE-NEW-011',
+    ]);
+});
+
+test('it handles video upload on real disk without finfo crashing', function () {
+    $order = ShopeeOrder::create([
+        'order_sn' => 'ORD-REAL-DISK-012',
+        'tracking_number' => 'RESI-REAL-DISK-012',
+        'order_status' => 'READY_TO_SHIP',
+        'total_amount' => 99000,
+        'buyer_username' => 'buyer_real_disk',
+    ]);
+
+    $tmp = tempnam(sys_get_temp_dir(), 'pest_vid');
+    file_put_contents($tmp, 'real disk video test content');
+    $realVideo = new UploadedFile($tmp, 'real_video.webm', 'video/webm', null, true);
+
+    $response = $this->actingAs($this->user)->postJson(route('packing.upload'), [
+        'order_sn' => 'ORD-REAL-DISK-012',
+        'tracking_number' => 'RESI-REAL-DISK-012',
+        'video' => $realVideo,
+        'duration' => 12,
+    ]);
+
+    $response->assertStatus(200);
+    $response->assertJson(['status' => 'success']);
+
+    $record = PackingRecord::where('order_sn', 'ORD-REAL-DISK-012')->first();
+    expect($record)->not->toBeNull();
+    expect(file_exists(storage_path('app/public/'.$record->video_path)))->toBeTrue();
+
+    // Clean up
+    if ($record->video_path && file_exists(storage_path('app/public/'.$record->video_path))) {
+        unlink(storage_path('app/public/'.$record->video_path));
+    }
+});
