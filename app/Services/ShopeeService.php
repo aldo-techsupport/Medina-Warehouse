@@ -674,6 +674,125 @@ class ShopeeService
     }
 
     /**
+     * Get shipping document data info (including unmasked recipient address image and sort code)
+     * via Shopee Open API v2 (/api/v2/logistics/get_shipping_document_data_info).
+     */
+    public function getShippingDocumentDataInfo(string $orderSn, ?string $packageNumber = null): array
+    {
+        if (! $this->setting->isConnected()) {
+            return ['success' => false, 'error' => 'Toko Shopee belum terhubung'];
+        }
+
+        $this->ensureValidToken();
+
+        $path = '/api/v2/logistics/get_shipping_document_data_info';
+        $url = $this->buildShopUrl($path);
+
+        $body = [
+            'order_sn' => $orderSn,
+            'recipient_address_info' => [
+                ['key' => 'full_address'],
+                ['key' => 'name'],
+                ['key' => 'phone'],
+            ],
+        ];
+
+        if ($packageNumber) {
+            $body['package_number'] = $packageNumber;
+        }
+
+        try {
+            $response = Http::timeout(15)->post($url, $body);
+            $data = $response->json();
+
+            if ($response->successful() && empty($data['error'])) {
+                return [
+                    'success' => true,
+                    'data' => $data['response'] ?? [],
+                ];
+            }
+
+            return ['success' => false, 'error' => $data['message'] ?? $data['error'] ?? 'Gagal mengambil shipping document data info'];
+        } catch (Exception $e) {
+            Log::error('Shopee getShippingDocumentDataInfo error: '.$e->getMessage());
+
+            return ['success' => false, 'error' => $e->getMessage()];
+        }
+    }
+
+    /**
+     * Resolve recipient address for an order using v2.order.get_order_detail and fallback to
+     * v2.logistics.get_shipping_document_data_info when Shopee masks buyer PII with "****".
+     *
+     * @return array<string, mixed>|null
+     */
+    public function resolveOrderRecipientAddress(ShopeeOrder $order): ?array
+    {
+        $recipientAddress = $order->recipient_address ?: Cache::get("courier_order_address_{$order->order_sn}");
+        if (! is_array($recipientAddress)) {
+            $recipientAddress = null;
+        }
+
+        if (! $this->setting->isConnected()) {
+            return $recipientAddress;
+        }
+
+        $updated = false;
+
+        if (empty($recipientAddress)) {
+            $detRes = $this->getOrderDetail([$order->order_sn]);
+            if ($detRes['success'] && ! empty($detRes['data']['order_list'][0]['recipient_address'])) {
+                $recipientAddress = $detRes['data']['order_list'][0]['recipient_address'];
+                $updated = true;
+            }
+        }
+
+        $isMasked = ShopeeOrder::isMaskedValue($recipientAddress['full_address'] ?? null);
+        if ($isMasked && empty($recipientAddress['checked_shipping_doc'])) {
+            $recipientAddress = $recipientAddress ?? [];
+            $recipientAddress['checked_shipping_doc'] = true;
+            $updated = true;
+
+            $docRes = $this->getShippingDocumentDataInfo($order->order_sn);
+            if ($docRes['success'] && ! empty($docRes['data'])) {
+                $docInfo = $docRes['data']['shipping_document_info'] ?? [];
+                if (! empty($docInfo['spx_sub_district'])) {
+                    $recipientAddress['sub_district'] = $docInfo['spx_sub_district'];
+                }
+                if (! empty($docInfo['deliver_area'])) {
+                    $recipientAddress['deliver_area'] = $docInfo['deliver_area'];
+                }
+                $sortCode = $docInfo['recipient_sort_code']['third_recipient_sort_code']
+                    ?? ($docInfo['recipient_sort_code']['first_recipient_sort_code'] ?? null);
+                if (! empty($sortCode)) {
+                    $recipientAddress['sort_code'] = $sortCode;
+                }
+
+                foreach ($docRes['data']['recipient_address_info'] ?? [] as $imgItem) {
+                    $key = $imgItem['key'] ?? '';
+                    $img = $imgItem['image'] ?? '';
+                    if ($key === 'full_address' && ! empty($img)) {
+                        $recipientAddress['address_image'] = $img;
+                    } elseif ($key === 'name' && ! empty($img)) {
+                        $recipientAddress['name_image'] = $img;
+                    } elseif ($key === 'phone' && ! empty($img)) {
+                        $recipientAddress['phone_image'] = $img;
+                    }
+                }
+            }
+        }
+
+        if ($updated && ! empty($recipientAddress)) {
+            Cache::put("courier_order_address_{$order->order_sn}", $recipientAddress, now()->addDays(7));
+            if (ShopeeOrder::hasRecipientAddressColumn()) {
+                $order->update(['recipient_address' => $recipientAddress]);
+            }
+        }
+
+        return $recipientAddress;
+    }
+
+    /**
      * Sync logistics tracking info from Shopee Open API v2 into ShopeeOrder model.
      * Implements Shopee Open Platform Developer Guide 4 (Logistics & Tracking).
      */
@@ -708,6 +827,19 @@ class ShopeeService
             'tracking_data' => $trackingData,
             'last_tracked_at' => now(),
         ];
+
+        // Fetch recipient_address from Shopee v2.order.get_order_detail if missing locally
+        if (empty($order->recipient_address) && empty(Cache::get("courier_order_address_{$order->order_sn}"))) {
+            $detRes = $this->getOrderDetail([$order->order_sn]);
+            if ($detRes['success'] && ! empty($detRes['data']['order_list'][0]['recipient_address'])) {
+                $recipientAddress = $detRes['data']['order_list'][0]['recipient_address'];
+                Cache::put("courier_order_address_{$order->order_sn}", $recipientAddress, now()->addDays(7));
+                if (ShopeeOrder::hasRecipientAddressColumn()) {
+                    $order->recipient_address = $recipientAddress;
+                    $updateData['recipient_address'] = $recipientAddress;
+                }
+            }
+        }
 
         if ($order->tracking_number) {
             $updateData['tracking_number'] = $order->tracking_number;
@@ -1125,8 +1257,13 @@ class ShopeeService
                 'buyer_username' => $orderDetail['buyer_username'] ?? 'Shopee Customer',
                 'tracking_number' => $orderDetail['tracking_number'] ?? ($orderDetail['package_list'][0]['tracking_number'] ?? null),
                 'shipping_carrier' => $orderDetail['shipping_carrier'] ?? null,
+                'recipient_address' => $orderDetail['recipient_address'] ?? null,
                 'items' => $items,
             ];
+
+            if (! empty($orderData['recipient_address'])) {
+                Cache::put("courier_order_address_{$orderSn}", $orderData['recipient_address'], now()->addDays(7));
+            }
 
             // If tracking_number not in order_detail, check local database first before hitting Shopee API
             if (empty($orderData['tracking_number'])) {
@@ -1323,8 +1460,13 @@ class ShopeeService
                     'buyer_username' => $orderDetail['buyer_username'] ?? 'Shopee Customer',
                     'tracking_number' => $tracking,
                     'shipping_carrier' => $orderDetail['shipping_carrier'] ?? ($orderDetail['package_list'][0]['shipping_carrier'] ?? null),
+                    'recipient_address' => $orderDetail['recipient_address'] ?? null,
                     'items' => $items,
                 ];
+
+                if (! empty($orderData['recipient_address'])) {
+                    Cache::put("courier_order_address_{$orderSn}", $orderData['recipient_address'], now()->addDays(7));
+                }
 
                 if (empty($orderData['tracking_number'])) {
                     $existing = ShopeeOrder::where('order_sn', $orderSn)->first(['tracking_number', 'shipping_carrier']);

@@ -152,6 +152,17 @@ test('it returns package details and tracking timeline as JSON for modal', funct
         'logistics_status' => 'LOGISTICS_DELIVERY_IN_PROCESS',
         'total_amount' => 300000,
         'buyer_username' => 'json_buyer',
+        'recipient_address' => [
+            'name' => 'Budi Santoso',
+            'phone' => '081234567890',
+            'town' => 'Senayan',
+            'district' => 'Kebayoran Baru',
+            'city' => 'Kota Jakarta Selatan',
+            'state' => 'DKI Jakarta',
+            'region' => 'ID',
+            'zipcode' => '12190',
+            'full_address' => 'Jl. Senopati No. 10, Senayan, Kebayoran Baru, Kota Jakarta Selatan, DKI Jakarta 12190',
+        ],
         'items_data' => [
             ['item_sku' => 'JSON-SKU-1', 'item_name' => 'Modal Test Product', 'model_quantity_purchased' => 2, 'model_discounted_price' => 150000],
         ],
@@ -174,6 +185,10 @@ test('it returns package details and tracking timeline as JSON for modal', funct
             'tracking_number' => 'SPXID_JSON_001',
             'shipping_carrier' => 'SPX Express',
             'buyer_username' => 'json_buyer',
+            'recipient_name' => 'Budi Santoso',
+            'recipient_phone' => '081234567890',
+            'destination_city' => 'Kota Jakarta Selatan, DKI Jakarta',
+            'formatted_address' => 'Jl. Senopati No. 10, Senayan, Kebayoran Baru, Kota Jakarta Selatan, DKI Jakarta 12190',
             'is_delayed_5_days' => false,
         ],
     ]);
@@ -202,6 +217,27 @@ test('it syncs tracking info using Shopee Logistics API according to Guide 4', f
         '*/api/v2/logistics/get_tracking_number*' => Http::response([
             'response' => [
                 'tracking_number' => 'SPXID_API_123456',
+            ],
+            'error' => '',
+        ], 200),
+        '*/api/v2/order/get_order_detail*' => Http::response([
+            'response' => [
+                'order_list' => [
+                    [
+                        'order_sn' => 'SYNC_LOGISTICS_API_TEST',
+                        'recipient_address' => [
+                            'name' => 'Siti Aminah',
+                            'phone' => '081122334455',
+                            'town' => 'Dago',
+                            'district' => 'Coblong',
+                            'city' => 'Kota Bandung',
+                            'state' => 'Jawa Barat',
+                            'region' => 'ID',
+                            'zipcode' => '40135',
+                            'full_address' => 'Jl. Ir. H. Juanda No. 88, Dago, Coblong, Kota Bandung, Jawa Barat 40135',
+                        ],
+                    ],
+                ],
             ],
             'error' => '',
         ], 200),

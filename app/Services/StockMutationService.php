@@ -150,13 +150,19 @@ class StockMutationService
             $order = ShopeeOrder::firstOrNew(['order_sn' => $orderSn]);
             $isAlreadyDeducted = $order->exists && $order->stock_deducted;
 
-            $order->fill([
+            $fillData = [
                 'shop_id' => $shopId,
                 'order_status' => $status,
                 'total_amount' => $totalAmount,
                 'buyer_username' => $buyer,
                 'items_data' => $items,
-            ]);
+            ];
+
+            if (! empty($orderData['recipient_address']) && ShopeeOrder::hasRecipientAddressColumn()) {
+                $fillData['recipient_address'] = $orderData['recipient_address'];
+            }
+
+            $order->fill($fillData);
 
             // Deduct stock if not already deducted and status is valid
             if (! $isAlreadyDeducted && in_array($status, ['READY_TO_SHIP', 'PROCESSED', 'COMPLETED'])) {
@@ -249,13 +255,17 @@ class StockMutationService
                 if (str_contains($e->getMessage(), 'Duplicate entry') || $e->getCode() == 23000) {
                     $existing = ShopeeOrder::where('order_sn', $orderSn)->first();
                     if ($existing) {
-                        $existing->update([
+                        $updateData = [
                             'shop_id' => $shopId,
                             'order_status' => $status,
                             'total_amount' => $totalAmount,
                             'buyer_username' => $buyer,
                             'items_data' => $items,
-                        ]);
+                        ];
+                        if (! empty($orderData['recipient_address']) && ShopeeOrder::hasRecipientAddressColumn()) {
+                            $updateData['recipient_address'] = $orderData['recipient_address'];
+                        }
+                        $existing->update($updateData);
 
                         return $existing;
                     }

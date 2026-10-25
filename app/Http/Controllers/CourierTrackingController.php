@@ -162,17 +162,30 @@ class CourierTrackingController extends Controller
     }
 
     /**
-     * Display details of a single package, including items & live tracking timeline.
+     * Display details of a single package, including items, recipient address & live tracking timeline.
      */
     public function show(Request $request, ShopeeOrder $order): JsonResponse|View
     {
         $order->load('packingRecords');
 
         // If tracking info is missing or older than 1 hour and connected to Shopee, auto-sync
-        if ($this->shopeeService->getSetting()->isConnected() && (empty($order->tracking_data) || ! $order->last_tracked_at || $order->last_tracked_at->diffInMinutes(now()) > 60)) {
-            $this->shopeeService->syncOrderTrackingInfo($order);
-            $order->refresh();
+        if ($this->shopeeService->getSetting()->isConnected()) {
+            $needsTracking = empty($order->tracking_data) || ! $order->last_tracked_at || $order->last_tracked_at->diffInMinutes(now()) > 60;
+
+            if ($needsTracking) {
+                $this->shopeeService->syncOrderTrackingInfo($order);
+                $order->refresh();
+            }
         }
+
+        $recipientAddress = $this->shopeeService->resolveOrderRecipientAddress($order);
+        $rawName = $recipientAddress['name'] ?? null;
+        $rawPhone = $recipientAddress['phone'] ?? null;
+        $recipientName = ! ShopeeOrder::isMaskedValue($rawName) ? trim((string) $rawName) : $order->buyer_username;
+        $recipientPhone = ! ShopeeOrder::isMaskedValue($rawPhone) ? trim((string) $rawPhone) : null;
+        $formattedAddress = $order->getFormattedRecipientAddress($recipientAddress);
+        $destinationCity = $order->getDestinationLocation($recipientAddress);
+        $isAddressMasked = ShopeeOrder::isMaskedValue($recipientAddress['full_address'] ?? null);
 
         // If AJAX request, return rich JSON structure for quick modal inspection
         if ($request->wantsJson() || $request->ajax()) {
@@ -187,6 +200,15 @@ class CourierTrackingController extends Controller
                     'order_status' => $order->order_status,
                     'logistics_info' => $order->logistics_info,
                     'buyer_username' => $order->buyer_username,
+                    'recipient_address' => $recipientAddress,
+                    'recipient_name' => $recipientName,
+                    'recipient_phone' => $recipientPhone,
+                    'destination_city' => $destinationCity,
+                    'formatted_address' => $formattedAddress,
+                    'is_address_masked' => $isAddressMasked,
+                    'address_image' => $recipientAddress['address_image'] ?? null,
+                    'name_image' => $recipientAddress['name_image'] ?? null,
+                    'phone_image' => $recipientAddress['phone_image'] ?? null,
                     'total_amount' => $order->total_amount,
                     'formatted_amount' => 'Rp '.number_format((float) $order->total_amount, 0, ',', '.'),
                     'items_data' => $order->items_data ?? [],

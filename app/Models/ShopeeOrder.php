@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Facades\Schema;
 
 class ShopeeOrder extends Model
 {
@@ -24,6 +25,7 @@ class ShopeeOrder extends Model
         'total_amount',
         'buyer_username',
         'items_data',
+        'recipient_address',
         'stock_deducted',
         'stock_deducted_at',
     ];
@@ -33,6 +35,7 @@ class ShopeeOrder extends Model
         return [
             'total_amount' => 'decimal:2',
             'items_data' => 'array',
+            'recipient_address' => 'array',
             'tracking_data' => 'array',
             'shipped_at' => 'datetime',
             'delivered_at' => 'datetime',
@@ -41,6 +44,129 @@ class ShopeeOrder extends Model
             'stock_deducted_at' => 'datetime',
             'shop_id' => 'integer',
         ];
+    }
+
+    /**
+     * Safely check whether the recipient_address column exists on shopee_orders table.
+     */
+    public static function hasRecipientAddressColumn(): bool
+    {
+        try {
+            return Schema::hasColumn('shopee_orders', 'recipient_address');
+        } catch (\Throwable) {
+            return false;
+        }
+    }
+
+    /**
+     * Check whether a Shopee field value is empty or masked with asterisks ("****") by Shopee PII policy.
+     */
+    public static function isMaskedValue(mixed $value): bool
+    {
+        if (! is_string($value)) {
+            return true;
+        }
+
+        $trimmed = trim($value);
+
+        return $trimmed === '' || preg_match('/^\*+$/', $trimmed) === 1;
+    }
+
+    /**
+     * Extract the latest known transit/destination city or hub from logistics tracking milestones.
+     */
+    public function extractLocationFromTracking(): ?string
+    {
+        if (empty($this->tracking_data) || ! is_array($this->tracking_data)) {
+            return null;
+        }
+
+        $sorted = $this->tracking_data;
+        usort($sorted, fn ($a, $b) => (($b['update_time'] ?? $b['ctime'] ?? 0) <=> ($a['update_time'] ?? $a['ctime'] ?? 0)));
+
+        foreach ($sorted as $step) {
+            $desc = $step['description'] ?? '';
+            if (! is_string($desc) || $desc === '') {
+                continue;
+            }
+
+            if (preg_match('/\bke\s+((?:Kota|Kab\.?|Kabupaten)\s+[^,.]+)/iu', $desc, $m)) {
+                return trim(preg_replace('/\s+via\s+.*$/iu', '', $m[1]));
+            }
+
+            if (preg_match('/\bdi\s+(?:lokasi\s+(?:transit|sortir)\s+)?((?:Kota|Kab\.?|Kabupaten)\s+[^,.]+)/iu', $desc, $m)) {
+                return trim($m[1]);
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Get clean formatted string for full destination address based on Shopee v2.order.get_order_detail.
+     *
+     * @param  array<string, mixed>|null  $addressOverride
+     */
+    public function getFormattedRecipientAddress(?array $addressOverride = null): string
+    {
+        $addr = $addressOverride ?? ($this->recipient_address ?? null);
+        if (empty($addr) || ! is_array($addr)) {
+            return '-';
+        }
+
+        if (! self::isMaskedValue($addr['full_address'] ?? null)) {
+            return trim((string) $addr['full_address']);
+        }
+
+        $parts = array_filter([
+            $addr['sort_code'] ?? null,
+            $addr['sub_district'] ?? null,
+            $addr['town'] ?? null,
+            $addr['district'] ?? null,
+            $addr['city'] ?? null,
+            $addr['state'] ?? null,
+            $addr['zipcode'] ?? null,
+        ], fn ($val) => ! self::isMaskedValue($val));
+
+        return ! empty($parts) ? implode(', ', $parts) : '-';
+    }
+
+    /**
+     * Get concise destination location (District/City, Province) from Shopee recipient_address.
+     *
+     * @param  array<string, mixed>|null  $addressOverride
+     */
+    public function getDestinationLocation(?array $addressOverride = null): string
+    {
+        $addr = $addressOverride ?? ($this->recipient_address ?? null);
+        if (is_array($addr)) {
+            $parts = array_filter([
+                $addr['city'] ?? null,
+                $addr['state'] ?? null,
+            ], fn ($val) => ! self::isMaskedValue($val));
+
+            if (! empty($parts)) {
+                return implode(', ', $parts);
+            }
+
+            foreach (['district', 'town', 'sub_district', 'deliver_area'] as $key) {
+                if (! self::isMaskedValue($addr[$key] ?? null)) {
+                    return trim((string) $addr[$key]);
+                }
+            }
+        }
+
+        return $this->extractLocationFromTracking() ?? '-';
+    }
+
+    public function getFormattedRecipientAddressAttribute(): string
+    {
+        return $this->getFormattedRecipientAddress();
+    }
+
+    public function getDestinationLocationAttribute(): string
+    {
+        return $this->getDestinationLocation();
     }
 
     public function packingRecords(): HasMany

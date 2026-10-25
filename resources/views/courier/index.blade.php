@@ -9,9 +9,9 @@
             <i class="fas fa-sync-alt mr-1"></i> Segarkan
         </a>
         @if($setting->isConnected())
-            <form action="{{ route('courier.sync.all') }}" method="POST" class="d-inline">
+            <form action="{{ route('courier.sync.all') }}" method="POST" class="d-inline" onsubmit="var btn = this.querySelector('button[type=submit]'); btn.disabled = true; btn.innerHTML = '<i class=&quot;fas fa-spinner fa-spin mr-1&quot;></i> Memperbarui...';">
                 @csrf
-                <button type="submit" class="btn btn-primary btn-sm shadow-sm font-weight-bold" onclick="this.disabled=true; this.innerHTML='<i class=\"fas fa-spinner fa-spin mr-1\"></i> Memperbarui...'; this.form.submit();">
+                <button type="submit" class="btn btn-primary btn-sm shadow-sm font-weight-bold">
                     <i class="fas fa-rotate mr-1"></i> Sinkronkan Kurir
                 </button>
             </form>
@@ -89,11 +89,19 @@
         border-radius: 12px;
         margin-left: 6px;
     }
+    .timeline-wrapper-shopee {
+        max-height: 420px;
+        overflow-y: auto;
+        overflow-x: hidden;
+        padding: 6px 10px 6px 14px;
+    }
     .timeline-item-shopee {
         position: relative;
-        padding-left: 28px;
-        padding-bottom: 18px;
+        padding-left: 22px;
+        padding-bottom: 16px;
         border-left: 2px solid #e2e8f0;
+        word-break: break-word;
+        overflow-wrap: anywhere;
     }
     .timeline-item-shopee:last-child {
         border-left: 2px solid transparent;
@@ -102,7 +110,7 @@
     .timeline-dot {
         position: absolute;
         left: -7px;
-        top: 2px;
+        top: 3px;
         width: 12px;
         height: 12px;
         border-radius: 50%;
@@ -115,6 +123,21 @@
     .timeline-dot.danger {
         background: #ef4444;
         box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.2);
+    }
+    @media (min-width: 768px) {
+        .modal-col-divider {
+            border-right: 1px solid #e2e8f0;
+        }
+    }
+    @media (max-width: 767.98px) {
+        .modal-col-divider {
+            border-bottom: 1px solid #e2e8f0;
+            padding-bottom: 1rem;
+            margin-bottom: 1rem;
+        }
+        .timeline-wrapper-shopee {
+            max-height: 320px;
+        }
     }
 </style>
 @endpush
@@ -472,10 +495,12 @@
                                     <i class="fas {{ $logistics['icon'] }} mr-1"></i> {{ $logistics['label'] }}
                                 </span>
                                 @php
-                                    $latestMilestone = !empty($pkg->tracking_data) ? collect($pkg->tracking_data)->last() : null;
+                                    $latestMilestone = !empty($pkg->tracking_data)
+                                        ? collect($pkg->tracking_data)->sortByDesc(fn ($m) => $m['update_time'] ?? $m['ctime'] ?? 0)->first()
+                                        : null;
                                 @endphp
                                 @if($latestMilestone)
-                                    <div class="text-muted text-xs text-truncate" style="max-width: 170px;" title="{{ $latestMilestone['description'] ?? '' }}">
+                                    <div class="text-muted text-xs mx-auto" style="max-width: 220px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; white-space: normal; line-height: 1.35;" title="{{ $latestMilestone['description'] ?? '' }}">
                                         {{ $latestMilestone['description'] ?? '' }}
                                     </div>
                                 @endif
@@ -511,7 +536,7 @@
                 Menampilkan {{ $packages->firstItem() }} - {{ $packages->lastItem() }} dari {{ $packages->total() }} paket
             </span>
             <div>
-                {{ $packages->links() }}
+                {{ $packages->links('pagination::bootstrap-4') }}
             </div>
         </div>
     @endif
@@ -519,18 +544,18 @@
 
 <!-- Modal Rincian Pengiriman Paket -->
 <div class="modal fade" id="packageDetailModal" tabindex="-1" role="dialog" aria-hidden="true">
-    <div class="modal-dialog modal-lg modal-dialog-centered" role="document">
+    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable" role="document">
         <div class="modal-content border-0 shadow" style="border-radius: 8px;">
             <div class="modal-header bg-light py-3 border-bottom">
-                <div>
-                    <h6 class="modal-title font-weight-bold text-dark mb-0" id="modalOrderSn">Rincian Paket</h6>
-                    <small class="text-muted" id="modalTrackingNumber">-</small>
+                <div class="pr-2" style="min-width: 0;">
+                    <h6 class="modal-title font-weight-bold text-dark mb-0 d-flex flex-wrap align-items-center" id="modalOrderSn" style="gap: 6px;">Rincian Paket</h6>
+                    <small class="text-muted d-block text-break" id="modalTrackingNumber">-</small>
                 </div>
                 <button type="button" class="close" data-dismiss="modal" aria-label="Close">
                     <span aria-hidden="true">&times;</span>
                 </button>
             </div>
-            <div class="modal-body p-4" id="modalContent">
+            <div class="modal-body p-3 p-md-4" id="modalContent">
                 <div class="text-center py-4">
                     <div class="spinner-border text-primary" role="status"></div>
                     <div class="text-muted text-sm mt-2">Memuat rincian paket...</div>
@@ -611,18 +636,19 @@
 
                 let timelineHtml = '';
                 if (d.tracking_timeline && d.tracking_timeline.length > 0) {
-                    const sorted = [...d.tracking_timeline].reverse();
+                    const sorted = [...d.tracking_timeline].sort((a, b) => ((b.update_time || b.ctime || 0) - (a.update_time || a.ctime || 0)));
                     sorted.forEach((step, idx) => {
                         const isLatest = idx === 0;
-                        const dateStr = step.ctime ? new Date(step.ctime * 1000).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' }) : '-';
+                        const ts = step.update_time || step.ctime;
+                        const dateStr = ts ? new Date(ts * 1000).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' }) : '-';
                         timelineHtml += `
                             <div class="timeline-item-shopee">
                                 <div class="timeline-dot ${isLatest ? (d.is_delayed_5_days ? 'danger' : 'active') : ''}"></div>
-                                <div class="d-flex justify-content-between align-items-baseline mb-1">
+                                <div class="d-flex flex-wrap justify-content-between align-items-center mb-1" style="gap: 4px;">
                                     <span class="text-xs font-weight-bold text-muted">${dateStr}</span>
-                                    <span class="badge badge-light border text-xs">${step.logistics_status || 'UPDATE'}</span>
+                                    <span class="badge badge-light border text-xs text-wrap text-left" style="max-width: 100%;">${step.logistics_status || 'UPDATE'}</span>
                                 </div>
-                                <div class="${isLatest ? 'font-weight-bold text-dark' : 'text-secondary'} text-sm">
+                                <div class="${isLatest ? 'font-weight-bold text-dark' : 'text-secondary'} text-sm" style="line-height: 1.45; word-break: break-word;">
                                     ${step.description || '-'}
                                 </div>
                             </div>
@@ -650,13 +676,70 @@
                     `;
                 }
 
+                const isMasked = val => !val || /^\*+$/.test(String(val).trim());
+                let addressSection = '';
+                const addr = d.recipient_address || {};
+                const recipientName = (!isMasked(d.recipient_name) ? d.recipient_name : null) || (!isMasked(addr.name) ? addr.name : null) || d.buyer_username || '-';
+                const rawPhone = (!isMasked(d.recipient_phone) ? d.recipient_phone : null) || (!isMasked(addr.phone) ? addr.phone : null);
+                const recipientPhone = rawPhone ? `<span class="text-muted ml-1 font-weight-normal">(${rawPhone})</span>` : '';
+                const destinationCity = (!isMasked(d.destination_city) && d.destination_city !== '-') ? d.destination_city : '';
+                const cleanFullAddress = (!isMasked(d.formatted_address) && d.formatted_address !== '-') ? d.formatted_address : (!isMasked(addr.full_address) ? addr.full_address : '');
+                const regionParts = [addr.sub_district, addr.town, addr.district, addr.city, addr.state, addr.zipcode].filter(v => !isMasked(v)).join(', ');
+                const zipcodeBadge = !isMasked(addr.zipcode) ? `<span class="badge badge-light border text-muted ml-1">${addr.zipcode}</span>` : '';
+
+                let addressBodyHtml = '';
+                if (d.address_image) {
+                    addressBodyHtml = `
+                        ${d.name_image ? `<div class="mb-1"><img src="${d.name_image}" alt="Nama Penerima" style="max-height: 22px;" class="mr-2">${d.phone_image ? `<img src="${d.phone_image}" alt="No. HP" style="max-height: 20px;">` : ''}</div>` : `<div class="font-weight-bold text-dark text-sm mb-1">${recipientName} ${recipientPhone}</div>`}
+                        <div class="bg-white p-2 rounded border mb-1">
+                            <img src="${d.address_image}" alt="Alamat Lengkap Penerima" class="img-fluid" style="max-height: 110px;">
+                        </div>
+                        ${cleanFullAddress ? `<div class="text-secondary text-xs">Kode Sortir / Area: <strong>${cleanFullAddress}</strong></div>` : ''}
+                    `;
+                } else if (cleanFullAddress) {
+                    addressBodyHtml = `
+                        <div class="font-weight-bold text-dark text-sm mb-1">
+                            ${recipientName} ${recipientPhone}
+                        </div>
+                        <div class="text-secondary text-xs" style="line-height: 1.45;">
+                            ${cleanFullAddress} ${zipcodeBadge}
+                        </div>
+                        ${(regionParts && cleanFullAddress !== regionParts) ? `<div class="text-muted text-xs mt-1"><i class="fas fa-city mr-1"></i>${regionParts}</div>` : ''}
+                    `;
+                } else {
+                    addressBodyHtml = `
+                        <div class="font-weight-bold text-dark text-sm mb-1">
+                            ${recipientName} ${recipientPhone}
+                        </div>
+                        <div class="text-secondary text-xs">
+                            ${destinationCity || '-'}
+                        </div>
+                    `;
+                }
+
+                addressSection = `
+                    <div class="card border-0 mb-3" style="background-color: #f1f5f9; border-left: 3.5px solid #2563eb !important; border-radius: 6px;">
+                        <div class="card-body p-2 p-md-3">
+                            <div class="d-flex align-items-center justify-content-between mb-1">
+                                <span class="font-weight-bold text-dark text-xs text-uppercase" style="letter-spacing: 0.5px;">
+                                    <i class="fas fa-map-marker-alt text-danger mr-1"></i> Alamat Pengiriman
+                                </span>
+                                ${destinationCity ? `<span class="badge badge-primary px-2 py-1 font-weight-normal text-xs">${destinationCity}</span>` : ''}
+                            </div>
+                            ${addressBodyHtml}
+                        </div>
+                    </div>
+                `;
+
                 $('#modalContent').html(`
                     <div class="row">
-                        <div class="col-md-6 mb-3 border-right">
+                        <div class="col-12 col-md-6 modal-col-divider">
                             <h6 class="font-weight-bold text-dark mb-2">Rincian Produk</h6>
                             <div class="mb-3">
                                 ${itemsHtml}
                             </div>
+
+                            ${addressSection}
                             
                             <div class="bg-light p-3 rounded border mb-3 text-xs">
                                 <div class="d-flex justify-content-between mb-1">
@@ -684,7 +767,7 @@
                             ${videoSection}
                         </div>
 
-                        <div class="col-md-6 mb-3">
+                        <div class="col-12 col-md-6 pl-md-3">
                             <div class="d-flex justify-content-between align-items-center mb-3">
                                 <h6 class="font-weight-bold text-dark mb-0">Riwayat Pengiriman</h6>
                                 <form action="/courier-tracking/sync/${d.id}" method="POST" class="d-inline">
@@ -694,7 +777,7 @@
                                     </button>
                                 </form>
                             </div>
-                            <div class="py-2" style="max-height: 380px; overflow-y: auto;">
+                            <div class="timeline-wrapper-shopee">
                                 ${timelineHtml}
                             </div>
                         </div>
