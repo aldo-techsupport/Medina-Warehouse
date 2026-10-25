@@ -546,6 +546,12 @@ class PackingController extends Controller
                 ], 500);
             }
 
+            // Post-process: sanitize EBML offset header & transcode to universal faststart MP4
+            $optimized = $this->processAndOptimizeVideo($path, $validated['order_sn']);
+            $finalPath = $optimized['path'];
+            $finalSize = $optimized['size'] ?: ($videoFile->getSize() ?: 0);
+            $finalDuration = $optimized['duration'] ?: (int) ($validated['duration'] ?? 0);
+
             $itemsChecked = [];
             if (! empty($validated['items_checked'])) {
                 $itemsChecked = json_decode($validated['items_checked'], true) ?: [];
@@ -567,9 +573,9 @@ class PackingController extends Controller
                     'status' => 'completed',
                     'packer_name' => ($validated['packer_name'] ?? null) ?: $record->packer_name,
                     'items_checked' => $itemsChecked,
-                    'video_path' => $path,
-                    'video_duration' => (int) ($validated['duration'] ?? $record->video_duration ?? 0),
-                    'file_size' => $videoFile->getSize() ?: 0,
+                    'video_path' => $finalPath,
+                    'video_duration' => $finalDuration ?: (int) ($record->video_duration ?? 0),
+                    'file_size' => $finalSize,
                     'notes' => $validated['notes'] ?? ($isReturn ? 'Video Unboxing & Pemeriksaan Paket Retur Shopee.' : 'Video packing berhasil disimpan.'),
                 ]);
             } else {
@@ -580,9 +586,9 @@ class PackingController extends Controller
                     'status' => 'completed',
                     'packer_name' => ($validated['packer_name'] ?? null) ?: ($isReturn ? 'Staff Pemeriksa Retur' : 'Staff Packing'),
                     'items_checked' => $itemsChecked,
-                    'video_path' => $path,
-                    'video_duration' => (int) ($validated['duration'] ?? 0),
-                    'file_size' => $videoFile->getSize() ?: 0,
+                    'video_path' => $finalPath,
+                    'video_duration' => $finalDuration,
+                    'file_size' => $finalSize,
                     'notes' => $validated['notes'] ?? ($isReturn ? 'Video Unboxing & Pemeriksaan Paket Retur Shopee.' : 'Video packing berhasil disimpan.'),
                 ]);
             }
@@ -668,5 +674,105 @@ class PackingController extends Controller
         $records = $query->latest()->paginate(15)->withQueryString();
 
         return view('packing.history', compact('records'));
+    }
+
+    /**
+     * Inspect, sanitize EBML offset header, and convert to faststart MP4 (H.264/AAC) for universal cross-platform playback.
+     *
+     * @return array{path: string, size: int, duration: int}
+     */
+    private function processAndOptimizeVideo(string $relativeSavedPath, string $orderSn): array
+    {
+        $diskPath = storage_path('app/public/'.$relativeSavedPath);
+        if (! file_exists($diskPath)) {
+            return [
+                'path' => $relativeSavedPath,
+                'size' => 0,
+                'duration' => 0,
+            ];
+        }
+
+        // 1. Repair WebM if EBML header \x1a\x45\xdf\xa3 is offset due to lingering chunks
+        $ext = strtolower(pathinfo($diskPath, PATHINFO_EXTENSION));
+        if ($ext === 'webm') {
+            $handle = @fopen($diskPath, 'rb');
+            if ($handle) {
+                // Read up to 2MB to locate EBML header
+                $headerChunk = fread($handle, 2097152);
+                $ebmlPos = strpos($headerChunk, "\x1a\x45\xdf\xa3");
+                if ($ebmlPos !== false && $ebmlPos > 0) {
+                    $tempClean = $diskPath.'.clean';
+                    $outFp = @fopen($tempClean, 'wb');
+                    if ($outFp) {
+                        fwrite($outFp, substr($headerChunk, $ebmlPos));
+                        while (! feof($handle)) {
+                            fwrite($outFp, fread($handle, 1048576));
+                        }
+                        fclose($outFp);
+                        fclose($handle);
+                        rename($tempClean, $diskPath);
+                    } else {
+                        fclose($handle);
+                    }
+                } else {
+                    fclose($handle);
+                }
+            }
+        }
+
+        // 2. Transcode to faststart MP4 (H.264/AAC) if ffmpeg is available
+        $ffmpegBin = '/usr/local/bin/ffmpeg';
+        if (! file_exists($ffmpegBin)) {
+            $ffmpegBin = trim((string) @shell_exec('which ffmpeg'));
+        }
+
+        if ($ffmpegBin && is_executable($ffmpegBin)) {
+            $targetMp4Name = 'pack_'.$orderSn.'_'.date('Ymd_His').'.mp4';
+            $targetMp4FullPath = storage_path('app/public/packing_videos/'.$targetMp4Name);
+
+            $cmd = sprintf(
+                '%s -y -i %s -c:v libx264 -preset veryfast -crf 26 -c:a aac -b:a 128k -movflags +faststart %s 2>&1',
+                escapeshellarg($ffmpegBin),
+                escapeshellarg($diskPath),
+                escapeshellarg($targetMp4FullPath)
+            );
+
+            $output = [];
+            $returnCode = 1;
+            @exec($cmd, $output, $returnCode);
+
+            if ($returnCode === 0 && file_exists($targetMp4FullPath) && filesize($targetMp4FullPath) > 1000) {
+                if ($diskPath !== $targetMp4FullPath && file_exists($diskPath)) {
+                    @unlink($diskPath);
+                }
+                @chmod($targetMp4FullPath, 0664);
+
+                $duration = 0;
+                $ffprobeBin = '/usr/local/bin/ffprobe';
+                if (file_exists($ffprobeBin) && is_executable($ffprobeBin)) {
+                    $probeCmd = sprintf(
+                        '%s -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 %s 2>&1',
+                        escapeshellarg($ffprobeBin),
+                        escapeshellarg($targetMp4FullPath)
+                    );
+                    $probeOut = @shell_exec($probeCmd);
+                    if ($probeOut && is_numeric(trim($probeOut))) {
+                        $duration = (int) round((float) trim($probeOut));
+                    }
+                }
+
+                return [
+                    'path' => 'packing_videos/'.$targetMp4Name,
+                    'size' => filesize($targetMp4FullPath),
+                    'duration' => $duration,
+                ];
+            }
+        }
+
+        return [
+            'path' => $relativeSavedPath,
+            'size' => file_exists($diskPath) ? filesize($diskPath) : 0,
+            'duration' => 0,
+        ];
     }
 }

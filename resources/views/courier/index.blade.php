@@ -667,7 +667,7 @@
             <!-- Tampilan Jika Ada Video Packing -->
             <div id="videoAvailableContainer" style="display: none;">
                 <div class="modal-body p-0 bg-black text-center" style="background-color: #000000;">
-                    <video id="packingVideoPlayer" controls playsinline style="max-height: 480px; width: 100%; object-fit: contain; background: #000; outline: none;"></video>
+                    <video id="packingVideoPlayer" controls playsinline webkit-playsinline preload="auto" style="max-height: 480px; width: 100%; object-fit: contain; background: #000; outline: none;"></video>
                 </div>
                 <div class="p-3 bg-light border-top">
                     <div class="row align-items-center text-xs">
@@ -1042,12 +1042,14 @@
             const player = document.getElementById('packingVideoPlayer');
             if (player) {
                 player.src = data.videoUrl;
+                player.load();
                 player.play().catch(function() {
                     // Autoplay fallback (user can click play if browser policy restricts autoplay)
                 });
             }
 
-            $('#videoDownloadLink').attr('href', data.videoUrl).attr('download', `packing_${data.orderSn}.webm`);
+            const downloadFilename = (data.videoUrl && data.videoUrl.endsWith('.mp4')) ? `packing_${data.orderSn}.mp4` : `packing_${data.orderSn}.webm`;
+            $('#videoDownloadLink').attr('href', data.videoUrl).attr('download', downloadFilename);
         } else {
             $('#videoAvailableContainer').hide();
             $('#noVideoContainer').show();

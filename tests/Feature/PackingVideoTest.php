@@ -457,3 +457,50 @@ test('it handles video upload on real disk without finfo crashing', function () 
         unlink(storage_path('app/public/'.$record->video_path));
     }
 });
+
+test('it auto repairs webm video with offset ebml header on upload', function () {
+    $order = ShopeeOrder::create([
+        'order_sn' => 'ORD-EBML-OFFSET-013',
+        'tracking_number' => 'RESI-EBML-OFFSET-013',
+        'order_status' => 'READY_TO_SHIP',
+        'total_amount' => 120000,
+        'buyer_username' => 'buyer_ebml_test',
+    ]);
+
+    // Simulate offset EBML header: 100 bytes of garbage prefix followed by EBML header
+    $garbage = str_repeat("\x00\xFF", 50);
+    $ebmlHeader = "\x1a\x45\xdf\xa3\x9f\x42\x86\x81\x01\x42\xf7\x81\x01\x42\xf2\x81\x04\x42\xf3\x81\x08\x42\x82\x84webm";
+    $payload = $garbage . $ebmlHeader . str_repeat("\x1f\x43\xb6\x75", 10);
+
+    $tmp = tempnam(sys_get_temp_dir(), 'pest_ebml');
+    file_put_contents($tmp, $payload);
+    $corruptVideo = new UploadedFile($tmp, 'corrupt_video.webm', 'video/webm', null, true);
+
+    $response = $this->actingAs($this->user)->postJson(route('packing.upload'), [
+        'order_sn' => 'ORD-EBML-OFFSET-013',
+        'tracking_number' => 'RESI-EBML-OFFSET-013',
+        'video' => $corruptVideo,
+        'duration' => 15,
+    ]);
+
+    $response->assertStatus(200);
+    $response->assertJson(['status' => 'success']);
+
+    $record = PackingRecord::where('order_sn', 'ORD-EBML-OFFSET-013')->first();
+    expect($record)->not->toBeNull();
+    $fullPath = storage_path('app/public/'.$record->video_path);
+    expect(file_exists($fullPath))->toBeTrue();
+
+    // Verify the saved file has the sanitized header or is converted
+    $content = file_get_contents($fullPath);
+    if (str_ends_with($record->video_path, '.webm')) {
+        expect(str_starts_with($content, "\x1a\x45\xdf\xa3"))->toBeTrue();
+    } else {
+        expect(str_ends_with($record->video_path, '.mp4'))->toBeTrue();
+    }
+
+    // Clean up
+    if (file_exists($fullPath)) {
+        unlink($fullPath);
+    }
+});

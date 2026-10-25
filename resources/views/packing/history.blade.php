@@ -152,7 +152,7 @@
                 </button>
             </div>
             <div class="modal-body p-0 bg-black text-center">
-                <video id="modalVideoElement" controls autoplay style="max-height: 480px; width: 100%; object-fit: contain; background: #000;"></video>
+                <video id="modalVideoElement" controls autoplay playsinline webkit-playsinline preload="auto" style="max-height: 480px; width: 100%; object-fit: contain; background: #000; outline: none;"></video>
             </div>
             <div class="modal-footer border-secondary py-2 d-flex justify-content-between">
                 <small class="text-muted" id="videoModalMeta"></small>
@@ -176,7 +176,14 @@
         document.getElementById('videoModalMeta').innerHTML = `Staf: <strong>${packer}</strong> &bull; Durasi: <strong>${duration}</strong> &bull; ${time}`;
         
         const videoEl = document.getElementById('modalVideoElement');
-        videoEl.src = videoUrl;
+        if (videoEl) {
+            videoEl.src = videoUrl;
+            videoEl.load();
+            const p = videoEl.play();
+            if (p !== undefined) {
+                p.catch(e => console.log('Autoplay restriction caught:', e));
+            }
+        }
         
         document.getElementById('videoDownloadBtn').href = videoUrl;
         
@@ -187,7 +194,8 @@
         const videoEl = document.getElementById('modalVideoElement');
         if (videoEl) {
             videoEl.pause();
-            videoEl.src = '';
+            videoEl.removeAttribute('src');
+            videoEl.load();
         }
     };
 

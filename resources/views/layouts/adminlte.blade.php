@@ -902,7 +902,7 @@
 <!-- ChartJS -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
 
-@include('layouts.spa-navigation')
+{{-- Note: Standard multi-page navigation is used to ensure clean JS lifecycle, proper camera release, and reliable video modal playback --}}
 
 <script>
     function toggleFullscreen() {

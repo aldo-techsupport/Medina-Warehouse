@@ -793,7 +793,7 @@
                 </button>
             </div>
             <div class="modal-body p-0 bg-black text-center">
-                <video id="stationModalVideoElement" controls autoplay style="max-height: 440px; width: 100%; object-fit: contain; background: #000;"></video>
+                <video id="stationModalVideoElement" controls autoplay playsinline webkit-playsinline preload="auto" style="max-height: 440px; width: 100%; object-fit: contain; background: #000; outline: none;"></video>
             </div>
             <div class="modal-footer border-secondary py-2 d-flex justify-content-between">
                 <small class="text-muted" id="stationVideoModalMeta"></small>
@@ -2061,7 +2061,8 @@
         const videoEl = document.getElementById('alreadyPackedInlineVideo');
         if (videoEl) {
             videoEl.pause();
-            videoEl.src = '';
+            videoEl.removeAttribute('src');
+            videoEl.load();
         }
         const container = document.getElementById('alreadyPackedVideoContainer');
         if (container) {
@@ -2078,7 +2079,8 @@
         const videoEl = document.getElementById('stationModalVideoElement');
         if (videoEl) {
             videoEl.pause();
-            videoEl.src = '';
+            videoEl.removeAttribute('src');
+            videoEl.load();
         }
     }
 
@@ -2165,15 +2167,34 @@
         isScanningActive = false;
         document.getElementById('cameraModeBadge').innerHTML = '<i class="fas fa-video mr-1"></i> Mode Rekam';
 
+        // Clean up any stale or previous mediaRecorder instance
+        if (mediaRecorder) {
+            try {
+                mediaRecorder.ondataavailable = null;
+                mediaRecorder.onerror = null;
+                mediaRecorder.onstop = null;
+                if (mediaRecorder.state !== 'inactive') {
+                    mediaRecorder.stop();
+                }
+            } catch (cleanupErr) {}
+            mediaRecorder = null;
+        }
+
+        if (timerInterval) {
+            clearInterval(timerInterval);
+            timerInterval = null;
+        }
+
         recordedChunks = [];
         
-        // Dynamic mimeType selection (pure video codecs to prevent issues with audio-disabled stream)
+        // Dynamic mimeType selection: prioritize MP4 (H.264/AAC) for universal compatibility across iOS & Android, fallback to WebM
         const mimeCandidates = [
-            'video/webm;codecs=vp8',
-            'video/webm;codecs=vp9',
-            'video/webm',
+            'video/mp4;codecs=avc1,mp4a.40.2',
             'video/mp4;codecs=avc1',
-            'video/mp4'
+            'video/mp4',
+            'video/webm;codecs=vp9',
+            'video/webm;codecs=vp8',
+            'video/webm'
         ];
         let chosenMime = '';
         if (typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported) {
@@ -2267,18 +2288,13 @@
     function stopPackingRecording() {
         if (!mediaRecorder || mediaRecorder.state === 'inactive') return;
 
-        clearInterval(timerInterval);
+        if (timerInterval) {
+            clearInterval(timerInterval);
+            timerInterval = null;
+        }
         document.getElementById('recordingBadge').style.display = 'none';
         
         setSavingButtonsState(true, 'Menyiapkan video...');
-
-        try {
-            if (mediaRecorder.state === 'recording') {
-                mediaRecorder.requestData();
-            }
-        } catch (e) {
-            console.warn('mediaRecorder.requestData notice:', e);
-        }
 
         try {
             mediaRecorder.stop();
