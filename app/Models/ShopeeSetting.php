@@ -36,15 +36,14 @@ class ShopeeSetting extends Model
         ];
     }
 
-    protected static ?self $instance = null;
-
     public static function current(): self
     {
-        if (static::$instance !== null) {
-            return static::$instance;
+        $setting = static::first();
+        if ($setting) {
+            return $setting;
         }
 
-        return static::$instance = static::firstOrCreate(
+        return static::firstOrCreate(
             ['id' => 1],
             [
                 'partner_id' => null,

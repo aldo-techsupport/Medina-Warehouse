@@ -36,18 +36,35 @@ class DashboardController extends Controller
             }
         }
 
-        // Shopee metrics: Today's orders identified by Shopee Order SN prefix (YYMMDD)
+        // Shopee metrics: Exclude cancelled & returned orders to reflect real Shopee income
         $todayPrefix = date('ymd');
         $shopeeConnectedCount = Product::whereNotNull('shopee_item_id')->count();
-        $todayShopeeOrders = ShopeeOrder::where('order_sn', 'like', "{$todayPrefix}%")->count();
-        $todayShopeeSales = (float) ShopeeOrder::where('order_sn', 'like', "{$todayPrefix}%")
-            ->whereNotIn('order_status', ['CANCELLED', 'IN_CANCEL', 'TO_RETURN'])
-            ->sum('total_amount');
 
-        // Total sales all-time and active orders for warehouse packing
-        $totalShopeeSales = (float) ShopeeOrder::whereNotIn('order_status', ['CANCELLED', 'IN_CANCEL', 'TO_RETURN'])->sum('total_amount');
-        $totalShopeeOrders = ShopeeOrder::count();
-        $activePackingOrders = ShopeeOrder::whereIn('order_status', ['READY_TO_SHIP', 'PROCESSED'])->count();
+        $validShopeeOrders = ShopeeOrder::whereNotIn('order_status', ['CANCELLED', 'IN_CANCEL', 'TO_RETURN', 'RETURNED']);
+
+        // Today's Shopee orders & sales
+        $todayShopeeQuery = (clone $validShopeeOrders)->where(function ($q) use ($todayStart, $todayEnd, $todayPrefix) {
+            $q->whereBetween('created_at', [$todayStart, $todayEnd])
+                ->orWhere('order_sn', 'like', "{$todayPrefix}%");
+        });
+        $todayShopeeOrders = (clone $todayShopeeQuery)->count();
+        $todayShopeeSales = (float) (clone $todayShopeeQuery)->sum('total_amount');
+
+        // Total sales all-time and valid orders count
+        $totalShopeeSales = (float) (clone $validShopeeOrders)->sum('total_amount');
+        $totalShopeeOrders = (clone $validShopeeOrders)->count();
+
+        // Penghasilan resmi Shopee:
+        // 1. Dana Dilepas / Cair (COMPLETED)
+        $releasedShopeeSales = (float) ShopeeOrder::where('order_status', 'COMPLETED')->sum('total_amount');
+        // 2. Dana Akan Dilepas / Escrow (READY_TO_SHIP & PROCESSED)
+        $escrowShopeeSales = (float) ShopeeOrder::whereIn('order_status', ['READY_TO_SHIP', 'PROCESSED'])->sum('total_amount');
+
+        // Status breakdown: Khusus pesanan masuk ready to ship vs dalam perjalanan kurir
+        $readyToShipOrders = ShopeeOrder::where('order_status', 'READY_TO_SHIP')->count();
+        $inTransitOrders = ShopeeOrder::where('order_status', 'PROCESSED')->count();
+        $completedShopeeOrders = ShopeeOrder::where('order_status', 'COMPLETED')->count();
+        $activePackingOrders = $readyToShipOrders;
 
         // Recent Mutations & Low Stock Items
         $recentMutations = StockMutation::with('product')->latest()->take(8)->get();
@@ -102,6 +119,11 @@ class DashboardController extends Controller
             'todayShopeeSales',
             'totalShopeeSales',
             'totalShopeeOrders',
+            'releasedShopeeSales',
+            'escrowShopeeSales',
+            'readyToShipOrders',
+            'inTransitOrders',
+            'completedShopeeOrders',
             'activePackingOrders',
             'recentMutations',
             'lowStockProducts',

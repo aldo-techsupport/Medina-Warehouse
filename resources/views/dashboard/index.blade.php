@@ -247,8 +247,8 @@
                 </h3>
             </div>
             <div class="small-box-footer text-muted mt-2 d-flex justify-content-between align-items-center" style="font-size: 11px;">
-                <span>Total: <strong>{{ number_format($totalShopeeOrders) }}</strong> pesanan</span>
-                <a href="{{ route('shopee.orders') }}" class="font-weight-bold text-primary">Lihat &rarr;</a>
+                <span title="Dana telah selesai dilepas ke saldo toko Shopee">Cair: <strong>Rp {{ number_format($releasedShopeeSales, 0, ',', '.') }}</strong></span>
+                <a href="{{ route('shopee.dashboard') }}" class="font-weight-bold text-primary">Detail &rarr;</a>
             </div>
         </div>
     </div>
@@ -271,38 +271,38 @@
         </div>
     </div>
 
-    <!-- Pesanan Aktif Siap Packing -->
+    <!-- Pesanan Siap Dikirim (Khusus Ready to Ship) -->
     <div class="col-6 col-lg-3 col-md-6 mb-2 mb-md-3">
-        <div class="small-box bg-white p-3 border shadow-xs h-100 mb-0" style="border-left: 4px solid #3b82f6 !important; border-radius: 8px;">
+        <div class="small-box bg-white p-3 border shadow-xs h-100 mb-0" style="border-left: 4px solid #f59e0b !important; border-radius: 8px;">
             <div class="inner">
                 <p class="text-muted text-uppercase mb-1 font-weight-bold" style="font-size: 11px;">
-                    <i class="fas fa-box-open text-primary mr-1"></i> Wajib Di-Pack
+                    <i class="fas fa-clock text-warning mr-1"></i> Pesanan Siap Dikirim
                 </p>
-                <h3 class="font-weight-bold text-primary mb-0" style="font-size: 1.35rem;">
-                    {{ number_format($activePackingOrders) }} <span style="font-size: 12px; font-weight: normal;" class="text-muted">Pesanan</span>
+                <h3 class="font-weight-bold text-warning mb-0" style="font-size: 1.35rem;">
+                    {{ number_format($readyToShipOrders) }} <span style="font-size: 12px; font-weight: normal;" class="text-muted">Pesanan</span>
                 </h3>
             </div>
             <div class="small-box-footer text-muted mt-2 d-flex justify-content-between align-items-center" style="font-size: 11px;">
-                <span>Siap kirim / diproses</span>
-                <a href="{{ route('packing.index') }}" class="font-weight-bold text-danger">Mulai Pack &rarr;</a>
+                <span>Antrean Ready to Ship</span>
+                <a href="{{ route('shopee.orders') }}" class="font-weight-bold text-warning">Pesanan Masuk &rarr;</a>
             </div>
         </div>
     </div>
 
-    <!-- Toko & Status Sinkronisasi -->
+    <!-- Paket Dalam Pengiriman (Lacak Kurir) -->
     <div class="col-6 col-lg-3 col-md-6 mb-2 mb-md-3">
-        <div class="small-box bg-white p-3 border shadow-xs h-100 mb-0" style="border-left: 4px solid #8b5cf6 !important; border-radius: 8px;">
+        <div class="small-box bg-white p-3 border shadow-xs h-100 mb-0" style="border-left: 4px solid #3b82f6 !important; border-radius: 8px;">
             <div class="inner">
                 <p class="text-muted text-uppercase mb-1 font-weight-bold" style="font-size: 11px;">
-                    <i class="fas fa-store text-purple mr-1"></i> Toko Shopee
+                    <i class="fas fa-truck-fast text-primary mr-1"></i> Dalam Pengiriman
                 </p>
-                <h3 class="font-weight-bold text-dark mb-0 text-truncate" style="font-size: 1.15rem;" title="{{ $shopeeSetting->shop_name }}">
-                    {{ $shopeeSetting->shop_name ?? 'Toko Shopee' }}
+                <h3 class="font-weight-bold text-primary mb-0" style="font-size: 1.35rem;">
+                    {{ number_format($inTransitOrders) }} <span style="font-size: 12px; font-weight: normal;" class="text-muted">Paket</span>
                 </h3>
             </div>
             <div class="small-box-footer text-muted mt-2 d-flex justify-content-between align-items-center" style="font-size: 11px;">
-                <span>Terhubung: <strong>{{ number_format($shopeeConnectedCount) }}</strong> SKU</span>
-                <a href="{{ route('shopee.dashboard') }}" class="font-weight-bold text-info">Detail &rarr;</a>
+                <span>Pantau SLA & Ekspedisi</span>
+                <a href="{{ route('courier.index') }}" class="font-weight-bold text-primary">Lacak Kurir &rarr;</a>
             </div>
         </div>
     </div>

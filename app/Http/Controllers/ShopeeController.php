@@ -39,10 +39,29 @@ class ShopeeController extends Controller
         $connectedProducts = Product::whereNotNull('shopee_item_id')->orderBy('name')->get();
         $unconnectedProducts = Product::whereNull('shopee_item_id')->orderBy('name')->get();
 
-        $totalOrders = ShopeeOrder::count();
-        $totalSales = ShopeeOrder::sum('total_amount');
-        $readyToShipCount = ShopeeOrder::whereIn('order_status', ['READY_TO_SHIP', 'PROCESSED'])->count();
-        $recentOrders = ShopeeOrder::latest()->take(6)->get();
+        // Shopee Revenue & Order Accounting:
+        // Exclude cancelled & returned orders so income matches actual Shopee Seller Centre
+        $validOrdersQuery = ShopeeOrder::whereNotIn('order_status', ['CANCELLED', 'IN_CANCEL', 'TO_RETURN', 'RETURNED']);
+
+        // 1. Total order & total omzet (pesanan sah)
+        $totalOrders = (clone $validOrdersQuery)->count();
+        $totalSales = (float) (clone $validOrdersQuery)->sum('total_amount');
+
+        // 2. Penghasilan Selesai / Cair ke Saldo Penjual (COMPLETED)
+        $releasedSales = (float) ShopeeOrder::where('order_status', 'COMPLETED')->sum('total_amount');
+        $completedCount = ShopeeOrder::where('order_status', 'COMPLETED')->count();
+
+        // 3. Penghasilan Akan Cair / Sedang Ditahan di Shopee Escrow (READY_TO_SHIP & PROCESSED)
+        $escrowSales = (float) ShopeeOrder::whereIn('order_status', ['READY_TO_SHIP', 'PROCESSED'])->sum('total_amount');
+
+        // 4. Status Breakdown:
+        // Khusus READY_TO_SHIP (pesanan masuk gudang siap dipacking)
+        $readyToShipCount = ShopeeOrder::where('order_status', 'READY_TO_SHIP')->count();
+        // Sedang diproses / dalam perjalanan kurir (dipantau di Lacak Kurir)
+        $inShippingCount = ShopeeOrder::where('order_status', 'PROCESSED')->count();
+        $cancelledCount = ShopeeOrder::whereIn('order_status', ['CANCELLED', 'IN_CANCEL', 'TO_RETURN', 'RETURNED'])->count();
+
+        $recentOrders = (clone $validOrdersQuery)->latest()->take(6)->get();
 
         $authUrl = '';
         if (! empty($setting->partner_id) && ! empty($setting->partner_key)) {
@@ -56,14 +75,19 @@ class ShopeeController extends Controller
             'unconnectedProducts',
             'totalOrders',
             'totalSales',
+            'releasedSales',
+            'escrowSales',
             'readyToShipCount',
+            'inShippingCount',
+            'completedCount',
+            'cancelledCount',
             'recentOrders',
             'authUrl'
         ));
     }
 
     /**
-     * Shopee Orders List.
+     * Shopee Orders List (Khusus Pesanan Masuk: READY_TO_SHIP).
      */
     public function orders(Request $request)
     {
@@ -73,24 +97,26 @@ class ShopeeController extends Controller
             $setting->refresh();
         }
 
-        $query = ShopeeOrder::query();
-
-        if ($request->filled('status')) {
-            $query->where('order_status', $request->input('status'));
-        }
+        // Pesanan Shopee khusus hanya menampilkan pesanan yang READY_TO_SHIP (Perlu Dikirim)
+        // Pesanan yang sudah diproses atau diserahkan ke ekspedisi dilacak di menu Lacak Kurir
+        $query = ShopeeOrder::where('order_status', 'READY_TO_SHIP');
 
         if ($request->filled('search')) {
-            $search = $request->input('search');
+            $search = trim((string) $request->input('search'));
             $query->where(function ($q) use ($search) {
                 $q->where('order_sn', 'like', "%{$search}%")
-                    ->orWhere('buyer_username', 'like', "%{$search}%");
+                    ->orWhere('buyer_username', 'like', "%{$search}%")
+                    ->orWhere('tracking_number', 'like', "%{$search}%");
             });
         }
 
         $orders = $query->latest()->paginate(15)->withQueryString();
-        $setting = ShopeeSetting::current();
 
-        return view('shopee.orders', compact('orders', 'setting'));
+        // Metrik status untuk kemudahan staf gudang
+        $readyToShipCount = ShopeeOrder::where('order_status', 'READY_TO_SHIP')->count();
+        $inCourierCount = ShopeeOrder::whereNotIn('order_status', ['READY_TO_SHIP', 'CANCELLED', 'IN_CANCEL', 'TO_RETURN', 'RETURNED'])->count();
+
+        return view('shopee.orders', compact('orders', 'setting', 'readyToShipCount', 'inCourierCount'));
     }
 
     /**
@@ -436,9 +462,10 @@ class ShopeeController extends Controller
             'product_id' => 'required|exists:products,id',
             'qty' => 'required|integer|min:1',
             'buyer_username' => 'nullable|string|max:100',
-            'order_status' => 'required|in:READY_TO_SHIP,PROCESSED,COMPLETED',
+            'order_status' => 'nullable|in:READY_TO_SHIP,PROCESSED,COMPLETED',
         ]);
 
+        $orderStatus = $validated['order_status'] ?? 'READY_TO_SHIP';
         $product = Product::findOrFail($validated['product_id']);
         $qty = (int) $validated['qty'];
         $buyer = $validated['buyer_username'] ?: 'pembeli_shopee_'.rand(100, 999);
@@ -447,7 +474,7 @@ class ShopeeController extends Controller
         $orderData = [
             'order_sn' => $orderSn,
             'shop_id' => ShopeeSetting::current()->shop_id ?? 12345678,
-            'order_status' => $validated['order_status'],
+            'order_status' => $orderStatus,
             'total_amount' => $product->selling_price * $qty,
             'buyer_username' => $buyer,
             'items' => [

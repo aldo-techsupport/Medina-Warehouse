@@ -832,3 +832,143 @@ test('warehouse product toggle-status unlists and relists on Shopee API', functi
                $request['item_list'][0]['unlist'] === false;
     });
 });
+
+test('pesanan shopee page strictly displays only READY_TO_SHIP orders', function () {
+    $admin = User::firstOrCreate(
+        ['email' => 'admin@medina.com'],
+        ['name' => 'Admin Test', 'username' => 'admintest', 'password' => bcrypt('password'), 'role' => 'superadmin', 'is_active' => true]
+    );
+
+    // Create 4 orders with different statuses
+    $readyOrder = ShopeeOrder::create([
+        'order_sn' => 'SN_ONLY_READY_001',
+        'buyer_username' => 'buyer_ready',
+        'order_status' => 'READY_TO_SHIP',
+        'total_amount' => 150000,
+    ]);
+
+    $processedOrder = ShopeeOrder::create([
+        'order_sn' => 'SN_ONLY_PROC_002',
+        'buyer_username' => 'buyer_proc',
+        'order_status' => 'PROCESSED',
+        'total_amount' => 200000,
+    ]);
+
+    $completedOrder = ShopeeOrder::create([
+        'order_sn' => 'SN_ONLY_DONE_003',
+        'buyer_username' => 'buyer_done',
+        'order_status' => 'COMPLETED',
+        'total_amount' => 300000,
+    ]);
+
+    $cancelledOrder = ShopeeOrder::create([
+        'order_sn' => 'SN_ONLY_CANC_004',
+        'buyer_username' => 'buyer_canc',
+        'order_status' => 'CANCELLED',
+        'total_amount' => 500000,
+    ]);
+
+    $response = $this->actingAs($admin)->get(route('shopee.orders'));
+
+    $response->assertStatus(200);
+    $response->assertSee('SN_ONLY_READY_001');
+    $response->assertDontSee('SN_ONLY_PROC_002');
+    $response->assertDontSee('SN_ONLY_DONE_003');
+    $response->assertDontSee('SN_ONLY_CANC_004');
+    $response->assertSee('Lacak Kurir');
+});
+
+test('shopee dashboard calculates revenue correctly excluding cancelled orders and separating released vs escrow', function () {
+    $admin = User::firstOrCreate(
+        ['email' => 'admin@medina.com'],
+        ['name' => 'Admin Test', 'username' => 'admintest', 'password' => bcrypt('password'), 'role' => 'superadmin', 'is_active' => true]
+    );
+
+    // Clear existing for clean sum test
+    ShopeeOrder::query()->delete();
+
+    ShopeeOrder::create([
+        'order_sn' => 'SN_REV_COMPLETED',
+        'order_status' => 'COMPLETED',
+        'total_amount' => 350000,
+    ]);
+
+    ShopeeOrder::create([
+        'order_sn' => 'SN_REV_READY',
+        'order_status' => 'READY_TO_SHIP',
+        'total_amount' => 150000,
+    ]);
+
+    ShopeeOrder::create([
+        'order_sn' => 'SN_REV_INTRANSIT',
+        'order_status' => 'PROCESSED',
+        'total_amount' => 200000,
+    ]);
+
+    ShopeeOrder::create([
+        'order_sn' => 'SN_REV_CANCELLED',
+        'order_status' => 'CANCELLED',
+        'total_amount' => 999000,
+    ]);
+
+    $response = $this->actingAs($admin)->get(route('shopee.dashboard'));
+
+    $response->assertStatus(200);
+    // Total sales non-cancelled: 350k + 150k + 200k = 700k
+    $response->assertViewHas('totalSales', 700000.0);
+    // Released sales: 350k
+    $response->assertViewHas('releasedSales', 350000.0);
+    // Escrow sales: 150k + 200k = 350k
+    $response->assertViewHas('escrowSales', 350000.0);
+    // Ready to ship count: 1
+    $response->assertViewHas('readyToShipCount', 1);
+    // In shipping count: 1
+    $response->assertViewHas('inShippingCount', 1);
+});
+
+test('main warehouse dashboard displays accurate shopee income and workflow breakdown', function () {
+    Http::fake();
+
+    $admin = User::firstOrCreate(
+        ['email' => 'admin@medina.com'],
+        ['name' => 'Admin Test', 'username' => 'admintest', 'password' => bcrypt('password'), 'role' => 'superadmin', 'is_active' => true]
+    );
+
+    ShopeeOrder::query()->delete();
+
+    ShopeeOrder::create([
+        'order_sn' => 'SN_MAIN_DONE',
+        'order_status' => 'COMPLETED',
+        'total_amount' => 500000,
+    ]);
+
+    ShopeeOrder::create([
+        'order_sn' => 'SN_MAIN_READY',
+        'order_status' => 'READY_TO_SHIP',
+        'total_amount' => 250000,
+    ]);
+
+    ShopeeOrder::create([
+        'order_sn' => 'SN_MAIN_INTRANSIT',
+        'order_status' => 'PROCESSED',
+        'total_amount' => 150000,
+    ]);
+
+    ShopeeOrder::create([
+        'order_sn' => 'SN_MAIN_CANCEL',
+        'order_status' => 'CANCELLED',
+        'total_amount' => 400000,
+    ]);
+
+    $response = $this->actingAs($admin)->get(route('dashboard'));
+
+    $response->assertStatus(200);
+    // Total sales non-cancelled: 500k + 250k + 150k = 900k
+    $response->assertViewHas('totalShopeeSales', 900000.0);
+    $response->assertViewHas('releasedShopeeSales', 500000.0);
+    $response->assertViewHas('escrowShopeeSales', 400000.0);
+    $response->assertViewHas('readyToShipOrders', 1);
+    $response->assertViewHas('inTransitOrders', 1);
+    $response->assertSee('Pesanan Siap Dikirim');
+    $response->assertSee('Dalam Pengiriman');
+});

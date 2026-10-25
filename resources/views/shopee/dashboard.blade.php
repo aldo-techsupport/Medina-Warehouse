@@ -89,10 +89,13 @@
     </div>
 
     <div class="col-6 col-lg-3 col-md-6 mb-2 mb-md-3">
-        <div class="small-box bg-white p-2 p-md-3 border h-100 mb-0">
+        <div class="small-box bg-white p-2 p-md-3 border h-100 mb-0 shadow-xs" style="border-radius: 8px;">
             <div class="inner">
-                <p class="text-muted text-uppercase mb-1 font-weight-bold" style="font-size: 10px;">Total Pesanan</p>
+                <p class="text-muted text-uppercase mb-1 font-weight-bold" style="font-size: 10px;">Total Pesanan Sah</p>
                 <h3 class="font-weight-bold text-dark mb-0" style="font-size: 1.4rem;">{{ number_format($totalOrders) }}</h3>
+                <small class="text-muted" style="font-size: 11px;">
+                    {{ $completedCount }} Selesai &bull; {{ $inShippingCount }} di Kurir
+                </small>
             </div>
             <div class="icon d-none d-sm-block" style="top: 10px; right: 12px; opacity: 0.12; position: absolute;">
                 <i class="fas fa-shopping-bag text-info fa-2x"></i>
@@ -101,10 +104,17 @@
     </div>
 
     <div class="col-6 col-lg-3 col-md-6 mb-2 mb-md-3">
-        <div class="small-box bg-white p-2 p-md-3 border h-100 mb-0">
+        <div class="small-box bg-white p-2 p-md-3 border h-100 mb-0 shadow-xs" style="border-left: 3px solid #f59e0b !important; border-radius: 8px;">
             <div class="inner">
-                <p class="text-muted text-uppercase mb-1 font-weight-bold" style="font-size: 10px;">Perlu Dipack</p>
-                <h3 class="font-weight-bold text-warning mb-0" style="font-size: 1.4rem;">{{ $readyToShipCount }}</h3>
+                <p class="text-muted text-uppercase mb-1 font-weight-bold" style="font-size: 10px;">
+                    <i class="fas fa-clock text-warning mr-1"></i> Perlu Dipack (Ready to Ship)
+                </p>
+                <h3 class="font-weight-bold text-warning mb-0" style="font-size: 1.4rem;">{{ number_format($readyToShipCount) }}</h3>
+                <div class="mt-1">
+                    <a href="{{ route('shopee.orders') }}" class="font-weight-bold text-warning" style="font-size: 11px;">
+                        Buka Pesanan Masuk &rarr;
+                    </a>
+                </div>
             </div>
             <div class="icon d-none d-sm-block" style="top: 10px; right: 12px; opacity: 0.12; position: absolute;">
                 <i class="fas fa-truck-loading text-warning fa-2x"></i>
@@ -113,17 +123,49 @@
     </div>
 
     <div class="col-6 col-lg-3 col-md-6 mb-2 mb-md-3">
-        <div class="small-box bg-white p-2 p-md-3 border h-100 mb-0">
+        <div class="small-box bg-white p-2 p-md-3 border h-100 mb-0 shadow-xs" style="border-left: 3px solid #10b981 !important; border-radius: 8px;">
             <div class="inner">
-                <p class="text-muted text-uppercase mb-1 font-weight-bold" style="font-size: 10px;">Total Penjualan</p>
+                <p class="text-muted text-uppercase mb-1 font-weight-bold" style="font-size: 10px;">
+                    <i class="fas fa-coins text-success mr-1"></i> Total Penjualan Shopee
+                </p>
                 <h3 class="font-weight-bold text-success mb-0" style="font-size: 1.15rem; line-height: 1.2;">
                     Rp {{ number_format($totalSales, 0, ',', '.') }}
                 </h3>
+                <div class="mt-1 d-flex flex-column text-muted" style="font-size: 10.5px; line-height: 1.3;">
+                    <span class="text-success"><i class="fas fa-check-circle mr-1"></i> Cair: Rp {{ number_format($releasedSales, 0, ',', '.') }}</span>
+                    <span class="text-warning"><i class="fas fa-hourglass-half mr-1"></i> Akan Cair: Rp {{ number_format($escrowSales, 0, ',', '.') }}</span>
+                </div>
             </div>
             <div class="icon d-none d-sm-block" style="top: 10px; right: 12px; opacity: 0.12; position: absolute;">
-                <i class="fas fa-coins text-success fa-2x"></i>
+                <i class="fas fa-wallet text-success fa-2x"></i>
             </div>
         </div>
+    </div>
+</div>
+
+<!-- Workflow Quick Status Bar -->
+<div class="card shadow-sm border-0 mb-3 bg-light">
+    <div class="card-body p-2 px-3 d-flex flex-wrap align-items-center justify-content-between">
+        <div class="d-flex align-items-center flex-wrap my-1">
+            <span class="font-weight-bold mr-3 text-dark" style="font-size: 12px;">Alur Pesanan & Pengiriman:</span>
+            <a href="{{ route('shopee.orders') }}" class="btn btn-xs btn-outline-warning font-weight-bold mr-2 mb-1">
+                <i class="fas fa-box-open mr-1"></i> 1. Pesanan Masuk ({{ $readyToShipCount }} Ready to Ship)
+            </a>
+            <a href="{{ route('courier.index', ['filter' => 'in_transit']) }}" class="btn btn-xs btn-outline-primary font-weight-bold mr-2 mb-1">
+                <i class="fas fa-truck-fast mr-1"></i> 2. Dalam Pengiriman ({{ $inShippingCount }} di Kurir)
+            </a>
+            <a href="{{ route('courier.index', ['filter' => 'delivered']) }}" class="btn btn-xs btn-outline-success font-weight-bold mr-2 mb-1">
+                <i class="fas fa-circle-check mr-1"></i> 3. Selesai ({{ $completedCount }} Terkirim)
+            </a>
+            @if($cancelledCount > 0)
+                <span class="badge badge-secondary px-2 py-1 mb-1" style="font-size: 11px;">
+                    Dibatalkan / Retur: {{ $cancelledCount }} (Stok dikembalikan)
+                </span>
+            @endif
+        </div>
+        <a href="{{ route('courier.index') }}" class="btn btn-xs btn-primary font-weight-bold my-1">
+            <i class="fas fa-location-arrow mr-1"></i> Buka Menu Lacak Kurir &rarr;
+        </a>
     </div>
 </div>
 
