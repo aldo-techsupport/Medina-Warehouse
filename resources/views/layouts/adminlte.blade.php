@@ -457,7 +457,7 @@
     <!-- Main Sidebar Container -->
     <aside class="main-sidebar sidebar-dark-primary elevation-4">
         <!-- Brand Logo -->
-        <a href="{{ route('dashboard') }}" class="brand-link d-flex align-items-center">
+        <a href="{{ auth()->check() ? auth()->user()->getRedirectUrl() : route('dashboard') }}" class="brand-link d-flex align-items-center">
             <img src="{{ asset('images/logo.png') }}" alt="Medina Logo" class="brand-image img-circle elevation-2" style="width: 33px; height: 33px; object-fit: cover; background: #ffffff; border: 1px solid rgba(255,255,255,0.2);">
             <span class="brand-text font-weight-bold ml-2">Medina Warehouse</span>
         </a>

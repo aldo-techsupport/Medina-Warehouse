@@ -15,7 +15,7 @@ class AuthController extends Controller
     public function showLoginForm(): View|RedirectResponse
     {
         if (Auth::check()) {
-            return redirect()->route('dashboard');
+            return redirect()->to(Auth::user()->getRedirectUrl());
         }
 
         return view('auth.login');
@@ -51,7 +51,24 @@ class AuthController extends Controller
 
             $request->session()->regenerate();
 
-            return redirect()->intended(route('dashboard'))
+            $defaultUrl = $user->getRedirectUrl();
+            $intendedUrl = session()->pull('url.intended');
+
+            $redirectUrl = $defaultUrl;
+            if ($intendedUrl) {
+                $intendedPath = parse_url($intendedUrl, PHP_URL_PATH) ?: '';
+                if ($intendedUrl !== route('login') && $intendedUrl !== url('/login') && $intendedUrl !== url('/') && $intendedPath !== '/') {
+                    if ($intendedUrl === route('dashboard') || $intendedUrl === url('/dashboard') || $intendedPath === '/dashboard') {
+                        if ($user->hasPermission('dashboard')) {
+                            $redirectUrl = $intendedUrl;
+                        }
+                    } else {
+                        $redirectUrl = $intendedUrl;
+                    }
+                }
+            }
+
+            return redirect()->to($redirectUrl)
                 ->with('success', 'Selamat datang kembali, '.$user->name.'!');
         }
 

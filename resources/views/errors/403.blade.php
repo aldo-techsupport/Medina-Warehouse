@@ -80,8 +80,8 @@
     </div>
 
     <div class="d-flex justify-content-center" style="gap: 10px;">
-        <a href="{{ route('dashboard') }}" class="btn btn-primary font-weight-bold px-4">
-            <i class="fas fa-home mr-1"></i> Kembali ke Dashboard
+        <a href="{{ auth()->check() ? auth()->user()->getRedirectUrl() : route('dashboard') }}" class="btn btn-primary font-weight-bold px-4">
+            <i class="fas fa-arrow-left mr-1"></i> Kembali ke Halaman Utama
         </a>
         <form action="{{ route('logout') }}" method="POST" class="d-inline">
             @csrf

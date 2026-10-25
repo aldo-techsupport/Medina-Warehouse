@@ -28,9 +28,10 @@ class RoleController extends Controller
     public function create(): View
     {
         $systemMenus = Role::SYSTEM_MENUS;
+        $predefinedRedirects = Role::getPredefinedRedirectOptions();
         $role = new Role;
 
-        return view('roles.form', compact('systemMenus', 'role'));
+        return view('roles.form', compact('systemMenus', 'predefinedRedirects', 'role'));
     }
 
     /**
@@ -42,6 +43,7 @@ class RoleController extends Controller
             'name' => ['required', 'string', 'max:255'],
             'slug' => ['nullable', 'string', 'max:255', 'unique:roles,slug'],
             'description' => ['nullable', 'string', 'max:500'],
+            'redirect_to' => ['nullable', 'string', 'max:255'],
             'permissions' => ['nullable', 'array'],
             'permissions.*' => ['string'],
         ], [
@@ -55,6 +57,7 @@ class RoleController extends Controller
             'name' => $validated['name'],
             'slug' => $slug,
             'description' => $validated['description'] ?? null,
+            'redirect_to' => ! empty($validated['redirect_to']) ? trim($validated['redirect_to']) : null,
             'permissions' => $validated['permissions'] ?? [],
         ]);
 
@@ -68,8 +71,9 @@ class RoleController extends Controller
     public function edit(Role $role): View
     {
         $systemMenus = Role::SYSTEM_MENUS;
+        $predefinedRedirects = Role::getPredefinedRedirectOptions();
 
-        return view('roles.form', compact('systemMenus', 'role'));
+        return view('roles.form', compact('systemMenus', 'predefinedRedirects', 'role'));
     }
 
     /**
@@ -81,6 +85,7 @@ class RoleController extends Controller
             'name' => ['required', 'string', 'max:255'],
             'slug' => ['nullable', 'string', 'max:255', Rule::unique('roles', 'slug')->ignore($role->id)],
             'description' => ['nullable', 'string', 'max:500'],
+            'redirect_to' => ['nullable', 'string', 'max:255'],
             'permissions' => ['nullable', 'array'],
             'permissions.*' => ['string'],
         ], [
@@ -101,6 +106,7 @@ class RoleController extends Controller
             'name' => $validated['name'],
             'slug' => $slug,
             'description' => $validated['description'] ?? null,
+            'redirect_to' => ! empty($validated['redirect_to']) ? trim($validated['redirect_to']) : null,
             'permissions' => $permissions,
         ]);
 

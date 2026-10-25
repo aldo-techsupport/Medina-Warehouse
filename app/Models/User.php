@@ -74,4 +74,16 @@ class User extends Authenticatable
 
         return $this->role->hasPermission($menuKey);
     }
+
+    /**
+     * Get user default landing / redirect URL based on role.
+     */
+    public function getRedirectUrl(): string
+    {
+        if ($this->role) {
+            return $this->role->getRedirectUrl();
+        }
+
+        return route('dashboard');
+    }
 }

@@ -20,6 +20,11 @@ return Application::configure(basePath: dirname(__DIR__))
             'api/shopee/webhook',
         ]);
 
+        $middleware->redirectTo(
+            guests: '/login',
+            users: fn (Request $request) => $request->user()?->getRedirectUrl() ?? route('dashboard'),
+        );
+
         $middleware->alias([
             'menu' => CheckMenuAccess::class,
         ]);

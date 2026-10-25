@@ -104,6 +104,65 @@
                         <textarea name="description" class="form-control" rows="3" placeholder="Deskripsikan cakupan tugas role ini...">{{ old('description', $role->description) }}</textarea>
                     </div>
 
+                    <div class="form-group mb-4 p-3 rounded" style="background-color: #f8fafc; border: 1px solid #e2e8f0;">
+                        <label class="font-weight-bold text-dark mb-1 d-flex justify-content-between align-items-center" style="font-size: 13px;">
+                            <span><i class="fas fa-arrow-right-to-bracket text-primary mr-1"></i> Direct Tujuan Saat Login</span>
+                            <span class="badge badge-primary px-2 py-1" style="font-size: 10px;">Landing Page</span>
+                        </label>
+                        <p class="text-muted mb-2" style="font-size: 11.5px; line-height: 1.35;">
+                            Tentukan halaman tujuan ketika pengguna dengan role ini berhasil masuk (login).
+                        </p>
+
+                        <!-- Preset Dropdown for Fast Selection -->
+                        <div class="mb-2">
+                            <select id="quick_redirect_select" class="form-control form-control-sm" onchange="applyRedirectPreset(this.value)">
+                                <option value="">-- Pilih Rekomendasi Menu Sistem --</option>
+                                @foreach($predefinedRedirects as $categoryName => $menuItems)
+                                    <optgroup label="{{ $categoryName }}">
+                                        @foreach($menuItems as $item)
+                                            <option value="{{ $item['url'] }}" {{ old('redirect_to', $role->redirect_to) === $item['url'] ? 'selected' : '' }}>
+                                                {{ $item['name'] }} ({{ $item['url'] }})
+                                            </option>
+                                        @endforeach
+                                    </optgroup>
+                                @endforeach
+                            </select>
+                        </div>
+
+                        <!-- Custom URL input -->
+                        <div class="input-group">
+                            <div class="input-group-prepend">
+                                <span class="input-group-text bg-white text-muted font-monospace font-weight-bold" style="font-size: 12px;">Path / URL</span>
+                            </div>
+                            <input type="text" 
+                                   id="redirect_to_input" 
+                                   name="redirect_to" 
+                                   class="form-control font-monospace" 
+                                   value="{{ old('redirect_to', $role->redirect_to ?? '/dashboard') }}" 
+                                   placeholder="Contoh: /packing atau /dashboard">
+                        </div>
+
+                        <!-- Quick suggestion pills for top paths -->
+                        <div class="d-flex flex-wrap mt-2 align-items-center" style="gap: 4px;">
+                            <span class="text-muted mr-1 font-weight-semibold" style="font-size: 11px;">Pintasan:</span>
+                            <button type="button" class="btn btn-xs btn-outline-danger py-0 px-2 rounded-pill font-weight-bold" onclick="setRedirectUrl('/packing')">
+                                <i class="fas fa-video mr-1"></i> /packing
+                            </button>
+                            <button type="button" class="btn btn-xs btn-outline-primary py-0 px-2 rounded-pill font-weight-bold" onclick="setRedirectUrl('/dashboard')">
+                                <i class="fas fa-chart-pie mr-1"></i> /dashboard
+                            </button>
+                            <button type="button" class="btn btn-xs btn-outline-info py-0 px-2 rounded-pill font-weight-bold" onclick="setRedirectUrl('/courier-tracking')">
+                                <i class="fas fa-truck-fast mr-1"></i> /courier-tracking
+                            </button>
+                            <button type="button" class="btn btn-xs btn-outline-warning py-0 px-2 rounded-pill font-weight-bold text-dark" onclick="setRedirectUrl('/shopee')">
+                                <i class="fas fa-store mr-1"></i> /shopee
+                            </button>
+                            <button type="button" class="btn btn-xs btn-outline-secondary py-0 px-2 rounded-pill font-weight-bold" onclick="setRedirectUrl('/warehouse/products')">
+                                <i class="fas fa-boxes mr-1"></i> /warehouse/products
+                            </button>
+                        </div>
+                    </div>
+
                     @if($role->slug === 'super_admin')
                         <div class="alert alert-warning py-2 px-3 mb-4 rounded" style="font-size: 12.5px;">
                             <i class="fas fa-crown mr-1"></i> <strong>Super Admin</strong> memiliki akses penuh ke semua modul sistem secara default.
@@ -267,5 +326,19 @@
             updateCardState(this);
         });
     });
+
+    function applyRedirectPreset(val) {
+        if (val) {
+            document.getElementById('redirect_to_input').value = val;
+        }
+    }
+
+    function setRedirectUrl(val) {
+        document.getElementById('redirect_to_input').value = val;
+        const select = document.getElementById('quick_redirect_select');
+        if (select) {
+            select.value = val;
+        }
+    }
 </script>
 @endpush

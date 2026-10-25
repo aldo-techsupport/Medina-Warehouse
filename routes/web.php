@@ -24,7 +24,7 @@ Route::middleware('auth')->group(function () {
 
     // Home redirect
     Route::get('/', function () {
-        return redirect()->route('dashboard');
+        return redirect()->to(auth()->user()->getRedirectUrl());
     });
 
     // Main Dashboard

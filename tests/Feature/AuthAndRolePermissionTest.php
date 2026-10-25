@@ -80,14 +80,51 @@ test('super admin can create and update roles with custom menu permissions', fun
         'name' => 'Supervisor Stock',
         'slug' => 'supervisor_stock',
         'description' => 'Khusus mengurus stok gudang',
+        'redirect_to' => '/warehouse/products',
         'permissions' => ['dashboard', 'warehouse_products'],
     ]);
 
     $response->assertRedirect(route('roles.index'));
     $role = Role::where('slug', 'supervisor_stock')->first();
     expect($role)->not->toBeNull();
+    expect($role->redirect_to)->toBe('/warehouse/products');
     expect($role->hasPermission('warehouse_products'))->toBeTrue();
     expect($role->hasPermission('packing_station'))->toBeFalse();
+
+    // Update redirect_to
+    $updateResponse = $this->actingAs($admin)->put(route('roles.update', $role), [
+        'name' => 'Supervisor Stock Gudang',
+        'slug' => 'supervisor_stock',
+        'redirect_to' => '/warehouse/mutations',
+        'permissions' => ['warehouse_mutations'],
+    ]);
+    $updateResponse->assertRedirect(route('roles.index'));
+    $role->refresh();
+    expect($role->redirect_to)->toBe('/warehouse/mutations');
+});
+
+test('packer role redirects to packing station upon successful login instead of dashboard', function () {
+    $response = $this->post(route('login.post'), [
+        'username' => 'packer',
+        'password' => 'password',
+    ]);
+
+    $this->assertAuthenticated();
+    $response->assertRedirect('/packing');
+});
+
+test('authenticated user accessing root url is redirected to their role landing page', function () {
+    $packer = User::where('email', 'packer@medina.com')->first();
+    $admin = User::where('email', 'admin@medina.com')->first();
+
+    $this->actingAs($packer)->get('/')->assertRedirect('/packing');
+    $this->actingAs($admin)->get('/')->assertRedirect(route('dashboard'));
+});
+
+test('already authenticated user accessing login page is redirected to role landing page', function () {
+    $packer = User::where('email', 'packer@medina.com')->first();
+
+    $this->actingAs($packer)->get(route('login'))->assertRedirect('/packing');
 });
 
 test('user can log out successfully', function () {

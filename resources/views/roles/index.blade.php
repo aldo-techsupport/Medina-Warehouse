@@ -57,6 +57,11 @@
                                     <span class="badge badge-secondary font-monospace mt-1" style="font-size: 10.5px;">
                                         {{ $role->slug }}
                                     </span>
+                                    <div class="mt-1">
+                                        <span class="badge badge-light border text-primary font-monospace" title="Direct URL tujuan saat login" style="font-size: 11px;">
+                                            <i class="fas fa-arrow-right-to-bracket mr-1"></i> {{ $role->redirect_to ?: '/dashboard (default)' }}
+                                        </span>
+                                    </div>
                                 </td>
                                 <td>
                                     <span class="text-muted" style="font-size: 13px;">{{ $role->description ?? '-' }}</span>

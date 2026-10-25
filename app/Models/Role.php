@@ -14,6 +14,7 @@ class Role extends Model
         'name',
         'slug',
         'description',
+        'redirect_to',
         'permissions',
     ];
 
@@ -132,5 +133,66 @@ class Role extends Model
         $permissions = $this->permissions ?? [];
 
         return in_array($menuKey, $permissions, true);
+    }
+
+    /**
+     * Get the resolved landing / redirect URL for this role after login.
+     */
+    public function getRedirectUrl(): string
+    {
+        if (! empty($this->redirect_to)) {
+            $target = trim($this->redirect_to);
+
+            if (str_starts_with($target, 'http://') || str_starts_with($target, 'https://') || str_starts_with($target, '/')) {
+                return $target;
+            }
+
+            if (\Illuminate\Support\Facades\Route::has($target)) {
+                return route($target);
+            }
+
+            return url('/'.ltrim($target, '/'));
+        }
+
+        // If super admin or user has dashboard permission, default to dashboard
+        if ($this->slug === 'super_admin' || $this->hasPermission('dashboard')) {
+            return route('dashboard');
+        }
+
+        // Fallback: find the first available menu route that this role has permission for
+        foreach (self::SYSTEM_MENUS as $category => $menus) {
+            foreach ($menus as $menuKey => $menu) {
+                if ($this->hasPermission($menuKey) && ! empty($menu['route']) && \Illuminate\Support\Facades\Route::has($menu['route'])) {
+                    return route($menu['route']);
+                }
+            }
+        }
+
+        return route('dashboard');
+    }
+
+    /**
+     * Get all predefined system routes formatted for select options.
+     */
+    public static function getPredefinedRedirectOptions(): array
+    {
+        $options = [];
+        foreach (self::SYSTEM_MENUS as $category => $menus) {
+            foreach ($menus as $key => $menu) {
+                $route = $menu['route'] ?? '';
+                if ($route && \Illuminate\Support\Facades\Route::has($route)) {
+                    $url = parse_url(route($route), PHP_URL_PATH) ?: route($route);
+                    $options[$category][] = [
+                        'key' => $key,
+                        'name' => $menu['name'],
+                        'route' => $route,
+                        'url' => $url,
+                        'icon' => $menu['icon'] ?? 'fas fa-link',
+                    ];
+                }
+            }
+        }
+
+        return $options;
     }
 }
