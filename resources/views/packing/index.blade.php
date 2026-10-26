@@ -238,7 +238,7 @@
         bottom: calc(12px + env(safe-area-inset-bottom, 0px));
         left: 12px;
         right: 12px;
-        z-index: 1030;
+        z-index: 1048 !important;
         background: rgba(15, 23, 42, 0.95);
         backdrop-filter: blur(14px);
         -webkit-backdrop-filter: blur(14px);
@@ -247,6 +247,43 @@
         padding: 10px 14px;
         box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
         animation: slideUp 0.25s ease-out;
+    }
+
+    /* 🎬 Direct In-Camera Floating Action Controls */
+    .in-cam-bottom-bar {
+        position: absolute;
+        bottom: calc(14px + env(safe-area-inset-bottom, 0px));
+        left: 14px;
+        right: 14px;
+        z-index: 35;
+        background: rgba(15, 23, 42, 0.92);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        border: 1px solid rgba(255, 255, 255, 0.25);
+        border-radius: 18px;
+        padding: 12px 14px 8px 14px;
+        box-shadow: 0 8px 30px rgba(0, 0, 0, 0.7);
+        animation: slideUp 0.25s ease-out;
+    }
+    .in-cam-btn-save {
+        font-size: 15px !important;
+        letter-spacing: 0.5px;
+        background: linear-gradient(135deg, #10b981 0%, #059669 100%) !important;
+        border: none !important;
+        box-shadow: 0 4px 18px rgba(16, 185, 129, 0.55) !important;
+    }
+    .in-cam-btn-save:active {
+        transform: scale(0.98);
+    }
+    .in-cam-btn-start {
+        font-size: 15px !important;
+        letter-spacing: 0.5px;
+        background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%) !important;
+        border: none !important;
+        box-shadow: 0 4px 18px rgba(239, 68, 68, 0.55) !important;
+    }
+    .in-cam-btn-start:active {
+        transform: scale(0.98);
     }
 
     @keyframes slideUp {
@@ -497,6 +534,38 @@
                         <div class="reticle-corner corner-bl"></div>
                         <div class="reticle-corner corner-br"></div>
                         <div class="reticle-laser"></div>
+                    </div>
+
+                    <!-- 🎬 FLOATING IN-CAMERA RECORDING CONTROLS (ALWAYS VISIBLE IN FULLSCREEN OR NORMAL) -->
+                    <div class="in-cam-bottom-bar" id="inCamRecordingBar" style="display: none;">
+                        <div class="d-flex align-items-center justify-content-between mb-2 text-white px-1">
+                            <div class="text-truncate mr-2">
+                                <span class="badge badge-success px-2 py-1 mr-1" id="inCamOrderCarrier">SPX</span>
+                                <strong class="text-xs" id="inCamOrderTracking" style="letter-spacing: 0.5px;">-</strong>
+                            </div>
+                            <span class="badge badge-danger animate-pulse px-2 py-1" id="inCamLiveRecTimer">
+                                <i class="fas fa-circle mr-1"></i> REC 00:00
+                            </span>
+                        </div>
+
+                        <!-- Tombol Mulai Rekam (jika order aktif belum rekam) -->
+                        <button type="button" class="btn btn-danger btn-block py-3 font-weight-bold rounded-pill shadow-lg text-uppercase in-cam-btn-start mb-0" id="inCamBtnStartRecord" onclick="startPackingRecording()" style="display: none;">
+                            <i class="fas fa-circle mr-2 fa-lg"></i> MULAI REKAM PACKING
+                        </button>
+
+                        <!-- Tombol Stop & Simpan (saat rekam berlangsung) -->
+                        <button type="button" class="btn btn-success btn-block py-3 font-weight-bold rounded-pill shadow-lg text-uppercase in-cam-btn-save mb-0" id="inCamBtnStopRecord" onclick="stopPackingRecording()" style="display: none;">
+                            <i class="fas fa-check-circle mr-2 fa-lg"></i> SELESAI & SIMPAN (<span id="inCamBtnTimer">00:00</span>)
+                        </button>
+
+                        <div class="d-flex align-items-center justify-content-between mt-2 pt-1 border-top border-secondary">
+                            <button type="button" class="btn btn-link text-white-50 text-xs p-0 text-decoration-none" onclick="showProductPhotoModal()">
+                                <i class="fas fa-images mr-1 text-warning"></i> Cek Foto Barang
+                            </button>
+                            <button type="button" class="btn btn-link text-white-50 text-xs p-0 text-decoration-none" onclick="resetPackingState()">
+                                <i class="fas fa-times-circle mr-1 text-danger"></i> Batal / Ganti Resi
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -1862,6 +1931,19 @@
         const mBtnStop = document.getElementById('mobileBtnStopRecord');
         if (mBtnStart) { mBtnStart.style.display = 'block'; mBtnStart.disabled = false; }
         if (mBtnStop) { mBtnStop.style.display = 'none'; }
+
+        // 🎬 IN-CAMERA FLOATING CONTROLS
+        const inCamBar = document.getElementById('inCamRecordingBar');
+        const inCamCarrier = document.getElementById('inCamOrderCarrier');
+        const inCamTracking = document.getElementById('inCamOrderTracking');
+        const inCamBtnStart = document.getElementById('inCamBtnStartRecord');
+        const inCamBtnStop = document.getElementById('inCamBtnStopRecord');
+
+        if (inCamCarrier) inCamCarrier.innerText = data.shipping_carrier || 'SPX';
+        if (inCamTracking) inCamTracking.innerText = data.tracking_number || data.order_sn;
+        if (inCamBtnStart) { inCamBtnStart.style.display = 'block'; inCamBtnStart.disabled = false; }
+        if (inCamBtnStop) { inCamBtnStop.style.display = 'none'; }
+        if (inCamBar) inCamBar.style.display = 'block';
     }
 
     // 🖼️ POPUP MODAL FOTO BARANG
@@ -2029,6 +2111,14 @@
             mBtnStop.disabled = false;
             mBtnStop.innerHTML = '<i class="fas fa-check-circle mr-2"></i> SELESAI & SIMPAN (<span id="mobileRecBtnTimer">00:00</span>)';
         }
+
+        // 🎬 RESET IN-CAMERA CONTROLS
+        const inCamBar = document.getElementById('inCamRecordingBar');
+        const inCamBtnStart = document.getElementById('inCamBtnStartRecord');
+        const inCamBtnStop = document.getElementById('inCamBtnStopRecord');
+        if (inCamBar) inCamBar.style.display = 'none';
+        if (inCamBtnStart) { inCamBtnStart.style.display = 'none'; inCamBtnStart.disabled = false; }
+        if (inCamBtnStop) { inCamBtnStop.style.display = 'none'; inCamBtnStop.disabled = false; }
     }
 
     function showAlreadyPackedModal(data) {
@@ -2280,6 +2370,14 @@
                 ? `<i class="fas fa-spinner fa-spin mr-2"></i> ${text}`
                 : `<i class="fas fa-check-circle mr-2"></i> SELESAI & SIMPAN (<span id="mobileRecBtnTimer">${mins}:${secs}</span>)`;
         }
+
+        const inCamBtnStop = document.getElementById('inCamBtnStopRecord');
+        if (inCamBtnStop) {
+            inCamBtnStop.disabled = isSaving;
+            inCamBtnStop.innerHTML = isSaving
+                ? `<i class="fas fa-spinner fa-spin mr-2"></i> ${text}`
+                : `<i class="fas fa-check-circle mr-2 fa-lg"></i> SELESAI & SIMPAN (<span id="inCamBtnTimer">${mins}:${secs}</span>)`;
+        }
     }
 
     // Video Recording Implementation
@@ -2407,6 +2505,25 @@
         if (mPillRec) mPillRec.style.display = 'inline-flex';
         if (mReticle) mReticle.style.display = 'none';
 
+        // 🎬 IN-CAMERA FLOATING RECORDING STATE (Paling penting untuk mode fullscreen)
+        const inCamBar = document.getElementById('inCamRecordingBar');
+        const inCamBtnStart = document.getElementById('inCamBtnStartRecord');
+        const inCamBtnStop = document.getElementById('inCamBtnStopRecord');
+        const inCamCarrier = document.getElementById('inCamOrderCarrier');
+        const inCamTracking = document.getElementById('inCamOrderTracking');
+        const inCamTimerBadge = document.getElementById('inCamLiveRecTimer');
+
+        if (inCamBar) inCamBar.style.display = 'block';
+        if (inCamCarrier && currentOrderData) inCamCarrier.innerText = currentOrderData.shipping_carrier || 'SPX';
+        if (inCamTracking && currentOrderData) inCamTracking.innerText = currentOrderData.tracking_number || currentOrderData.order_sn;
+        if (inCamBtnStart) inCamBtnStart.style.display = 'none';
+        if (inCamBtnStop) {
+            inCamBtnStop.style.display = 'block';
+            inCamBtnStop.disabled = false;
+            inCamBtnStop.innerHTML = '<i class="fas fa-check-circle mr-2 fa-lg"></i> SELESAI & SIMPAN (<span id="inCamBtnTimer">00:00</span>)';
+        }
+        if (inCamTimerBadge) inCamTimerBadge.innerHTML = '<i class="fas fa-circle mr-1"></i> REC 00:00';
+
         timerInterval = setInterval(() => {
             const elapsedSeconds = Math.floor((Date.now() - recordStartTime) / 1000);
             recordDuration = elapsedSeconds;
@@ -2419,6 +2536,12 @@
             const mBtnTimerText = document.getElementById('mobileRecBtnTimer');
             if (mTimerText) mTimerText.innerText = `REC ${mins}:${secs}`;
             if (mBtnTimerText) mBtnTimerText.innerText = `${mins}:${secs}`;
+
+            // In-Camera Floating Timer
+            const inCamBtnTimer = document.getElementById('inCamBtnTimer');
+            const inCamLiveTimer = document.getElementById('inCamLiveRecTimer');
+            if (inCamBtnTimer) inCamBtnTimer.innerText = `${mins}:${secs}`;
+            if (inCamLiveTimer) inCamLiveTimer.innerHTML = `<i class="fas fa-circle mr-1"></i> REC ${mins}:${secs}`;
         }, 500);
 
         playBeep(600, 'sine', 0.2);
