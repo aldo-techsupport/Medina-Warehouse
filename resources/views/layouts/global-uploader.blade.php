@@ -97,6 +97,73 @@
             border-radius: 14px !important;
         }
     }
+
+    /* 🔔 Mini Compact Toast Alert for Global Uploader (Top-Right Stacked) */
+    .swal2-container.swal2-top-end, .swal2-container.swal2-top-right {
+        top: calc(8px + env(safe-area-inset-top, 0px)) !important;
+        right: 8px !important;
+        z-index: 1070 !important;
+    }
+    .swal2-popup.swal2-compact-toast {
+        padding: 6px 12px !important;
+        width: auto !important;
+        min-width: 150px !important;
+        max-width: 240px !important;
+        border-radius: 10px !important;
+        background: rgba(15, 23, 42, 0.95) !important;
+        backdrop-filter: blur(10px) !important;
+        -webkit-backdrop-filter: blur(10px) !important;
+        box-shadow: 0 4px 18px rgba(0, 0, 0, 0.6) !important;
+    }
+    .swal2-popup.swal2-toast-success {
+        border: 1px solid rgba(34, 197, 94, 0.6) !important;
+    }
+    .swal2-popup.swal2-toast-error {
+        border: 1px solid rgba(239, 68, 68, 0.7) !important;
+    }
+    .swal2-popup.swal2-compact-toast .swal2-icon {
+        width: 15px !important;
+        height: 15px !important;
+        min-width: 15px !important;
+        margin: 0 6px 0 0 !important;
+        border-width: 1.5px !important;
+    }
+    .swal2-popup.swal2-toast-success .swal2-icon {
+        border-color: #22c55e !important;
+        color: #22c55e !important;
+    }
+    .swal2-popup.swal2-toast-error .swal2-icon {
+        border-color: #ef4444 !important;
+        color: #ef4444 !important;
+    }
+    .swal2-popup.swal2-compact-toast .swal2-icon .swal2-icon-content {
+        font-size: 9.5px !important;
+    }
+    .swal2-popup.swal2-compact-toast .swal2-title {
+        font-size: 11px !important;
+        font-weight: 700 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        line-height: 1.25 !important;
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+    }
+    .swal2-popup.swal2-toast-success .swal2-title {
+        color: #4ade80 !important;
+    }
+    .swal2-popup.swal2-toast-error .swal2-title {
+        color: #f87171 !important;
+    }
+    .swal2-popup.swal2-compact-toast .swal2-timer-progress-bar {
+        height: 2px !important;
+    }
+    .swal2-popup.swal2-toast-success .swal2-timer-progress-bar {
+        background: #22c55e !important;
+    }
+    .swal2-popup.swal2-toast-error .swal2-timer-progress-bar {
+        background: #ef4444 !important;
+    }
 </style>
 
 <div id="globalUploadWidget" class="global-upload-widget shadow-lg" style="display: none;">
@@ -462,18 +529,22 @@
                     this.broadcastCompleted(job);
                     this.syncLocalStorageMetadata();
 
-                    // Notifikasi Toast
+                    // Notifikasi Toast Berhasil (Kecil, Hijau, Kanan Atas, Durasi Singkat 1.8s)
                     if (typeof Swal !== 'undefined') {
                         const Toast = Swal.mixin({
                             toast: true,
-                            position: 'bottom-end',
+                            position: 'top-end',
                             showConfirmButton: false,
-                            timer: 4500,
-                            timerProgressBar: true
+                            timer: 1800,
+                            timerProgressBar: true,
+                            customClass: {
+                                popup: 'swal2-compact-toast swal2-toast-success'
+                            }
                         });
+                        const shortKey = job.tracking_number || job.order_sn || 'Pesanan';
                         Toast.fire({
                             icon: 'success',
-                            title: `✅ Video packing [${job.tracking_number || job.order_sn}] tersimpan di server!`
+                            title: `${shortKey} Video berhasil di upload`
                         });
                     }
 
@@ -482,15 +553,19 @@
                         this.processQueue();
                     }, 800);
                 } else {
-                    this.handleUploadError(job, res.message || 'Gagal menyimpan video ke server.');
+                    const errCode = xhr.status || '500';
+                    job.httpCode = errCode;
+                    this.handleUploadError(job, res.message || `Server error (${errCode})`);
                 }
             };
 
             xhr.onerror = () => {
+                job.httpCode = 'NET_ERR';
                 this.handleUploadError(job, 'Koneksi terputus saat mengunggah video.');
             };
 
             xhr.ontimeout = () => {
+                job.httpCode = 'TIMEOUT';
                 this.handleUploadError(job, 'Waktu upload melebihi batas (timeout).');
             };
 
@@ -541,6 +616,25 @@
                 await this.updateJob(job);
                 this.updateUIFailed(job);
                 this.syncLocalStorageMetadata();
+
+                // Notifikasi Toast Gagal (Kecil, Merah, Kanan Atas, Durasi Singkat)
+                if (typeof Swal !== 'undefined') {
+                    const Toast = Swal.mixin({
+                        toast: true,
+                        position: 'top-end',
+                        showConfirmButton: false,
+                        timer: 2200,
+                        timerProgressBar: true,
+                        customClass: {
+                            popup: 'swal2-compact-toast swal2-toast-error'
+                        }
+                    });
+                    const errCode = job.httpCode || 'ERR';
+                    Toast.fire({
+                        icon: 'error',
+                        title: `[${errCode}] Video gagal diupload`
+                    });
+                }
             }
         },
 
