@@ -107,12 +107,12 @@
     .swal2-popup.swal2-compact-toast {
         padding: 6px 12px !important;
         width: auto !important;
-        min-width: 150px !important;
-        max-width: 240px !important;
+        min-width: 160px !important;
+        max-width: 290px !important;
         border-radius: 10px !important;
-        background: rgba(15, 23, 42, 0.95) !important;
-        backdrop-filter: blur(10px) !important;
-        -webkit-backdrop-filter: blur(10px) !important;
+        background: rgba(15, 23, 42, 0.96) !important;
+        backdrop-filter: blur(12px) !important;
+        -webkit-backdrop-filter: blur(12px) !important;
         box-shadow: 0 4px 18px rgba(0, 0, 0, 0.6) !important;
     }
     .swal2-popup.swal2-toast-success {
@@ -121,39 +121,14 @@
     .swal2-popup.swal2-toast-error {
         border: 1px solid rgba(239, 68, 68, 0.7) !important;
     }
+    /* Sembunyikan icon bawaan SweetAlert2 agar tidak glitch/terbalik */
     .swal2-popup.swal2-compact-toast .swal2-icon {
-        width: 15px !important;
-        height: 15px !important;
-        min-width: 15px !important;
-        margin: 0 6px 0 0 !important;
-        border-width: 1.5px !important;
+        display: none !important;
     }
-    .swal2-popup.swal2-toast-success .swal2-icon {
-        border-color: #22c55e !important;
-        color: #22c55e !important;
-    }
-    .swal2-popup.swal2-toast-error .swal2-icon {
-        border-color: #ef4444 !important;
-        color: #ef4444 !important;
-    }
-    .swal2-popup.swal2-compact-toast .swal2-icon .swal2-icon-content {
-        font-size: 9.5px !important;
-    }
-    .swal2-popup.swal2-compact-toast .swal2-title {
-        font-size: 11px !important;
-        font-weight: 700 !important;
+    .swal2-popup.swal2-compact-toast .swal2-html-container {
         margin: 0 !important;
         padding: 0 !important;
-        line-height: 1.25 !important;
-        white-space: nowrap !important;
-        overflow: hidden !important;
-        text-overflow: ellipsis !important;
-    }
-    .swal2-popup.swal2-toast-success .swal2-title {
-        color: #4ade80 !important;
-    }
-    .swal2-popup.swal2-toast-error .swal2-title {
-        color: #f87171 !important;
+        text-align: left !important;
     }
     .swal2-popup.swal2-compact-toast .swal2-timer-progress-bar {
         height: 2px !important;
@@ -543,8 +518,13 @@
                         });
                         const shortKey = job.tracking_number || job.order_sn || 'Pesanan';
                         Toast.fire({
-                            icon: 'success',
-                            title: `${shortKey} Video berhasil di upload`
+                            html: `
+                                <div style="display: flex; align-items: center; white-space: nowrap;">
+                                    <i class="fas fa-check-circle" style="color: #4ade80; font-size: 13px; margin-right: 6px; flex-shrink: 0;"></i>
+                                    <span style="color: #ffffff; font-size: 11px; font-weight: 700;">${shortKey}</span>
+                                    <span style="color: #dcfce7; font-size: 10.5px; margin-left: 5px;">Video berhasil di upload</span>
+                                </div>
+                            `
                         });
                     }
 
@@ -631,8 +611,13 @@
                     });
                     const errCode = job.httpCode || 'ERR';
                     Toast.fire({
-                        icon: 'error',
-                        title: `[${errCode}] Video gagal diupload`
+                        html: `
+                            <div style="display: flex; align-items: center; white-space: nowrap;">
+                                <i class="fas fa-times-circle" style="color: #f87171; font-size: 13px; margin-right: 6px; flex-shrink: 0;"></i>
+                                <span style="color: #f87171; font-size: 11px; font-weight: 700;">[${errCode}]</span>
+                                <span style="color: #fee2e2; font-size: 10.5px; margin-left: 5px;">Video gagal diupload</span>
+                            </div>
+                        `
                     });
                 }
             }

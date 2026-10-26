@@ -368,41 +368,25 @@
         z-index: 1070 !important;
     }
     .swal2-popup.swal2-compact-toast {
-        padding: 5px 10px !important;
+        padding: 6px 12px !important;
         width: auto !important;
-        min-width: 170px !important;
-        max-width: 215px !important;
+        min-width: 160px !important;
+        max-width: 290px !important;
         border-radius: 10px !important;
-        background: rgba(15, 23, 42, 0.95) !important;
-        backdrop-filter: blur(10px) !important;
-        -webkit-backdrop-filter: blur(10px) !important;
-        border: 1px solid rgba(34, 197, 94, 0.4) !important;
-        box-shadow: 0 4px 18px rgba(0, 0, 0, 0.55) !important;
+        background: rgba(15, 23, 42, 0.96) !important;
+        backdrop-filter: blur(12px) !important;
+        -webkit-backdrop-filter: blur(12px) !important;
+        border: 1px solid rgba(34, 197, 94, 0.6) !important;
+        box-shadow: 0 4px 18px rgba(0, 0, 0, 0.6) !important;
     }
+    /* Sembunyikan icon bawaan SweetAlert2 agar tidak glitch/terbalik */
     .swal2-popup.swal2-compact-toast .swal2-icon {
-        width: 15px !important;
-        height: 15px !important;
-        min-width: 15px !important;
-        margin: 0 5px 0 0 !important;
-        border: 1.5px solid #22c55e !important;
-    }
-    .swal2-popup.swal2-compact-toast .swal2-icon .swal2-icon-content {
-        font-size: 9.5px !important;
-    }
-    .swal2-popup.swal2-compact-toast .swal2-title {
-        font-size: 11px !important;
-        font-weight: 700 !important;
-        color: #ffffff !important;
-        margin: 0 !important;
-        padding: 0 !important;
-        line-height: 1.25 !important;
+        display: none !important;
     }
     .swal2-popup.swal2-compact-toast .swal2-html-container {
-        font-size: 9px !important;
-        color: #94a3b8 !important;
-        margin: 1px 0 0 0 !important;
+        margin: 0 !important;
         padding: 0 !important;
-        line-height: 1.2 !important;
+        text-align: left !important;
     }
     .swal2-popup.swal2-compact-toast .swal2-timer-progress-bar {
         height: 2px !important;
@@ -3211,14 +3195,20 @@
         Swal.fire({
             toast: true,
             position: 'top-end',
-            icon: 'success',
-            title: `<span style="font-size: 11px; font-weight: 700;">✓ ${titleText} [${orderKey}]</span>`,
-            html: '<span style="font-size: 9px; opacity: 0.85;">Siap scan resi berikutnya</span>',
+            html: `
+                <div style="display: flex; align-items: center; white-space: nowrap;">
+                    <i class="fas fa-check-circle" style="color: #4ade80; font-size: 13px; margin-right: 6px; flex-shrink: 0;"></i>
+                    <span style="color: #ffffff; font-size: 11px; font-weight: 700;">${titleText} [${orderKey}]</span>
+                </div>
+                <div style="font-size: 9px; color: #94a3b8; text-align: left; padding-left: 19px; margin-top: 1px;">
+                    Siap scan resi berikutnya
+                </div>
+            `,
             showConfirmButton: false,
-            timer: 2200,
+            timer: 1800,
             timerProgressBar: true,
             customClass: {
-                popup: 'swal2-compact-toast'
+                popup: 'swal2-compact-toast swal2-toast-success'
             }
         });
 
