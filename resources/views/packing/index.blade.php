@@ -356,35 +356,57 @@
         z-index: 1050 !important;
     }
 
-    /* Floating Background Upload Indicator */
+    /* Floating Background Upload Indicator (Hidden in favor of global-uploader) */
     .floating-upload-pill {
-        position: fixed;
-        bottom: 24px;
-        right: 24px;
-        z-index: 1045;
-        background: #0f172a;
-        color: #ffffff;
-        padding: 9px 16px;
-        border-radius: 30px;
-        cursor: pointer;
-        border: 1px solid rgba(255, 255, 255, 0.2);
-        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.45);
-        display: flex;
-        align-items: center;
-        transition: all 0.25s ease;
+        display: none !important;
     }
-    .floating-upload-pill:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 14px 30px rgba(0, 0, 0, 0.6);
-        background: #1e293b;
+
+    /* 🔔 Mini Compact Toast Alert for Mobile & Desktop */
+    .swal2-container.swal2-top-end, .swal2-container.swal2-top-right {
+        top: calc(8px + env(safe-area-inset-top, 0px)) !important;
+        right: 8px !important;
+        z-index: 1070 !important;
     }
-    @media (max-width: 767.98px) {
-        .floating-upload-pill {
-            bottom: 82px;
-            right: 12px;
-            padding: 7px 12px;
-            font-size: 12px;
-        }
+    .swal2-popup.swal2-compact-toast {
+        padding: 5px 10px !important;
+        width: auto !important;
+        min-width: 170px !important;
+        max-width: 215px !important;
+        border-radius: 10px !important;
+        background: rgba(15, 23, 42, 0.95) !important;
+        backdrop-filter: blur(10px) !important;
+        -webkit-backdrop-filter: blur(10px) !important;
+        border: 1px solid rgba(34, 197, 94, 0.4) !important;
+        box-shadow: 0 4px 18px rgba(0, 0, 0, 0.55) !important;
+    }
+    .swal2-popup.swal2-compact-toast .swal2-icon {
+        width: 15px !important;
+        height: 15px !important;
+        min-width: 15px !important;
+        margin: 0 5px 0 0 !important;
+        border: 1.5px solid #22c55e !important;
+    }
+    .swal2-popup.swal2-compact-toast .swal2-icon .swal2-icon-content {
+        font-size: 9.5px !important;
+    }
+    .swal2-popup.swal2-compact-toast .swal2-title {
+        font-size: 11px !important;
+        font-weight: 700 !important;
+        color: #ffffff !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        line-height: 1.25 !important;
+    }
+    .swal2-popup.swal2-compact-toast .swal2-html-container {
+        font-size: 9px !important;
+        color: #94a3b8 !important;
+        margin: 1px 0 0 0 !important;
+        padding: 0 !important;
+        line-height: 1.2 !important;
+    }
+    .swal2-popup.swal2-compact-toast .swal2-timer-progress-bar {
+        height: 2px !important;
+        background: #22c55e !important;
     }
 </style>
 @endpush
@@ -3184,16 +3206,20 @@
         // 3. Play success chime and show immediate non-blocking feedback toast
         playSuccessSound();
         const isReturn = modeSnapshot === 'return_unboxing';
-        const titleText = isReturn ? 'Unboxing Selesai!' : 'Packing Selesai!';
+        const titleText = isReturn ? 'Unboxing Selesai' : 'Packing Selesai';
+        const orderKey = uploadJob.tracking_number || uploadJob.order_sn;
         Swal.fire({
             toast: true,
             position: 'top-end',
             icon: 'success',
-            title: `✅ ${titleText} [${uploadJob.tracking_number || uploadJob.order_sn}]`,
-            text: 'Video diunggah di latar belakang. Anda bisa langsung scan paket berikutnya!',
+            title: `<span style="font-size: 11px; font-weight: 700;">✓ ${titleText} [${orderKey}]</span>`,
+            html: '<span style="font-size: 9px; opacity: 0.85;">Siap scan resi berikutnya</span>',
             showConfirmButton: false,
-            timer: 3500,
-            timerProgressBar: true
+            timer: 2200,
+            timerProgressBar: true,
+            customClass: {
+                popup: 'swal2-compact-toast'
+            }
         });
 
         // 4. Immediately reset button state and packing station

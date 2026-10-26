@@ -2,51 +2,54 @@
 <style>
     .global-upload-widget {
         position: fixed;
-        bottom: 24px;
-        right: 24px;
+        top: calc(52px + env(safe-area-inset-top, 0px));
+        right: 12px;
+        bottom: auto;
         z-index: 1055;
-        width: 340px;
-        max-width: calc(100vw - 32px);
-        background: rgba(255, 255, 255, 0.98);
+        width: 215px;
+        max-width: calc(100vw - 24px);
+        background: rgba(15, 23, 42, 0.94);
         backdrop-filter: blur(12px);
         -webkit-backdrop-filter: blur(12px);
-        border: 1px solid #e2e8f0;
-        border-radius: 16px;
-        box-shadow: 0 12px 30px -4px rgba(15, 23, 42, 0.18), 0 4px 6px -2px rgba(15, 23, 42, 0.05);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        border-radius: 12px;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
         font-family: inherit;
         overflow: hidden;
-        transition: transform 0.25s ease, opacity 0.25s ease, bottom 0.25s ease;
+        transition: transform 0.25s ease, opacity 0.25s ease, top 0.25s ease;
     }
     .global-upload-widget.minimized {
         width: auto;
-        min-width: 200px;
+        min-width: 140px;
+        border-radius: 16px;
     }
     .global-upload-widget.minimized .upload-widget-body {
         display: none !important;
     }
     .global-upload-header {
-        padding: 10px 14px;
+        padding: 5px 8px;
         display: flex;
         align-items: center;
         justify-content: space-between;
-        background: #0f172a;
+        background: transparent;
         color: #f8fafc;
-        border-bottom: 1px solid #1e293b;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
         cursor: pointer;
     }
     .global-upload-header .upload-title {
-        font-size: 12px;
+        font-size: 10px;
         font-weight: 700;
-        letter-spacing: 0.3px;
+        letter-spacing: 0.2px;
         display: flex;
         align-items: center;
+        color: #f8fafc;
     }
     .global-upload-header .live-pulse-dot {
-        width: 8px;
-        height: 8px;
+        width: 6px;
+        height: 6px;
         background-color: #38bdf8;
         border-radius: 50%;
-        margin-right: 8px;
+        margin-right: 5px;
         box-shadow: 0 0 0 0 rgba(56, 189, 248, 0.7);
         animation: globalPulse 1.6s infinite cubic-bezier(0.66, 0, 0, 1);
         flex-shrink: 0;
@@ -63,86 +66,84 @@
         to { box-shadow: 0 0 0 10px rgba(56, 189, 248, 0); }
     }
     .upload-widget-body {
-        padding: 14px;
+        padding: 5px 8px 6px 8px;
     }
     .global-upload-progress {
-        height: 10px;
-        border-radius: 6px;
-        background-color: #f1f5f9;
+        height: 4px;
+        border-radius: 4px;
+        background-color: rgba(255, 255, 255, 0.15);
         overflow: hidden;
+        margin-bottom: 4px;
     }
     .global-upload-progress .progress-bar {
         background: linear-gradient(90deg, #0284c7 0%, #38bdf8 100%);
         transition: width 0.3s ease;
     }
 
-    /* 📱 RESPONSIVE MOBILE STYLING: Di atas navbar bawah HP agar tidak bertabrakan */
+    /* 📱 RESPONSIVE MOBILE STYLING: Di pojok kanan atas, ultra-compact */
     @media (max-width: 767.98px) {
         .global-upload-widget {
-            bottom: calc(68px + env(safe-area-inset-bottom, 0px)) !important;
-            right: 12px;
-            left: 12px;
-            width: auto;
-            max-width: calc(100vw - 24px);
-            border-radius: 14px;
+            top: calc(52px + env(safe-area-inset-top, 0px)) !important;
+            right: 8px !important;
+            bottom: auto !important;
+            left: auto !important;
+            width: 200px !important;
+            max-width: calc(100vw - 16px) !important;
+            border-radius: 12px !important;
         }
         .global-upload-widget.minimized {
-            left: auto;
-            right: 12px;
-            bottom: calc(66px + env(safe-area-inset-bottom, 0px)) !important;
-            width: auto;
-            min-width: 190px;
-            max-width: calc(100vw - 24px);
-            border-radius: 20px;
+            width: auto !important;
+            min-width: 130px !important;
+            border-radius: 14px !important;
         }
     }
 </style>
 
 <div id="globalUploadWidget" class="global-upload-widget shadow-lg" style="display: none;">
     <div class="global-upload-header" onclick="GlobalPackingUploader.toggleMinimize()">
-        <div class="upload-title text-truncate mr-2">
+        <div class="upload-title text-truncate mr-1">
             <span class="live-pulse-dot" id="globalUploadPulse"></span>
-            <span id="globalUploadHeaderTitle">Upload Video Packing</span>
-            <span class="badge badge-info ml-2 px-1.5 py-0.5 text-xs font-weight-bold" id="globalUploadCountBadge" style="display: none;">1</span>
+            <span id="globalUploadHeaderTitle">Upload Video</span>
+            <span class="badge badge-info ml-1 px-1 py-0.5 text-xs font-weight-bold" id="globalUploadCountBadge" style="display: none; font-size: 8.5px;">1</span>
         </div>
         <div class="d-flex align-items-center" onclick="event.stopPropagation()">
-            <button type="button" class="btn btn-link text-white-50 p-0 mr-2" id="globalUploadMinimizeBtn" onclick="GlobalPackingUploader.toggleMinimize()" title="Perkecil / Perbesar">
-                <i class="fas fa-minus text-xs"></i>
+            <button type="button" class="btn btn-link text-white-50 p-0 mr-1" id="globalUploadMinimizeBtn" onclick="GlobalPackingUploader.toggleMinimize()" title="Perkecil / Perbesar">
+                <i class="fas fa-minus" style="font-size: 9px;"></i>
             </button>
             <button type="button" class="btn btn-link text-white-50 p-0" id="globalUploadCloseBtn" onclick="GlobalPackingUploader.closeWidget()" title="Tutup" style="display: none;">
-                <i class="fas fa-times text-xs"></i>
+                <i class="fas fa-times" style="font-size: 9px;"></i>
             </button>
         </div>
     </div>
     
     <div class="upload-widget-body" id="globalUploadBody">
         <div class="d-flex justify-content-between align-items-center mb-1">
-            <div class="text-truncate mr-2">
-                <strong class="text-dark text-sm" id="globalUploadOrderSn">SPXID...</strong>
-                <span class="badge badge-light border text-muted ml-1" id="globalUploadOrderTag" style="font-size: 10px;">-</span>
+            <div class="text-truncate mr-1" style="max-width: 125px;">
+                <strong class="text-white text-xs" id="globalUploadOrderSn" style="font-size: 10px;">SPXID...</strong>
+                <span class="badge badge-secondary border-0 text-white ml-1" id="globalUploadOrderTag" style="font-size: 8px; display: none;">-</span>
             </div>
-            <span class="badge badge-primary font-weight-bold text-xs px-2 py-1" id="globalUploadPercentBadge">0%</span>
+            <span class="badge badge-primary font-weight-bold px-1.5 py-0.5" id="globalUploadPercentBadge" style="font-size: 9px; border-radius: 6px;">0%</span>
         </div>
 
-        <div class="progress global-upload-progress mb-2">
+        <div class="progress global-upload-progress mb-1">
             <div class="progress-bar progress-bar-striped progress-bar-animated" id="globalUploadProgressBar" style="width: 0%;"></div>
         </div>
 
-        <div class="d-flex justify-content-between align-items-center text-xs text-muted">
-            <span id="globalUploadSizeText"><i class="fas fa-file-video mr-1 text-primary"></i> 0.0 MB / 0.0 MB</span>
+        <div class="d-flex justify-content-between align-items-center" style="font-size: 9px; color: #94a3b8;">
+            <span id="globalUploadSizeText"><i class="fas fa-file-video mr-1 text-info"></i> 0.0 / 0.0 MB</span>
             <span id="globalUploadDurationText"><i class="fas fa-clock mr-1"></i> 0s</span>
         </div>
 
         <!-- Failure Action View -->
-        <div id="globalUploadFailedView" class="mt-2 pt-2 border-top text-xs" style="display: none;">
-            <div class="text-danger font-weight-bold mb-2" id="globalUploadErrorMsg">
+        <div id="globalUploadFailedView" class="mt-1 pt-1 border-top border-secondary" style="display: none;">
+            <div class="text-danger font-weight-bold mb-1" id="globalUploadErrorMsg" style="font-size: 9px;">
                 <i class="fas fa-exclamation-triangle mr-1"></i> Upload terputus.
             </div>
             <div class="d-flex justify-content-between align-items-center">
-                <button type="button" class="btn btn-xs btn-outline-danger" onclick="GlobalPackingUploader.cancelCurrentJob()" title="Hapus dari antrean agar hemat memori HP">
-                    <i class="fas fa-trash-alt mr-1"></i> Hapus Video
+                <button type="button" class="btn btn-xs btn-outline-danger py-0 px-1" onclick="GlobalPackingUploader.cancelCurrentJob()" title="Hapus dari antrean" style="font-size: 8.5px;">
+                    <i class="fas fa-trash-alt mr-1"></i> Hapus
                 </button>
-                <button type="button" class="btn btn-xs btn-primary font-weight-bold" onclick="GlobalPackingUploader.retryCurrentJob()">
+                <button type="button" class="btn btn-xs btn-primary font-weight-bold py-0 px-2" onclick="GlobalPackingUploader.retryCurrentJob()" style="font-size: 8.5px;">
                     <i class="fas fa-redo mr-1"></i> Coba Lagi
                 </button>
             </div>
@@ -625,7 +626,7 @@
             if (headerTitle) {
                 headerTitle.innerText = widget.classList.contains('minimized') 
                     ? `[${job.percent || 0}%] ${job.tracking_number || job.order_sn}`
-                    : 'Mengunggah Video Packing';
+                    : `Upload Video (${job.percent || 0}%)`;
             }
 
             const orderSnEl = document.getElementById('globalUploadOrderSn');
@@ -638,7 +639,7 @@
 
             const percentBadge = document.getElementById('globalUploadPercentBadge');
             if (percentBadge) {
-                percentBadge.className = 'badge badge-primary font-weight-bold text-xs px-2 py-1';
+                percentBadge.className = 'badge badge-primary font-weight-bold px-1.5 py-0.5';
                 percentBadge.innerText = `${job.percent || 0}%`;
             }
 
@@ -650,7 +651,7 @@
 
             const sizeText = document.getElementById('globalUploadSizeText');
             if (sizeText) {
-                sizeText.innerHTML = `<i class="fas fa-file-video mr-1 text-primary"></i> ${job.loadedMB || '0.0'} MB / ${job.totalMB || '0.0'} MB`;
+                sizeText.innerHTML = `<i class="fas fa-file-video mr-1 text-info"></i> ${job.loadedMB || '0.0'} / ${job.totalMB || '0.0'} MB`;
             }
 
             const durText = document.getElementById('globalUploadDurationText');
@@ -673,11 +674,11 @@
             if (pulse) pulse.className = 'live-pulse-dot success';
 
             const headerTitle = document.getElementById('globalUploadHeaderTitle');
-            if (headerTitle) headerTitle.innerText = 'Video Berhasil Tersimpan';
+            if (headerTitle) headerTitle.innerText = 'Tersimpan ✓';
 
             const percentBadge = document.getElementById('globalUploadPercentBadge');
             if (percentBadge) {
-                percentBadge.className = 'badge badge-success font-weight-bold text-xs px-2 py-1';
+                percentBadge.className = 'badge badge-success font-weight-bold px-1.5 py-0.5';
                 percentBadge.innerHTML = '<i class="fas fa-check mr-1"></i> 100%';
             }
 
@@ -690,13 +691,13 @@
             const closeBtn = document.getElementById('globalUploadCloseBtn');
             if (closeBtn) closeBtn.style.display = 'inline-block';
 
-            // Auto-hide widget setelah 4 detik jika antrean sudah bersih
+            // Auto-hide widget setelah 2.5 detik jika antrean sudah bersih
             setTimeout(async () => {
                 const remaining = await this.getAllJobs();
                 if (remaining.length === 0) {
                     widget.style.display = 'none';
                 }
-            }, 4000);
+            }, 2500);
         },
 
         updateUIFailed(job) {
