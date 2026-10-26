@@ -278,6 +278,47 @@
         }
     }
 
+    /* 📱 FULLSCREEN VIEWFINDER MODE */
+    .video-preview-wrapper.cam-fullscreen {
+        position: fixed !important;
+        top: 0 !important;
+        left: 0 !important;
+        right: 0 !important;
+        bottom: 0 !important;
+        width: 100vw !important;
+        height: 100dvh !important;
+        max-height: none !important;
+        z-index: 1040 !important;
+        border-radius: 0 !important;
+        margin: 0 !important;
+        background: #000 !important;
+    }
+    .video-preview-wrapper.cam-fullscreen video#cameraPreview {
+        width: 100% !important;
+        height: 100% !important;
+        object-fit: cover !important;
+    }
+    .video-preview-wrapper.cam-fullscreen .mobile-cam-header {
+        padding-top: calc(12px + env(safe-area-inset-top, 0px));
+        padding-left: 16px;
+        padding-right: 16px;
+    }
+    .video-preview-wrapper.cam-fullscreen .mobile-cam-reticle-box {
+        width: min(82vw, 320px);
+        height: min(55vw, 200px);
+    }
+    .cam-fullscreen-active-card {
+        z-index: 1045 !important;
+    }
+
+    /* Ensure all modals open cleanly above fullscreen camera (1040) and backdrop (1050) */
+    .modal {
+        z-index: 1060 !important;
+    }
+    .modal-backdrop {
+        z-index: 1050 !important;
+    }
+
     /* Floating Background Upload Indicator */
     .floating-upload-pill {
         position: fixed;
@@ -429,6 +470,9 @@
                             </span>
 
                             <div class="d-flex align-items-center">
+                                <button type="button" class="btn-cam-glass mr-2" id="mobileFullscreenBtn" onclick="toggleCameraFullscreen()" title="Layar Penuh HP">
+                                    <i class="fas fa-expand" id="mobileFullscreenIcon"></i>
+                                </button>
                                 <button type="button" class="btn-cam-glass mr-2 position-relative" onclick="openGalleryModal()" title="Galeri Video & Antrean">
                                     <i class="fas fa-photo-video"></i>
                                     <span class="badge badge-warning position-absolute" id="mobileHeaderActiveUploadBadge" style="top: -4px; right: -4px; font-size: 9px; padding: 2px 4px; display: none;">0</span>
@@ -970,11 +1014,49 @@
         if (!isScanningActive) return false;
         if (isCheckingOrder) return false;
         if (isScannerLocked) return false;
-        if (currentOrderData !== null) return false;
-        if (typeof Swal !== 'undefined' && Swal.isVisible()) return false;
-        if (document.querySelector('.modal.show')) return false;
+        // Jangan scan saat sedang aktif merekam video packing agar rekaman tidak terganggu
+        if (mediaRecorder && mediaRecorder.state === 'recording') return false;
+        // Dialog pemblokir (bukan toast)
+        if (isBlockingDialogVisible()) return false;
         if (document.activeElement && (document.activeElement.id === 'mobileManualResiInput' || document.activeElement.id === 'packerNameInput')) return false;
         return true;
+    }
+
+    function isBlockingDialogVisible() {
+        if (typeof Swal !== 'undefined' && Swal.isVisible()) {
+            const popup = Swal.getPopup();
+            if (popup && !popup.classList.contains('swal2-toast')) {
+                return true;
+            }
+        }
+        // Jangan blokir scanner jika hanya productPhotoPopupModal yang terbuka (agar langsung otomatis ganti paket)
+        const openModals = document.querySelectorAll('.modal.show');
+        for (const m of openModals) {
+            if (m.id !== 'productPhotoPopupModal') {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    function toggleCameraFullscreen() {
+        const wrapper = document.getElementById('cameraWrapper');
+        const icon = document.getElementById('mobileFullscreenIcon');
+        if (!wrapper) return;
+
+        const isFull = wrapper.classList.toggle('cam-fullscreen');
+        if (icon) {
+            icon.className = isFull ? 'fas fa-compress' : 'fas fa-expand';
+        }
+
+        const mActiveCard = document.getElementById('mobileActiveOrderCard');
+        if (mActiveCard) {
+            if (isFull) {
+                mActiveCard.classList.add('cam-fullscreen-active-card');
+            } else {
+                mActiveCard.classList.remove('cam-fullscreen-active-card');
+            }
+        }
     }
 
     // Polyfill BarcodeDetector with ZBar WebAssembly on iOS Safari if native API is absent
@@ -1239,7 +1321,7 @@
                 let lastDetectTime = 0;
                 const scanLoop = async () => {
                     const now = Date.now();
-                    if (isScannerReady() && !isDetectingFrame && videoElement.readyState >= 2 && videoElement.videoWidth > 0 && (now - lastDetectTime >= 200)) {
+                    if (isScannerReady() && !isDetectingFrame && videoElement.readyState >= 2 && videoElement.videoWidth > 0 && (now - lastDetectTime >= 60)) {
                         lastDetectTime = now;
                         isDetectingFrame = true;
                         try {
@@ -1291,7 +1373,7 @@
                 let lastDetectTime = 0;
                 const zxingScanLoop = async () => {
                     const now = Date.now();
-                    if (isScannerReady() && !isDetectingFrame && videoElement.readyState >= 2 && videoElement.videoWidth > 0 && (now - lastDetectTime >= 200)) {
+                    if (isScannerReady() && !isDetectingFrame && videoElement.readyState >= 2 && videoElement.videoWidth > 0 && (now - lastDetectTime >= 75)) {
                         lastDetectTime = now;
                         isDetectingFrame = true;
                         try {
@@ -1299,7 +1381,7 @@
                                 scanCanvas = document.createElement('canvas');
                                 scanCtx = scanCanvas.getContext('2d', { willReadFrequently: true });
                             }
-                            const w = Math.min(videoElement.videoWidth, 1280);
+                            const w = Math.min(videoElement.videoWidth, 640);
                             const h = Math.round(videoElement.videoHeight * (w / videoElement.videoWidth));
                             if (scanCanvas.width !== w || scanCanvas.height !== h) {
                                 scanCanvas.width = w;
@@ -1360,32 +1442,86 @@
         }
     }
 
+    function extractTrackingFromRaw(code) {
+        let s = (code || '').trim();
+        if (!s) return '';
+        // If URL (e.g. SPX/Shopee QR code)
+        if (s.startsWith('http://') || s.startsWith('https://')) {
+            try {
+                const u = new URL(s);
+                const p = u.searchParams;
+                const track = p.get('tracking_number') || p.get('resi') || p.get('awb') || p.get('order_sn') || p.get('sn');
+                if (track) return track.trim();
+                const segs = u.pathname.split('/').filter(Boolean);
+                if (segs.length > 0) {
+                    const last = segs[segs.length - 1];
+                    if (/^(SPXID[A-Z0-9]+|JP\d+|JX\d+|JT\d+|TKP\d+|\d{10,})$/i.test(last)) {
+                        return last.trim();
+                    }
+                }
+            } catch(e) {}
+        }
+        // If contains pipe or semicolon or newline
+        if (/[|;\n\r\t]/.test(s)) {
+            const parts = s.split(/[|;\n\r\t]+/);
+            for (const part of parts) {
+                const trimmed = part.trim();
+                if (/^(SPXID[A-Z0-9]+|JP\d+|JX\d+|JT\d+|TKP\d+|\d{10,})$/i.test(trimmed)) {
+                    return trimmed;
+                }
+            }
+        }
+        // Regex extract if embedded in arbitrary text
+        const courierMatch = s.match(/\b(SPXID[A-Z0-9]{8,}|JP\d{10,}|JX\d{10,}|JT\d{10,}|TKP\d{10,})\b/i);
+        if (courierMatch) {
+            return courierMatch[1].trim();
+        }
+        return s.replace(/[^a-zA-Z0-9\-_]/g, '').trim();
+    }
+
     function onDetectedBarcode(rawCode) {
         if (!isScannerReady()) {
             return;
         }
 
-        const cleanCode = (rawCode || '').trim();
+        const cleanCode = extractTrackingFromRaw(rawCode);
         if (!cleanCode || cleanCode.length < 3) {
             return;
         }
 
         const now = Date.now();
 
-        // 1. Minimum global interval between ANY scan attempt (prevents alternating barcodes on the same shipping label)
-        if (now - lastAnyScanTime < 2000) {
+        // 🚀 AUTO-SWITCH RESI: Jika sedang ada order di layar dan user scan paket BARU:
+        if (currentOrderData) {
+            const activeTracking = (currentOrderData.tracking_number || '').trim().toLowerCase();
+            const activeSn = (currentOrderData.order_sn || '').trim().toLowerCase();
+            const target = cleanCode.toLowerCase();
+            if (target === activeTracking || target === activeSn) {
+                // Barcode resi yang sama masih di depan kamera, abaikan agar tidak spam
+                return;
+            }
+
+            // Paket BARU terdeteksi! Langsung tutup modal lama dan muat paket baru secara instan
+            console.log('Paket baru terdeteksi via scan kamera, beralih ke:', cleanCode);
+            $('#productPhotoPopupModal').modal('hide');
+            $('#alreadyPackedModal').modal('hide');
+            $('#cancelledOrderModal').modal('hide');
+        }
+
+        // 1. Minimum global interval between ANY scan attempt (400ms untuk respon instan)
+        if (now - lastAnyScanTime < 400) {
             return;
         }
 
-        // 2. Per-code throttle: minimum 4 seconds for the exact same code
+        // 2. Per-code throttle: jeda 3.5 detik hanya jika barcode sama persis
         const lastTimeThisCode = scannedCodeCooldownMap.get(cleanCode) || 0;
-        if (now - lastTimeThisCode < 4000) {
+        if (now - lastTimeThisCode < 3500) {
             return;
         }
 
-        // 3. Failed codes cache: minimum 8 seconds cooldown for codes that failed previously
+        // 3. Failed codes cache: jeda 4 detik untuk kode yang gagal sebelumnya
         const lastFailedTime = failedCodesCache.get(cleanCode) || 0;
-        if (now - lastFailedTime < 8000) {
+        if (now - lastFailedTime < 4000) {
             return;
         }
 
@@ -1395,10 +1531,13 @@
         lastScanTime = now;
         scannedCodeCooldownMap.set(cleanCode, now);
 
+        // Feedback audio instan: bunyi "tit!" pendek konfirmasi deteksi
+        playBeep(1200, 'sine', 0.08);
+
         const reticle = document.getElementById('mobileCamReticle');
         if (reticle) {
             reticle.classList.add('reticle-detected');
-            setTimeout(() => reticle.classList.remove('reticle-detected'), 600);
+            setTimeout(() => reticle.classList.remove('reticle-detected'), 500);
         }
 
         const input = document.getElementById('barcodeInput');
@@ -1505,8 +1644,8 @@
                 isScannerLocked = true;
             } else if (data.status === 'ready') {
                 currentOrderData = data;
-                // Scanner tetap terkunci selama order aktif sedang dikerjakan
-                isScannerLocked = true;
+                // Scanner dibiarkan tetap aktif agar staf bisa langsung scan paket berikutnya tanpa menekan "Ganti Resi"
+                isScannerLocked = false;
 
                 if (data.already_packed) {
                     // ⚠️ WARNING: ALREADY PACKED PREVIOUSLY
@@ -1525,7 +1664,7 @@
                 $('#alreadyPackedModal').modal('hide');
                 playAlarmSound();
 
-                // Simpan kode gagal ke cache selama 8 detik
+                // Simpan kode gagal ke cache selama 4 detik
                 failedCodesCache.set(query, Date.now());
                 isScannerLocked = true;
 
@@ -1539,15 +1678,15 @@
                     allowEscapeKey: true
                 });
 
-                // Beri jeda 2 detik setelah notifikasi ditutup agar staf sempat memindahkan paket
+                // Buka kembali scanner setelah notifikasi ditutup
                 setTimeout(() => {
-                    if (currentOrderData === null && !document.querySelector('.modal.show') && !(typeof Swal !== 'undefined' && Swal.isVisible())) {
+                    if (currentOrderData === null && !isBlockingDialogVisible()) {
                         isScannerLocked = false;
                         if (!isMobileDevice && input) {
                             input.select();
                         }
                     }
-                }, 2000);
+                }, 600);
             }
         } catch (err) {
             console.error('Error saat memeriksa data pesanan:', err);
@@ -1855,15 +1994,15 @@
             bInput.blur();
         }
 
-        // Beri jeda 1.5 detik sebelum scanner aktif kembali agar tidak langsung men-scan frame transisi
+        // Beri jeda 400ms sebelum scanner aktif kembali agar transisi mulus
         setTimeout(() => {
-            if (currentOrderData === null && !document.querySelector('.modal.show') && !(typeof Swal !== 'undefined' && Swal.isVisible())) {
+            if (currentOrderData === null && !isBlockingDialogVisible()) {
                 isScanningActive = true;
                 isScannerLocked = false;
                 const dBadge = document.getElementById('cameraModeBadge');
                 if (dBadge) dBadge.innerHTML = `<i class="fas fa-qrcode mr-1"></i> Auto-Scan (${scanEngineName})`;
             }
-        }, 1500);
+        }, 400);
 
         // 📱 RESET MOBILE FULLSCREEN OVERLAY
         const mActiveCard = document.getElementById('mobileActiveOrderCard');
@@ -2986,18 +3125,26 @@
         if (isMobileDevice) {
             const bInput = document.getElementById('barcodeInput');
             if (bInput) bInput.setAttribute('inputmode', 'none');
+
+            // 📱 Auto Fullscreen Mode di Ponsel agar area pandang scanner luas dan leluasa
+            const wrapper = document.getElementById('cameraWrapper');
+            if (wrapper) {
+                wrapper.classList.add('cam-fullscreen');
+                const icon = document.getElementById('mobileFullscreenIcon');
+                if (icon) icon.className = 'fas fa-compress';
+            }
         } else {
             const bInput = document.getElementById('barcodeInput');
             if (bInput) bInput.focus();
         }
 
-        // Buka kunci scanner saat modal ditutup (jika tidak ada order aktif)
+        // Buka kunci scanner saat modal ditutup
         $(document).on('hidden.bs.modal', '.modal', function () {
             setTimeout(() => {
-                if (currentOrderData === null && !document.querySelector('.modal.show') && !(typeof Swal !== 'undefined' && Swal.isVisible())) {
+                if (!isBlockingDialogVisible()) {
                     isScannerLocked = false;
                 }
-            }, 800);
+            }, 300);
         });
     });
 
