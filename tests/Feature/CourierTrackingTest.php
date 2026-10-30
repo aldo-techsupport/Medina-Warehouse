@@ -345,4 +345,29 @@ test('it displays direct packing video action and modal in courier tracking with
     $jsonNoVid->assertStatus(200);
     $jsonNoVid->assertJsonPath('data.has_video', false);
     $jsonNoVid->assertJsonPath('data.packing_record', null);
+    $jsonNoVid->assertJsonPath('data.tracking_timeline', []);
+});
+
+test('it returns tracking_timeline in show json endpoint when tracking data exists', function () {
+    $timeline = [
+        ['ctime' => 1730000000, 'description' => 'Paket telah di-pickup SPX Express', 'logistics_status' => 'LOGISTICS_PICKUP_DONE'],
+        ['ctime' => 1730010000, 'description' => 'Paket sedang menuju Hub Sortir', 'logistics_status' => 'LOGISTICS_DELIVERY_IN_PROCESS'],
+    ];
+
+    $order = ShopeeOrder::create([
+        'order_sn' => 'ORD_TIMELINE_TEST_01',
+        'tracking_number' => 'SPXID_TIMELINE_01',
+        'shipping_carrier' => 'SPX Express',
+        'order_status' => 'PROCESSED',
+        'total_amount' => 95000,
+        'buyer_username' => 'buyer_timeline',
+        'tracking_data' => $timeline,
+    ]);
+
+    $response = $this->actingAs($this->adminUser)->getJson(route('courier.show', $order));
+
+    $response->assertStatus(200);
+    $response->assertJsonPath('data.tracking_number', 'SPXID_TIMELINE_01');
+    $response->assertJsonPath('data.tracking_timeline', $timeline);
+    $response->assertJsonCount(2, 'data.tracking_timeline');
 });

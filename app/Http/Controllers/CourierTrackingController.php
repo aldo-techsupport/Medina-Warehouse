@@ -233,6 +233,7 @@ class CourierTrackingController extends Controller
                     'total_amount' => $order->total_amount,
                     'formatted_amount' => 'Rp '.number_format((float) $order->total_amount, 0, ',', '.'),
                     'items_data' => $order->items_data ?? [],
+                    'tracking_timeline' => $order->tracking_data ?? [],
                     'days_in_transit' => $order->days_in_transit,
                     'is_delayed_5_days' => $order->isDelayed(5),
                     'created_at' => $order->created_at->format('d M Y, H:i'),

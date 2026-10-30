@@ -824,9 +824,14 @@
                         `;
                     });
                 } else {
+                    const noResiNote = (!d.tracking_number || d.tracking_number === 'Belum ada resi')
+                        ? 'Pesanan belum memiliki nomor resi / belum diatur pengirimannya di Shopee.'
+                        : 'Paket sedang menunggu penjemputan atau scan pertama oleh kurir ' + (d.shipping_carrier || '') + '.';
                     timelineHtml = `
                         <div class="text-muted text-xs p-3 bg-light rounded border text-center">
-                            Belum ada riwayat pelacakan kurir yang tercatat.
+                            <i class="fas fa-box-open text-secondary mb-2 fa-2x d-block"></i>
+                            <div class="font-weight-semibold text-dark mb-1">Belum ada riwayat pelacakan kurir yang tercatat.</div>
+                            <small class="text-secondary d-block">${noResiNote}</small>
                         </div>
                     `;
                 }
@@ -950,12 +955,9 @@
                         <div class="col-12 col-md-6 pl-md-3">
                             <div class="d-flex justify-content-between align-items-center mb-3">
                                 <h6 class="font-weight-bold text-dark mb-0">Riwayat Pengiriman</h6>
-                                <form action="/courier-tracking/sync/${d.id}" method="POST" class="d-inline">
-                                    <input type="hidden" name="_token" value="${$('meta[name="csrf-token"]').attr('content')}">
-                                    <button type="submit" class="btn btn-xs btn-outline-primary font-weight-bold">
-                                        Perbarui
-                                    </button>
-                                </form>
+                                <button type="button" class="btn btn-xs btn-outline-primary font-weight-bold" id="btnSyncTracking_${d.id}" onclick="syncSingleTracking(${d.id})">
+                                    <i class="fas fa-rotate mr-1"></i> Perbarui
+                                </button>
                             </div>
                             <div class="timeline-wrapper-shopee">
                                 ${timelineHtml}
@@ -970,6 +972,50 @@
                         Gagal memuat rincian paket.
                     </div>
                 `);
+            }
+        });
+    }
+
+    function syncSingleTracking(orderId) {
+        const btn = $(`#btnSyncTracking_${orderId}`);
+        const originalText = btn.html();
+        btn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin mr-1"></i> Memperbarui...');
+
+        $.ajax({
+            url: `/courier-tracking/sync/${orderId}`,
+            method: 'POST',
+            headers: {
+                'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content'),
+                'X-Requested-With': 'XMLHttpRequest',
+                'Accept': 'application/json'
+            },
+            success: function(res) {
+                openPackageDetailModal(orderId);
+                if (typeof Swal !== 'undefined') {
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Tracking Diperbarui',
+                        text: res.message || 'Status tracking berhasil disinkronkan.',
+                        timer: 2500,
+                        showConfirmButton: false,
+                        toast: true,
+                        position: 'top-end'
+                    });
+                }
+            },
+            error: function(xhr) {
+                btn.prop('disabled', false).html(originalText);
+                const err = xhr.responseJSON?.message || 'Gagal memperbarui tracking dari Shopee.';
+                if (typeof Swal !== 'undefined') {
+                    Swal.fire({
+                        icon: 'warning',
+                        title: 'Informasi Tracking',
+                        text: err,
+                        confirmButtonColor: '#2563eb'
+                    });
+                } else {
+                    alert(err);
+                }
             }
         });
     }
