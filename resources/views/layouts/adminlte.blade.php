@@ -753,13 +753,13 @@
 
                         <div class="form-group">
                             <label class="font-weight-semibold" id="mutationQtyLabel">Jumlah Unit <span class="text-danger">*</span></label>
-                            <input type="number" name="qty" class="form-control" placeholder="Contoh: 10" required min="1">
+                            <input type="number" name="qty" class="form-control" placeholder="" required min="1">
                             <small class="text-muted" id="mutationQtyHelp">Masukkan jumlah unit yang masuk / keluar.</small>
                         </div>
 
                         <div class="form-group">
                             <label class="font-weight-semibold">Catatan / Keterangan</label>
-                            <input type="text" name="notes" class="form-control" placeholder="Contoh: Restock Supplier PT ABC / Sample Display">
+                            <input type="text" name="notes" class="form-control" placeholder="">
                         </div>
 
                         <div class="form-group">
@@ -827,7 +827,7 @@
 
                         <div class="form-group">
                             <label class="font-weight-semibold">Nama Akun Pembeli Shopee</label>
-                            <input type="text" name="buyer_username" class="form-control" placeholder="Contoh: anita_shopee99">
+                            <input type="text" name="buyer_username" class="form-control" placeholder="">
                         </div>
                     </div>
                     <div class="modal-footer bg-light">
@@ -1155,17 +1155,24 @@
             }
         });
 
-        // Shopee Background Active Orders Auto-Sync (Runs quietly every 60s / 1 minute)
+        // Real-Time OpenShopee API Delta Sync (Runs quietly every 15s + triggers instant notification chime on new orders)
         @auth
         function triggerBackgroundShopeeSync() {
             if (document.visibilityState === 'visible') {
                 fetch('{{ route("shopee.bg-sync") }}', { 
-                    headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                    headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' },
                     credentials: 'same-origin'
-                }).catch(() => {});
+                })
+                .then(res => res.ok ? res.json() : null)
+                .then(payload => {
+                    if (payload && (payload.orders_synced > 0 || payload.products_synced > 0)) {
+                        fetchLiveNotifications(true);
+                    }
+                })
+                .catch(() => {});
             }
         }
-        setInterval(triggerBackgroundShopeeSync, 60000); // Every 60 seconds (1 minute delay)
+        setInterval(triggerBackgroundShopeeSync, 15000);
         @endauth
     });
 </script>

@@ -35,4 +35,10 @@ return [
         ],
     ],
 
+    'openshopee' => [
+        'url' => env('OPENSHOPEE_API_URL', 'http://127.0.0.1:8001'),
+        'api_key' => env('OPENSHOPEE_API_KEY', ''),
+        'timeout' => (int) env('OPENSHOPEE_API_TIMEOUT', 20),
+    ],
+
 ];

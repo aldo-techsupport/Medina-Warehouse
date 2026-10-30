@@ -85,6 +85,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->validateCsrfTokens(except: [
             'shopee/webhook',
             'api/shopee/webhook',
+            'api/shopee-bridge/webhook',
         ]);
 
         $middleware->redirectTo(

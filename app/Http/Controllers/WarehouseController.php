@@ -29,11 +29,16 @@ class WarehouseController extends Controller
     public function products(Request $request)
     {
         $setting = ShopeeSetting::current();
-        if ($setting->isConnected() && $request->boolean('refresh')) {
+        if ($setting->hasApiBridge()) {
+            $this->shopeeService->syncGatewayStatus($request->boolean('refresh'));
+            $setting->refresh();
+        }
+
+        if ($setting->isConnected()) {
             try {
-                $this->shopeeService->syncLiveProductsIfStale(0, $this->mutationService, true);
+                $this->shopeeService->syncLiveProductsIfStale(15, $this->mutationService, $request->boolean('refresh'));
             } catch (Exception $e) {
-                Log::warning('Manual live sync products: '.$e->getMessage());
+                Log::warning('Live sync products warning: '.$e->getMessage());
             }
         }
 

@@ -10,17 +10,17 @@ class ShopeeSetting extends Model
     use HasFactory;
 
     protected $fillable = [
-        'partner_id',
-        'partner_key',
+        'api_url',
+        'api_key',
         'shop_id',
         'shop_name',
-        'access_token',
-        'refresh_token',
-        'expire_in',
         'token_expires_at',
         'is_active',
+        'remote_connected',
         'auto_sync_stock',
         'environment',
+        'remote_auth_url',
+        'remote_dashboard_url',
         'last_synced_at',
     ];
 
@@ -28,10 +28,10 @@ class ShopeeSetting extends Model
     {
         return [
             'is_active' => 'boolean',
+            'remote_connected' => 'boolean',
             'auto_sync_stock' => 'boolean',
             'token_expires_at' => 'datetime',
             'last_synced_at' => 'datetime',
-            'partner_id' => 'integer',
             'shop_id' => 'integer',
         ];
     }
@@ -46,23 +46,49 @@ class ShopeeSetting extends Model
         return static::firstOrCreate(
             ['id' => 1],
             [
-                'partner_id' => null,
-                'partner_key' => null,
+                'api_url' => null,
+                'api_key' => null,
                 'shop_id' => null,
-                'shop_name' => 'Medina Official Store',
+                'shop_name' => null,
                 'is_active' => true,
+                'remote_connected' => false,
                 'auto_sync_stock' => true,
                 'environment' => 'sandbox',
             ]
         );
     }
 
+    public function getApiUrl(): string
+    {
+        $url = trim((string) ($this->api_url ?: config('services.openshopee.url', '')));
+
+        return rtrim($url, '/');
+    }
+
+    public function getApiKey(): string
+    {
+        return trim((string) ($this->api_key ?: config('services.openshopee.api_key', '')));
+    }
+
+    public function hasApiBridge(): bool
+    {
+        return $this->getApiUrl() !== '' && $this->getApiKey() !== '';
+    }
+
+    public function getDashboardUrl(): string
+    {
+        if (! empty($this->remote_dashboard_url)) {
+            return (string) $this->remote_dashboard_url;
+        }
+
+        $base = $this->getApiUrl();
+
+        return $base !== '' ? $base.'/dashboard' : '';
+    }
+
     public function isConnected(): bool
     {
-        return ! empty($this->partner_id)
-            && ! empty($this->partner_key)
-            && ! empty($this->access_token)
-            && ! str_starts_with((string) $this->access_token, 'sample_');
+        return $this->is_active && $this->remote_connected && $this->hasApiBridge();
     }
 
     public function isTokenExpired(): bool
@@ -77,6 +103,6 @@ class ShopeeSetting extends Model
 
     public function isSandbox(): bool
     {
-        return $this->environment === 'sandbox';
+        return $this->environment !== 'production';
     }
 }

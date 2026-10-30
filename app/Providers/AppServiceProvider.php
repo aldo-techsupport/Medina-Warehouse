@@ -3,6 +3,7 @@
 namespace App\Providers;
 
 use App\Models\ShopeeSetting;
+use App\Services\ShopeeService;
 use Illuminate\Pagination\Paginator;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\ServiceProvider;
@@ -14,7 +15,7 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        $this->app->singleton(ShopeeService::class, fn () => new ShopeeService(null));
     }
 
     public function boot(): void

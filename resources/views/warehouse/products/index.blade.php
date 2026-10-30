@@ -309,11 +309,11 @@
                                             <p class="text-muted text-xs">Hubungkan <strong>[{{ $product->sku }}] {{ $product->name }}</strong> dengan Item ID Shopee.</p>
                                             <div class="form-group">
                                                 <label class="text-sm">Shopee Item ID <span class="text-danger">*</span></label>
-                                                <input type="number" name="shopee_item_id" class="form-control form-control-sm" placeholder="Contoh: 23145678901" required>
+                                                <input type="number" name="shopee_item_id" class="form-control form-control-sm" placeholder="" required>
                                             </div>
                                             <div class="form-group">
                                                 <label class="text-sm">Shopee Model ID (Opsional jika variasi)</label>
-                                                <input type="number" name="shopee_model_id" class="form-control form-control-sm" placeholder="Kosongkan jika bukan variasi">
+                                                <input type="number" name="shopee_model_id" class="form-control form-control-sm" placeholder="">
                                             </div>
                                         </div>
                                         <div class="modal-footer bg-light py-2">
@@ -404,7 +404,7 @@
 
                     <div class="form-group mb-0">
                         <label class="font-weight-semibold text-sm">Shopee Item ID (Opsional)</label>
-                        <input type="number" name="shopee_item_id" class="form-control form-control-sm" placeholder="Contoh: 25412984712">
+                        <input type="number" name="shopee_item_id" class="form-control form-control-sm" placeholder="">
                     </div>
                 </div>
                 <div class="modal-footer bg-light py-2">

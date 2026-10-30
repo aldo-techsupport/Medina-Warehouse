@@ -101,6 +101,7 @@ Route::middleware('auth')->group(function () {
         Route::middleware('menu:shopee_settings')->group(function () {
             Route::get('/settings', [ShopeeController::class, 'settings'])->name('settings');
             Route::post('/settings', [ShopeeController::class, 'updateSettings'])->name('settings.update');
+            Route::post('/settings/test-connection', [ShopeeController::class, 'testApiConnection'])->name('settings.test');
             Route::post('/settings/refresh-token', [ShopeeController::class, 'refreshToken'])->name('settings.refresh');
             Route::post('/settings/disconnect', [ShopeeController::class, 'disconnect'])->name('settings.disconnect');
             Route::get('/callback', [ShopeeController::class, 'handleCallback'])->name('callback');
@@ -126,5 +127,6 @@ Route::middleware('auth')->group(function () {
         ->middleware('menu:user_management');
 });
 
-// Public Shopee Webhook (CSRF excluded in bootstrap/app.php)
+// Public Real-Time Push Bridge Webhook from OpenShopee API (CSRF excluded in bootstrap/app.php)
+Route::post('/api/shopee-bridge/webhook', [ShopeeController::class, 'handleWebhook'])->name('shopee.bridge.webhook');
 Route::post('/shopee/webhook', [ShopeeController::class, 'handleWebhook'])->name('shopee.webhook');

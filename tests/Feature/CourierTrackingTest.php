@@ -197,50 +197,36 @@ test('it returns package details and tracking timeline as JSON for modal', funct
 
 test('it syncs tracking info using Shopee Logistics API according to Guide 4', function () {
     $this->setting->update([
-        'partner_id' => 123456,
-        'partner_key' => 'secret_key',
+        'api_url' => 'http://openshopee.test',
+        'api_key' => 'osk_test_courier_bridge_key',
         'shop_id' => 789012,
-        'access_token' => 'valid_token',
+        'remote_connected' => true,
         'token_expires_at' => now()->addHours(3),
     ]);
 
     Http::fake([
-        '*/api/v2/logistics/get_tracking_info*' => Http::response([
-            'response' => [
+        'http://openshopee.test/api/v1/logistics/sync-order-tracking*' => Http::response([
+            'success' => true,
+            'data' => [
+                'order_sn' => 'SYNC_LOGISTICS_API_TEST',
+                'tracking_number' => 'SPXID_API_123456',
                 'logistics_status' => 'LOGISTICS_DELIVERY_IN_PROCESS',
+                'recipient_address' => [
+                    'name' => 'Siti Aminah',
+                    'phone' => '081122334455',
+                    'town' => 'Dago',
+                    'district' => 'Coblong',
+                    'city' => 'Kota Bandung',
+                    'state' => 'Jawa Barat',
+                    'region' => 'ID',
+                    'zipcode' => '40135',
+                    'full_address' => 'Jl. Ir. H. Juanda No. 88, Dago, Coblong, Kota Bandung, Jawa Barat 40135',
+                ],
                 'tracking_info' => [
                     ['ctime' => time() - 3600, 'description' => 'Parcel handed to SPX Express Hub', 'logistics_status' => 'LOGISTICS_PICKUP_DONE'],
                     ['ctime' => time(), 'description' => 'Courier is delivering the parcel to buyer', 'logistics_status' => 'LOGISTICS_DELIVERY_IN_PROCESS'],
                 ],
             ],
-            'error' => '',
-        ], 200),
-        '*/api/v2/logistics/get_tracking_number*' => Http::response([
-            'response' => [
-                'tracking_number' => 'SPXID_API_123456',
-            ],
-            'error' => '',
-        ], 200),
-        '*/api/v2/order/get_order_detail*' => Http::response([
-            'response' => [
-                'order_list' => [
-                    [
-                        'order_sn' => 'SYNC_LOGISTICS_API_TEST',
-                        'recipient_address' => [
-                            'name' => 'Siti Aminah',
-                            'phone' => '081122334455',
-                            'town' => 'Dago',
-                            'district' => 'Coblong',
-                            'city' => 'Kota Bandung',
-                            'state' => 'Jawa Barat',
-                            'region' => 'ID',
-                            'zipcode' => '40135',
-                            'full_address' => 'Jl. Ir. H. Juanda No. 88, Dago, Coblong, Kota Bandung, Jawa Barat 40135',
-                        ],
-                    ],
-                ],
-            ],
-            'error' => '',
         ], 200),
     ]);
 

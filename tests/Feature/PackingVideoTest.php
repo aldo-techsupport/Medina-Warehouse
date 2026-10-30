@@ -470,7 +470,7 @@ test('it auto repairs webm video with offset ebml header on upload', function ()
     // Simulate offset EBML header: 100 bytes of garbage prefix followed by EBML header
     $garbage = str_repeat("\x00\xFF", 50);
     $ebmlHeader = "\x1a\x45\xdf\xa3\x9f\x42\x86\x81\x01\x42\xf7\x81\x01\x42\xf2\x81\x04\x42\xf3\x81\x08\x42\x82\x84webm";
-    $payload = $garbage . $ebmlHeader . str_repeat("\x1f\x43\xb6\x75", 10);
+    $payload = $garbage.$ebmlHeader.str_repeat("\x1f\x43\xb6\x75", 10);
 
     $tmp = tempnam(sys_get_temp_dir(), 'pest_ebml');
     file_put_contents($tmp, $payload);

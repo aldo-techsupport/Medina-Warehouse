@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Facades\Route;
 
 class Role extends Model
 {
@@ -147,7 +148,7 @@ class Role extends Model
                 return $target;
             }
 
-            if (\Illuminate\Support\Facades\Route::has($target)) {
+            if (Route::has($target)) {
                 return route($target);
             }
 
@@ -162,7 +163,7 @@ class Role extends Model
         // Fallback: find the first available menu route that this role has permission for
         foreach (self::SYSTEM_MENUS as $category => $menus) {
             foreach ($menus as $menuKey => $menu) {
-                if ($this->hasPermission($menuKey) && ! empty($menu['route']) && \Illuminate\Support\Facades\Route::has($menu['route'])) {
+                if ($this->hasPermission($menuKey) && ! empty($menu['route']) && Route::has($menu['route'])) {
                     return route($menu['route']);
                 }
             }
@@ -180,7 +181,7 @@ class Role extends Model
         foreach (self::SYSTEM_MENUS as $category => $menus) {
             foreach ($menus as $key => $menu) {
                 $route = $menu['route'] ?? '';
-                if ($route && \Illuminate\Support\Facades\Route::has($route)) {
+                if ($route && Route::has($route)) {
                     $url = parse_url(route($route), PHP_URL_PATH) ?: route($route);
                     $options[$category][] = [
                         'key' => $key,

@@ -31,9 +31,13 @@ class ShopeeSyncCommand extends Command
     public function handle(ShopeeService $shopeeService, StockMutationService $mutationService): int
     {
         $setting = ShopeeSetting::current();
+        if ($setting->hasApiBridge()) {
+            $shopeeService->syncGatewayStatus(true);
+            $setting->refresh();
+        }
 
         if (! $setting->isConnected()) {
-            $this->warn('Shopee Auto-Sync: Toko Shopee belum terhubung atau token belum aktif.');
+            $this->warn('Shopee Auto-Sync: OpenShopee API / Toko Shopee belum terhubung.');
 
             return self::SUCCESS;
         }

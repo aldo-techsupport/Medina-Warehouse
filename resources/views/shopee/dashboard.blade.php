@@ -57,13 +57,18 @@
                     </div>
 
                     <div class="d-flex flex-wrap align-items-center mt-2 mt-md-0">
+                        @if(!empty($apiDashboardUrl))
+                            <a href="{{ $apiDashboardUrl }}" target="_blank" class="btn btn-outline-primary btn-xs font-weight-bold mr-1 mb-1">
+                                <i class="fas fa-server mr-1"></i> Dashboard OpenShopee API
+                            </a>
+                        @endif
                         @if($authUrl)
                             <a href="{{ $authUrl }}" target="_blank" class="btn btn-shopee btn-xs font-weight-bold mr-1 mb-1">
                                 <i class="fas fa-lock mr-1"></i> Otorisasi (OAuth)
                             </a>
                         @endif
                         <a href="{{ route('shopee.settings') }}" class="btn btn-outline-dark btn-xs mb-1">
-                            <i class="fas fa-cog mr-1"></i> Pengaturan API
+                            <i class="fas fa-cog mr-1"></i> Koneksi API
                         </a>
                     </div>
                 </div>
@@ -288,7 +293,7 @@
 
                     <div class="form-group">
                         <label class="font-weight-semibold text-sm" id="modalQtyLabel">Jumlah Unit Tambahan <span class="text-danger">*</span></label>
-                        <input type="number" name="qty" id="modalQtyInput" class="form-control form-control-sm font-weight-bold" placeholder="Contoh: 10" required min="1">
+                        <input type="number" name="qty" id="modalQtyInput" class="form-control form-control-sm font-weight-bold" placeholder="" required min="1">
                         <small class="text-muted d-block mt-1">
                             Stok akhir setelah disimpan: <strong class="text-success" id="modalCalcResult">0</strong>
                         </small>
@@ -296,7 +301,7 @@
 
                     <div class="form-group mb-2">
                         <label class="font-weight-semibold text-sm">Keterangan / Catatan (Opsional)</label>
-                        <input type="text" name="notes" id="modalNotesInput" class="form-control form-control-sm" placeholder="Contoh: Restock Supplier / Penyesuaian Fisik">
+                        <input type="text" name="notes" id="modalNotesInput" class="form-control form-control-sm" placeholder="">
                     </div>
 
                     <div class="alert alert-info py-2 px-3 mb-0 text-xs rounded border-0">
