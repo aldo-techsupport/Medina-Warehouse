@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\AuthenticateMobileApi;
 use App\Http\Middleware\CheckMenuAccess;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -76,6 +77,7 @@ if (! function_exists('finfo_close')) {
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
         web: __DIR__.'/../routes/web.php',
+        api: __DIR__.'/../routes/api.php',
         commands: __DIR__.'/../routes/console.php',
         health: '/up',
     )
@@ -95,6 +97,8 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $middleware->alias([
             'menu' => CheckMenuAccess::class,
+            'mobile.auth' => AuthenticateMobileApi::class,
+            'mobile.auth' => \App\Http\Middleware\AuthenticateMobileApi::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

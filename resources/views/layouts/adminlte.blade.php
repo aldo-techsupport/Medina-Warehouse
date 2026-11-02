@@ -550,6 +550,16 @@
                                 </a>
                             </li>
                         @endif
+
+                        <li class="nav-item">
+                            <a href="{{ route('mobile.api.index') }}" class="nav-link {{ request()->routeIs('mobile.api.*') ? 'active bg-success' : '' }}">
+                                <i class="nav-icon fas fa-mobile-screen-button text-success"></i>
+                                <p>
+                                    API & Mobile App
+                                    <span class="badge badge-success right">REST</span>
+                                </p>
+                            </a>
+                        </li>
                     @endif
 
                     @if(auth()->user()->hasPermission('shopee_dashboard') || auth()->user()->hasPermission('shopee_orders') || auth()->user()->hasPermission('shopee_settings'))

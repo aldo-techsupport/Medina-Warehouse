@@ -4,6 +4,7 @@ use App\Http\Controllers\AiAdvisorController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\CourierTrackingController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\MobileIntegrationController;
 use App\Http\Controllers\PackingController;
 use App\Http\Controllers\RoleController;
 use App\Http\Controllers\ShopeeController;
@@ -67,6 +68,13 @@ Route::middleware('auth')->group(function () {
         Route::middleware('menu:packing_history')->group(function () {
             Route::get('/history', [PackingController::class, 'history'])->name('history');
         });
+    });
+
+    // Mobile App & Camera API Integration
+    Route::prefix('mobile-api')->name('mobile.api.')->group(function () {
+        Route::get('/', [MobileIntegrationController::class, 'index'])->name('index');
+        Route::get('/postman', [MobileIntegrationController::class, 'postmanCollection'])->name('postman');
+        Route::post('/token', [MobileIntegrationController::class, 'generateToken'])->name('token');
     });
 
     // Courier & Logistics Tracking (Shopee Guide 4)

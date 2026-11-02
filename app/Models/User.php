@@ -10,9 +10,10 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Str;
 
-#[Fillable(['name', 'username', 'email', 'password', 'role_id', 'status'])]
-#[Hidden(['password', 'remember_token'])]
+#[Fillable(['name', 'username', 'email', 'password', 'role_id', 'status', 'api_token', 'api_token_last_used_at'])]
+#[Hidden(['password', 'remember_token', 'api_token'])]
 class User extends Authenticatable
 {
     /** @use HasFactory<UserFactory> */
@@ -27,6 +28,7 @@ class User extends Authenticatable
     {
         return [
             'email_verified_at' => 'datetime',
+            'api_token_last_used_at' => 'datetime',
             'password' => 'hashed',
         ];
     }
@@ -85,5 +87,52 @@ class User extends Authenticatable
         }
 
         return route('dashboard');
+    }
+
+    /**
+     * Generate or renew mobile API token.
+     */
+    public function generateApiToken(): string
+    {
+        $plainToken = Str::random(60);
+        $this->forceFill([
+            'api_token' => hash('sha256', $plainToken),
+            'api_token_last_used_at' => now(),
+        ])->save();
+
+        return $plainToken;
+    }
+
+    /**
+     * Revoke mobile API token.
+     */
+    public function revokeApiToken(): void
+    {
+        $this->forceFill([
+            'api_token' => null,
+            'api_token_last_used_at' => null,
+        ])->save();
+    }
+
+    /**
+     * Find user by plain text API token.
+     */
+    public static function findByApiToken(?string $plainToken): ?self
+    {
+        if (empty($plainToken)) {
+            return null;
+        }
+
+        $hashed = hash('sha256', $plainToken);
+
+        $user = self::where('api_token', $hashed)
+            ->where('status', 'active')
+            ->first();
+
+        if ($user) {
+            $user->update(['api_token_last_used_at' => now()]);
+        }
+
+        return $user;
     }
 }

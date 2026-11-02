@@ -4,6 +4,9 @@
 @section('page_title', 'Packing Video & Validasi Resi')
 
 @section('page_actions')
+    <a href="{{ route('mobile.api.index') }}" class="btn btn-outline-success btn-sm font-weight-bold shadow-xs mr-1">
+        <i class="fas fa-mobile-screen-button mr-1"></i> Aplikasi Mobile & API
+    </a>
     <a href="{{ route('packing.history') }}" class="btn btn-outline-primary btn-sm font-weight-bold">
         <i class="fas fa-video mr-1"></i> Galeri Video Packing
     </a>
@@ -498,8 +501,9 @@
 
                     <div id="cameraPlaceholder" class="text-center text-white p-3" style="display: none; position: absolute;">
                         <i class="fas fa-video-slash fa-2x text-muted mb-2"></i>
-                        <p class="text-muted mb-2" style="font-size: 12px;">Kamera belum diizinkan atau tidak aktif.</p>
-                        <button class="btn btn-primary btn-xs" onclick="startCamera()">Aktifkan Kamera</button>
+                        <p class="text-white-50 mb-2" style="font-size: 12px;">Kamera belum diizinkan atau diblokir Chrome karena IP lokal HTTP (non-SSL).</p>
+                        <button class="btn btn-primary btn-xs mr-1" onclick="startCamera()">Aktifkan Kamera</button>
+                        <a href="{{ route('mobile.api.index') }}" class="btn btn-success btn-xs font-weight-bold"><i class="fas fa-mobile-screen-button mr-1"></i> Buka Aplikasi Mobile</a>
                     </div>
 
                     <!-- Quick Floating Camera Header -->
